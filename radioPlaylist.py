@@ -60,6 +60,7 @@ def calculate_category_percentages(playlists, days):
 	polskie_counts = {'morning': 0, 'day': 0, 'night': 0, 'late_night': 0}
 	total_files = set()
 	total_polskie_files = set()
+
 	for day in days:
 		for category in category_counts.keys():
 			category_counts[category] += len(playlists[day][category])
@@ -70,18 +71,19 @@ def calculate_category_percentages(playlists, days):
 					total_polskie_files.add(file)
 
 	total_count = len(total_files)
-	total_polskie_count = len(total_polskie_files)
 	if total_count == 0:
 		return None
+
 	percentages = {
 		category: (count / total_count) * 100 for category, count in category_counts.items()
 	}
-	polskie_percentages = {
-		category: (count / total_polskie_count) * 100 if total_polskie_count > 0 else 0
-		for category, count in polskie_counts.items()
-	}
-	return percentages, polskie_percentages
 
+	polskie_percentages = {
+		category: (polskie_counts[category] / category_counts[category]) * 100 if category_counts[category] > 0 else 0
+		for category in category_counts
+	}
+
+	return percentages, polskie_percentages
 
 def update_playlist_file(day: str, period: str, filepath: str, add: bool):
 	playlist_dir = ensure_playlist_dir(day)
@@ -212,7 +214,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 	for category in ['morning', 'day', 'night', 'late_night']:
 		percent = percentages.get(category, 0)
 		polskie_percent = polskie_percentages.get(category, 0)
-		category_bar += f" {category[:3].capitalize()}: {percent:.1f}% (P:{polskie_percent:.1f}%) |"
+		category_bar += f" {category[:4].capitalize()}: {percent:.1f}% (P:{polskie_percent:.1f}%) |"
 
 	if len(category_bar) > term_width - 2:
 		category_bar = category_bar[:term_width - 5] + "..."
@@ -301,7 +303,7 @@ def main():
 			term_width, term_height = get_terminal_size()
 			terminal_size_cache.saveElement("width", term_width, 5, False, True)
 			terminal_size_cache.saveElement("height", term_height, 5, False, True)
-		visible_lines = term_height - 5
+		visible_lines = term_height - 6
 
 		if selected_idx < scroll_offset:
 			scroll_offset = selected_idx
