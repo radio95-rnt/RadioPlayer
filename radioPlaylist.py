@@ -55,16 +55,15 @@ def ensure_playlist_dir(day: str) -> str:
 		os.makedirs(playlist_dir)
 	return playlist_dir
 
-def calculate_category_percentages(playlists, days):
+def calculate_category_percentages(playlists, current_day):
 	category_counts = {'morning': 0, 'day': 0, 'night': 0, 'late_night': 0}
 	polskie_counts = {'morning': 0, 'day': 0, 'night': 0, 'late_night': 0}
 
-	for day in days:
-		for category in category_counts.keys():
-			for file in playlists[day][category]:
-				category_counts[category] += 1
-				if "Polskie" in file or "Dzem" in file:
-					polskie_counts[category] += 1
+	for category in category_counts.keys():
+		for file in playlists[current_day][category]:
+			category_counts[category] += 1
+			if "Polskie" in file or "Dzem" in file:
+				polskie_counts[category] += 1
 
 	total_count = sum(category_counts.values())
 
@@ -199,7 +198,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 	days = get_days_of_week()
 	current_day = days[current_day_idx]
 
-	percentages, polskie_percentages, total_pl = calculate_category_percentages(playlists, days) or ({}, {}, 0)
+	percentages, polskie_percentages, total_pl = calculate_category_percentages(playlists, current_day) or ({}, {}, 0)
 
 	available_lines = term_height - 6
 	start_idx = max(0, min(scroll_offset, len(audio_files) - available_lines))
