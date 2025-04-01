@@ -161,7 +161,7 @@ def copy_current_file_to_all(playlists: dict, source_day: str, days: list[str], 
 
 		for period, is_present in source_periods.items():
 			target_set = playlists[target_day][period]
-			full_path = os.path.join(playlists_dir, current_file)
+			full_path = os.path.join(files_dir, current_file)
 
 			if is_present:
 				target_set.add(current_file)
