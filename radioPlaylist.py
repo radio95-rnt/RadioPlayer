@@ -166,14 +166,14 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 	"""Draw the TUI interface with day-of-week sections"""
 	clear_screen()
 	term_width, term_height = terminal_size_cache.getElement("width", False), terminal_size_cache.getElement("height", False)
-	if term_width or term_height == 0:
+	if term_width is None or term_height is None:
 		term_width, term_height = get_terminal_size()
 		terminal_size_cache.saveElement("width", term_width, 30, False, True)
 		terminal_size_cache.saveElement("height", term_height, 30, False, True)
 	days = get_days_of_week()
 	current_day = days[current_day_idx]
 
-	available_lines = term_height - 5  
+	available_lines = term_height - 5
 	start_idx = max(0, min(scroll_offset, len(audio_files) - available_lines))
 	end_idx = min(start_idx + available_lines, len(audio_files))
 
@@ -193,7 +193,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 		print(" ", end="")
 
 	position_info = f" {current_day.capitalize()} | File {selected_idx + 1}/{len(audio_files)} "
-	padding = term_width - len(position_info) - 2  
+	padding = term_width - len(position_info) - 2
 	print(position_info.center(padding), end="")
 
 	if end_idx < len(audio_files):
@@ -204,7 +204,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 	if message:
 		print(f"\033[1;32m{message}\033[0m")
 	else:
-		print()  
+		print()
 
 	for idx in range(start_idx, end_idx):
 		file = audio_files[idx]
@@ -220,11 +220,11 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 		l_color = "\033[1;32m" if in_late_night else "\033[1;30m"
 
 		if idx == selected_idx:
-			row_highlight = "\033[1;44m"  
+			row_highlight = "\033[1;44m"
 		else:
 			row_highlight = ""
 
-		max_filename_length = term_width - 15 
+		max_filename_length = term_width - 15
 		if len(file) > max_filename_length:
 			file = file[:max_filename_length-3] + "..."
 
@@ -240,11 +240,11 @@ def main():
 	days_of_week = get_days_of_week()
 	playlists = load_playlists(days_of_week)
 
-	selected_idx = 0  
-	current_day_idx = 0 
-	scroll_offset = 0 
-	flash_message = None  
-	message_timer = 0  
+	selected_idx = 0
+	current_day_idx = 0
+	scroll_offset = 0
+	flash_message = None
+	message_timer = 0
 
 	def signal_handler(sig, frame):
 		clear_screen()
@@ -254,10 +254,9 @@ def main():
 
 	terminal_size_cache = libcache.Cache()
 
-	# Main loop
 	while True:
 		term_width, term_height = terminal_size_cache.getElement("width", False), terminal_size_cache.getElement("height", False)
-		if term_width or term_height == 0:
+		if term_width is None or term_height is None:
 			term_width, term_height = get_terminal_size()
 			terminal_size_cache.saveElement("width", term_width, 30, False, True)
 			terminal_size_cache.saveElement("height", term_height, 30, False, True)
@@ -278,36 +277,36 @@ def main():
 
 		key = get_char()
 
-		if key == 'q': 
+		if key == 'q':
 			clear_screen()
 			break
-		elif key == '\x1b':  
+		elif key == '\x1b':
 			next_key = get_char()
 			if next_key == '[':
 				arrow_key = get_char()
-				if arrow_key == 'A':  
+				if arrow_key == 'A':
 					selected_idx = max(0, selected_idx - 1)
-				elif arrow_key == 'B':  
+				elif arrow_key == 'B':
 					selected_idx = min(len(audio_files) - 1, selected_idx + 1)
-				elif arrow_key == 'C':  
+				elif arrow_key == 'C':
 					current_day_idx = (current_day_idx + 1) % len(days_of_week)
-				elif arrow_key == 'D':  
+				elif arrow_key == 'D':
 					current_day_idx = (current_day_idx - 1) % len(days_of_week)
-				elif arrow_key == '5':  
+				elif arrow_key == '5':
 					try:
-						next_key = get_char()  
+						next_key = get_char()
 					except:
 						pass
 					selected_idx = max(0, selected_idx - visible_lines)
 				elif arrow_key == '6':
 					try:
-						next_key = get_char() 
+						next_key = get_char()
 					except:
 						pass
 					selected_idx = min(len(audio_files) - 1, selected_idx + visible_lines)
-		elif key == ' ': 
+		elif key == ' ':
 			selected_idx = min(len(audio_files) - 1, selected_idx + visible_lines)
-		elif key.lower() == 'm': 
+		elif key.lower() == 'm':
 			current_day = days_of_week[current_day_idx]
 			file = audio_files[selected_idx]
 			is_in_playlist = file in playlists[current_day]['morning']
@@ -318,7 +317,7 @@ def main():
 				playlists[current_day]['morning'].add(file)
 
 			update_playlist_file(current_day, 'morning', file, not is_in_playlist)
-		elif key.lower() == 'd': 
+		elif key.lower() == 'd':
 			current_day = days_of_week[current_day_idx]
 			file = audio_files[selected_idx]
 			is_in_playlist = file in playlists[current_day]['day']
@@ -330,7 +329,7 @@ def main():
 
 			update_playlist_file(current_day, 'day', file, not is_in_playlist)
 
-		elif key.lower() == 'n':  
+		elif key.lower() == 'n':
 			current_day = days_of_week[current_day_idx]
 			file = audio_files[selected_idx]
 			is_in_playlist = file in playlists[current_day]['night']
@@ -354,13 +353,13 @@ def main():
 
 			update_playlist_file(current_day, 'late_night', file, not is_in_playlist)
 
-		elif key.lower() == 'c':  
+		elif key.lower() == 'c':
 			current_day = days_of_week[current_day_idx]
 			playlists = copy_day_to_all(playlists, current_day, days_of_week)
 			flash_message = f"Playlists from {current_day} copied to all other days!"
 			message_timer = 0
 
-		elif key.lower() == 'f':  
+		elif key.lower() == 'f':
 			current_day = days_of_week[current_day_idx]
 			current_file = audio_files[selected_idx]
 
