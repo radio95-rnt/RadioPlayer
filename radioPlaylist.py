@@ -168,8 +168,8 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 	term_width, term_height = terminal_size_cache.getElement("width", False), terminal_size_cache.getElement("height", False)
 	if term_width is None or term_height is None:
 		term_width, term_height = get_terminal_size()
-		terminal_size_cache.saveElement("width", term_width, 30, False, True)
-		terminal_size_cache.saveElement("height", term_height, 30, False, True)
+		terminal_size_cache.saveElement("width", term_width, 5, False, True)
+		terminal_size_cache.saveElement("height", term_height, 5, False, True)
 	days = get_days_of_week()
 	current_day = days[current_day_idx]
 
@@ -258,8 +258,8 @@ def main():
 		term_width, term_height = terminal_size_cache.getElement("width", False), terminal_size_cache.getElement("height", False)
 		if term_width is None or term_height is None:
 			term_width, term_height = get_terminal_size()
-			terminal_size_cache.saveElement("width", term_width, 30, False, True)
-			terminal_size_cache.saveElement("height", term_height, 30, False, True)
+			terminal_size_cache.saveElement("width", term_width, 5, False, True)
+			terminal_size_cache.saveElement("height", term_height, 5, False, True)
 		visible_lines = term_height - 5
 
 		if selected_idx < scroll_offset:
