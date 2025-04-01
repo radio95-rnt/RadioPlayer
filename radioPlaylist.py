@@ -80,7 +80,7 @@ def calculate_category_percentages(playlists, days):
 		for category in category_counts
 	}
 
-	return percentages, polskie_percentages, sum(polskie_percentages.values())
+	return percentages, polskie_percentages, sum(polskie_percentages.values())/len(polskie_percentages.keys())
 
 def update_playlist_file(day: str, period: str, filepath: str, add: bool):
 	playlist_dir = ensure_playlist_dir(day)
