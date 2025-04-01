@@ -134,7 +134,7 @@ def copy_day_to_all(playlists: dict, source_day: str, days: list[str]):
 
 			filepaths = []
 			for filename in playlists[source_day][period]:
-				full_path = os.path.join(playlists_dir, filename)
+				full_path = os.path.join(files_dir, filename)
 				filepaths.append(full_path)
 
 			with open(target_file, 'w') as f:
