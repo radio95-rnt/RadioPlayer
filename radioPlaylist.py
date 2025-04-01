@@ -58,19 +58,16 @@ def ensure_playlist_dir(day: str) -> str:
 def calculate_category_percentages(playlists, days):
 	category_counts = {'morning': 0, 'day': 0, 'night': 0, 'late_night': 0}
 	polskie_counts = {'morning': 0, 'day': 0, 'night': 0, 'late_night': 0}
-	total_files = set()
-	total_polskie_files = set()
 
 	for day in days:
 		for category in category_counts.keys():
-			category_counts[category] += len(playlists[day][category])
 			for file in playlists[day][category]:
-				total_files.add(file)
+				category_counts[category] += 1
 				if "Polskie" in file:
 					polskie_counts[category] += 1
-					total_polskie_files.add(file)
 
-	total_count = len(total_files)
+	total_count = sum(category_counts.values())
+
 	if total_count == 0:
 		return None
 
