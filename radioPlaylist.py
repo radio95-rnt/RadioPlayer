@@ -63,7 +63,7 @@ def calculate_category_percentages(playlists, days):
 		for category in category_counts.keys():
 			for file in playlists[day][category]:
 				category_counts[category] += 1
-				if "Polskie" in file:
+				if "Polskie" in file or "Dzem" in file:
 					polskie_counts[category] += 1
 
 	total_count = sum(category_counts.values())
