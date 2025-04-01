@@ -79,8 +79,8 @@ def calculate_category_percentages(playlists, days):
 		category: (polskie_counts[category] / category_counts[category]) * 100 if category_counts[category] > 0 else 0
 		for category in category_counts
 	}
-
-	return percentages, polskie_percentages
+ 
+	return percentages, polskie_percentages, sum(polskie_percentages.values())
 
 def update_playlist_file(day: str, period: str, filepath: str, add: bool):
 	playlist_dir = ensure_playlist_dir(day)
@@ -200,7 +200,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 	days = get_days_of_week()
 	current_day = days[current_day_idx]
 
-	percentages, polskie_percentages = calculate_category_percentages(playlists, days) or ({}, {})
+	percentages, polskie_percentages, total_pl = calculate_category_percentages(playlists, days) or ({}, {}, 0)
 
 	available_lines = term_height - 6
 	start_idx = max(0, min(scroll_offset, len(audio_files) - available_lines))
@@ -211,7 +211,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 	for category in ['morning', 'day', 'night', 'late_night']:
 		percent = percentages.get(category, 0)
 		polskie_percent = polskie_percentages.get(category, 0)
-		category_bar += f" {category[:4].capitalize()}: {percent:.1f}% (P:{polskie_percent:.1f}%) |"
+		category_bar += f"{category[:4].capitalize()}: {percent:.1f}% (P:{polskie_percent:.1f}%) TP:{total_pl:0.1f}"
 
 	if len(category_bar) > term_width - 2:
 		category_bar = category_bar[:term_width - 5] + "..."
