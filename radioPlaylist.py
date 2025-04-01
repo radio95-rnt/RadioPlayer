@@ -203,14 +203,20 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 
 	percentages, polskie_percentages = calculate_category_percentages(playlists, days) or ({}, {})
 
-	available_lines = term_height - 8
+	available_lines = term_height - 6
 	start_idx = max(0, min(scroll_offset, len(audio_files) - available_lines))
 	end_idx = min(start_idx + available_lines, len(audio_files))
 
-	print("Playlist Distribution:")
-	for category, percent in percentages.items():
-		print(f"{category.capitalize()}: {percent:.2f}% (Polskie: {polskie_percentages.get(category, 0):.2f}%)")
-	print("\n")
+	print("\033[1;37mCategory Distribution:\033[0m".center(term_width))
+	category_bar = ""
+	for category in ['morning', 'day', 'night', 'late_night']:
+		percent = percentages.get(category, 0)
+		polskie_percent = polskie_percentages.get(category, 0)
+		category_bar += f" {category[:3].capitalize()}: {percent:.1f}% (P:{polskie_percent:.1f}%) |"
+
+	if len(category_bar) > term_width - 2:
+		category_bar = category_bar[:term_width - 5] + "..."
+	print(category_bar.center(term_width))
 
 	day_bar = ""
 	for i, day in enumerate(days):
