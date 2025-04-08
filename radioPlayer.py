@@ -92,6 +92,7 @@ def play_playlist(playlist_path, play_newest_first=False):
 		time.sleep(15)
 		return
 
+	random.seed(time.time()-1744118482)
 	if play_newest_first:
 		newest_track = get_newest_track(tracks)
 		if newest_track:
