@@ -13,6 +13,8 @@ playlists_dir = "/home/user/playlists/"
 
 formats = ('.mp3', '.m4a')
 
+p = ("Polskie", "Dzem")
+
 def get_audio_files(directory) -> list[str]:
 	audio_files = []
 	try:
@@ -56,13 +58,13 @@ def ensure_playlist_dir(day: str) -> str:
 	return playlist_dir
 
 def calculate_category_percentages(playlists, current_day):
-	category_counts = {'morning': 0, 'day': 0, 'night': 0, 'late_night': 0}
-	polskie_counts = {'morning': 0, 'day': 0, 'night': 0, 'late_night': 0}
+	category_counts = {'late_night': 0, 'morning': 0, 'day': 0, 'night': 0}
+	polskie_counts = {'late_night': 0, 'morning': 0, 'day': 0, 'night': 0}
 
 	for category in category_counts.keys():
 		for file in playlists[current_day][category]:
 			category_counts[category] += 1
-			if "Polskie" in file or "Dzem" in file:
+			if any(element in file for element in p):
 				polskie_counts[category] += 1
 
 	total_count = sum(category_counts.values())
@@ -79,7 +81,7 @@ def calculate_category_percentages(playlists, current_day):
 		for category in category_counts
 	}
 
-	return percentages, polskie_percentages, sum(polskie_percentages.values())/len(polskie_percentages.keys())
+	return percentages, polskie_percentages, (sum(polskie_counts.values())/sum(category_counts.values()))*100
 
 def update_playlist_file(day: str, period: str, filepath: str, add: bool):
 	playlist_dir = ensure_playlist_dir(day)
@@ -105,11 +107,11 @@ def update_playlist_file(day: str, period: str, filepath: str, add: bool):
 def load_playlists(days: list[str]):
 	playlists = {}
 	for day in days:
-		playlists[day] = {'morning': set(), 'day': set(), 'night': set(), 'late_night': set()}
+		playlists[day] = {'late_night': set(), 'morning': set(), 'day': set(), 'night': set()}
 		playlist_dir = os.path.expanduser(os.path.join(playlists_dir, day))
 
 		if os.path.exists(playlist_dir):
-			for period in ['morning', 'day', 'night', 'late_night']:
+			for period in ['late_night', 'morning', 'day', 'night']:
 				playlist_file = os.path.join(playlist_dir, period)
 				if os.path.exists(playlist_file):
 					with open(playlist_file, 'r') as f:
@@ -122,7 +124,7 @@ def load_playlists(days: list[str]):
 	return playlists
 
 def copy_day_to_all(playlists: dict, source_day: str, days: list[str]):
-	periods = ['morning', 'day', 'night', 'late_night']
+	periods = ['late_night', 'morning', 'day', 'night']
 
 	for target_day in days:
 		if target_day == source_day:
@@ -146,10 +148,10 @@ def copy_day_to_all(playlists: dict, source_day: str, days: list[str]):
 
 def copy_current_file_to_all(playlists: dict, source_day: str, days: list[str], current_file: str):
 	source_periods = {
+		'late_night': current_file in playlists[source_day]['late_night'],
 		'morning': current_file in playlists[source_day]['morning'],
 		'day': current_file in playlists[source_day]['day'],
 		'night': current_file in playlists[source_day]['night'],
-		'late_night': current_file in playlists[source_day]['late_night']
 	}
 
 	if not any(source_periods.values()):
@@ -206,7 +208,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 
 	print("\033[1;37mCategory Distribution:\033[0m".center(term_width))
 	category_bar = ""
-	for category in ['morning', 'day', 'night', 'late_night']:
+	for category in ['late_night', 'morning', 'day', 'night']:
 		percent = percentages.get(category, 0)
 		polskie_percent = polskie_percentages.get(category, 0)
 		category_bar += f"{category[:4].capitalize()}: {percent:.1f}% (P:{polskie_percent:.1f}%) | "
@@ -248,15 +250,15 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 	for idx in range(start_idx, end_idx):
 		file = audio_files[idx]
 
+		in_late_night = file in playlists[current_day]['late_night']
 		in_morning = file in playlists[current_day]['morning']
 		in_day = file in playlists[current_day]['day']
 		in_night = file in playlists[current_day]['night']
-		in_late_night = file in playlists[current_day]['late_night']
 
+		l_color = "\033[1;32m" if in_late_night else "\033[1;30m"
 		m_color = "\033[1;32m" if in_morning else "\033[1;30m"
 		d_color = "\033[1;32m" if in_day else "\033[1;30m"
 		n_color = "\033[1;32m" if in_night else "\033[1;30m"
-		l_color = "\033[1;32m" if in_late_night else "\033[1;30m"
 
 		if idx == selected_idx:
 			row_highlight = "\033[1;44m"
@@ -267,7 +269,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
 		if len(file) > max_filename_length:
 			file = file[:max_filename_length-3] + "..."
 
-		print(f"{row_highlight}[{m_color}M\033[0m{row_highlight}] [{d_color}D\033[0m{row_highlight}] [{n_color}N\033[0m{row_highlight}] [{l_color}L\033[0m{row_highlight}] {file}\033[0m")
+		print(f"{row_highlight}[{l_color}L\033[0m{row_highlight}] [{m_color}M\033[0m{row_highlight}] [{d_color}D\033[0m{row_highlight}] [{n_color}N\033[0m{row_highlight}] {file}\033[0m")
 
 def main():
 	audio_files = get_audio_files(files_dir)
