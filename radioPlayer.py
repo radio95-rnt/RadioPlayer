@@ -6,13 +6,20 @@ import time
 import sys
 from datetime import datetime
 
+MORNING_START = 6
+MORNING_END = 10
+DAY_START = 10
+DAY_END = 20
+LATE_NIGHT_START = 0
+LATE_NIGHT_END = 6
+
 playlist_dir = "/home/user/playlists"
 name_table_dir = "/home/user/mixes/name_table.txt"
 
 rds_base = "Gramy: radio95 - {}"
 rds_default_name = "Program Godzinny"
 rds_path = "/home/user/RDS"
-rds_rtp_data = "4,7,7,1,17"
+rds_default_rtp_data = "4,7,7,1,17"
 
 def get_current_hour():
 	return datetime.now().hour
@@ -40,12 +47,12 @@ def update_rds(track_name):
 			prt = rds_base.format(rds_default_name)
 
 		f = open(rds_path, "w")
-		f.write(f"TEXT={prt}\r")
+		f.write(f"TEXT={prt}\r\n")
 
 		try:
-			f.write(f"RTP={rds_rtp_data},{len(str(name_table[track_name]))-1}\r")
+			f.write(f"RTP={rds_default_rtp_data},{len(str(name_table[track_name]))-1}\r\n")
 		except KeyError:
-			f.write(f"RTP={rds_rtp_data},{len(rds_default_name)-1}\r")
+			f.write(f"RTP={rds_default_rtp_data},{len(rds_default_name)-1}\r\n")
 		f.close()
 	except Exception as e:
 		print(f"Error updating RDS: {e}")
@@ -116,15 +123,15 @@ def play_playlist(playlist_path, play_newest_first=False):
 		night_playlist_path = os.path.join(playlist_dir, current_day, 'night')
 		late_night_playlist_path = os.path.join(playlist_dir, current_day, 'late_night')
 
-		if 10 <= current_hour < 20:
+		if DAY_START <= current_hour < DAY_END:
 			if playlist_path != day_playlist_path:
 				print("Time changed to day hours, switching playlist...")
 				return
-		elif 6 <= current_hour < 10:
+		elif MORNING_START <= current_hour < MORNING_END:
 			if playlist_path != morning_playlist_path:
 				print("Time changed to morning hours, switching playlist...")
 				return
-		elif 0 <= current_hour < 6:
+		elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
 			if playlist_path != late_night_playlist_path:
 				print("Time changed to late night hours, switching playlist...")
 				return
@@ -163,7 +170,6 @@ def main():
 		if not os.path.exists(morning_dir):
 			print(f"Creating directory: {morning_dir}")
 			os.makedirs(morning_dir, exist_ok=True)
-			
 		if not os.path.exists(day_dir):
 			print(f"Creating directory: {day_dir}")
 			os.makedirs(day_dir, exist_ok=True)
@@ -182,13 +188,13 @@ def main():
 				with open(playlist_path, 'w') as f:
 					pass
 
-		if 10 <= current_hour < 20:
+		if DAY_START <= current_hour < DAY_END:
 			print(f"Playing {current_day} day playlist...")
 			play_playlist(day_playlist, play_newest_first)
-		elif 6 <= current_hour < 10:
+		elif MORNING_START <= current_hour < MORNING_END:
 			print(f"Playing {current_day} morning playlist...")
 			play_playlist(morning_playlist, play_newest_first)
-		elif 0 <= current_hour < 6:
+		elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
 			print(f"Playing {current_day} late_night playlist...")
 			play_playlist(late_night_playlist, play_newest_first)
 		else:
