@@ -148,10 +148,25 @@ def play_playlist(playlist_path, play_newest_first=False):
 		subprocess.run(['ffplay', '-nodisp', '-stats', '-hide_banner', '-autoexit', track_path])
 
 def main():
-	play_newest_first = len(sys.argv) > 1 and sys.argv[1].lower() == "n"
-	
-	if play_newest_first:
-		print("Newest song will be played first")
+	arg = sys.argv[1] if len(sys.argv) > 1 else None
+	play_newest_first = False
+	pre_track_path = None
+
+	if arg:
+		if arg.lower() == "n":
+			play_newest_first = True
+			print("Newest song will be played first")
+		elif os.path.isfile(os.path.join(playlist_dir, arg)):
+			pre_track_path = os.path.join(playlist_dir, arg)
+			print(f"Will play requested song first: {os.path.basename(pre_track_path)}")
+		else:
+			print(f"Invalid argument or file not found: {arg}")
+
+	if pre_track_path:
+		track_name = os.path.basename(pre_track_path)
+		print(f"Now playing: {track_name}")
+		update_rds(track_name)
+		subprocess.run(['ffplay', '-nodisp', '-stats', '-hide_banner', '-autoexit', pre_track_path])
 
 	while True:
 		current_hour = get_current_hour()
