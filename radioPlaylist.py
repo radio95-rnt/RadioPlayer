@@ -214,14 +214,16 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
         category_bar += f"{category[:4].capitalize()}: {percent:.1f}% (P:{polskie_percent:.1f}%) | "
     category_bar += f"TP:{total_pl:0.1f}% | "
     
-    assigned = 0
+    assigned_files = set()
     categories = ['late_night', 'morning', 'day', 'night']
-    for category in categories:
-        for day in get_days_of_week():
-            for file in playlists[day][category]:
-                assigned += 1
-    assigned /= len(get_days_of_week())
-    unassigned = ((len(audio_files)-assigned) / len(audio_files))*100
+    for day in get_days_of_week():
+        for category in categories:
+            assigned_files.update(playlists[day][category])
+    
+    total_files = len(audio_files)
+    assigned_count = len(assigned_files)
+    unassigned = ((total_files - assigned_count) / total_files) * 100 if total_files > 0 else 0
+    
     category_bar += f"UA:{unassigned:0.1f}%"
 
     if len(category_bar) > term_width - 2:
