@@ -57,7 +57,7 @@ def ensure_playlist_dir(day: str) -> str:
         os.makedirs(playlist_dir)
     return playlist_dir
 
-def calculate_category_percentages(audio_files, playlists, current_day):
+def calculate_category_percentages(playlists, current_day):
     category_counts = {'late_night': 0, 'morning': 0, 'day': 0, 'night': 0}
     polskie_counts = {'late_night': 0, 'morning': 0, 'day': 0, 'night': 0}
 
@@ -68,12 +68,6 @@ def calculate_category_percentages(audio_files, playlists, current_day):
                 polskie_counts[category] += 1
 
     total_count = sum(category_counts.values())
-    
-    # Calculate unassigned percentage
-    total_files = len(set().union(*playlists[current_day].values()))
-    unassigned_count = len(set(audio_files) - set().union(*playlists[current_day].values()))
-    unassigned_percentage = (unassigned_count / len(audio_files)) * 100 if audio_files else 0
-
 
     if total_count == 0:
         return None
@@ -87,7 +81,7 @@ def calculate_category_percentages(audio_files, playlists, current_day):
         for category in category_counts
     }
 
-    return percentages, polskie_percentages, (sum(polskie_counts.values())/sum(category_counts.values()))*100, unassigned_percentage
+    return percentages, polskie_percentages, (sum(polskie_counts.values())/sum(category_counts.values()))*100
 
 def update_playlist_file(day: str, period: str, filepath: str, add: bool):
     playlist_dir = ensure_playlist_dir(day)
@@ -206,7 +200,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
     days = get_days_of_week()
     current_day = days[current_day_idx]
 
-    percentages, polskie_percentages, total_pl, unassigned = calculate_category_percentages(audio_files, playlists, current_day) or ({}, {}, 0, 0)
+    percentages, polskie_percentages, total_pl = calculate_category_percentages(playlists, current_day) or ({}, {}, 0)
 
     available_lines = term_height - 6
     start_idx = max(0, min(scroll_offset, len(audio_files) - available_lines))
@@ -219,6 +213,13 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
         polskie_percent = polskie_percentages.get(category, 0)
         category_bar += f"{category[:4].capitalize()}: {percent:.1f}% (P:{polskie_percent:.1f}%) | "
     category_bar += f"TP:{total_pl:0.1f}% | "
+    
+    unassigned = len(audio_files)
+    categories = ['late_night', 'morning', 'day', 'night']
+    for category in categories:
+        for file in playlists[current_day][category]:
+            unassigned -= 1
+    unassigned = (unassigned / len(audio_files))*100
     category_bar += f"UA:{unassigned:0.1f}%"
 
     if len(category_bar) > term_width - 2:
