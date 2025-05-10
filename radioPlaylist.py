@@ -217,8 +217,9 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
     unassigned = len(audio_files)
     categories = ['late_night', 'morning', 'day', 'night']
     for category in categories:
-        for file in playlists[current_day][category]:
-            unassigned -= 1
+        for day in get_days_of_week():
+            for file in playlists[day][category]:
+                unassigned -= 1
     unassigned = (unassigned / len(audio_files))*100
     category_bar += f"UA:{unassigned:0.1f}%"
 
