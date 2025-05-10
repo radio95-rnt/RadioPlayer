@@ -219,7 +219,7 @@ def draw_interface(audio_files: list, playlists: dict, selected_idx: int, curren
         polskie_percent = polskie_percentages.get(category, 0)
         category_bar += f"{category[:4].capitalize()}: {percent:.1f}% (P:{polskie_percent:.1f}%) | "
     category_bar += f"TP:{total_pl:0.1f}% | "
-    category_bar += f"UA:{unassigned:0.1}%"
+    category_bar += f"UA:{unassigned:0.1f}%"
 
     if len(category_bar) > term_width - 2:
         category_bar = category_bar[:term_width - 5] + "..."
