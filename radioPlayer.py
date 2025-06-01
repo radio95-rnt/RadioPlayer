@@ -99,7 +99,7 @@ def play_playlist(playlist_path, play_newest_first=False):
 		time.sleep(15)
 		return
 
-	random.seed(time.time()-1744118482)
+	random.seed(time.time_ns()-1748789305527928867)
 	if play_newest_first:
 		newest_track = get_newest_track(tracks)
 		if newest_track:
@@ -156,9 +156,9 @@ def main():
 		if arg.lower() == "n":
 			play_newest_first = True
 			print("Newest song will be played first")
-		elif os.path.isfile(os.path.join(playlist_dir, arg)):
-			pre_track_path = os.path.join(playlist_dir, arg)
-			print(f"Will play requested song first: {os.path.basename(pre_track_path)}")
+		elif os.path.isfile(arg):
+			pre_track_path = arg
+			print(f"Will play requested song first: {arg}")
 		else:
 			print(f"Invalid argument or file not found: {arg}")
 
