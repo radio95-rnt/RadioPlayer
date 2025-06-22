@@ -2,7 +2,7 @@
 import os
 import random
 import subprocess
-import time
+import time, datetime
 import sys
 from datetime import datetime
 
@@ -99,7 +99,7 @@ def play_playlist(playlist_path, play_newest_first=False):
 		time.sleep(15)
 		return
 
-	random.seed(time.time_ns()-1748789305527928867)
+	random.seed()
 	if play_newest_first:
 		newest_track = get_newest_track(tracks)
 		if newest_track:
