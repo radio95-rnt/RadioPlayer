@@ -145,7 +145,8 @@ def play_playlist(playlist_path, play_newest_first=False):
         print(f"Now playing: {track_name}")
         update_rds(track_name)
 
-        subprocess.run(['ffplay', '-nodisp', '-stats', '-hide_banner', '-autoexit', track_path])
+        subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
         if can_delete_file("/tmp/radioPlayer_quit"): 
             os.remove("/tmp/radioPlayer_quit")
             exit()
@@ -184,7 +185,7 @@ def main():
         track_name = os.path.basename(pre_track_path)
         print(f"Now playing: {track_name}")
         update_rds(track_name)
-        subprocess.run(['ffplay', '-nodisp', '-stats', '-hide_banner', '-autoexit', pre_track_path])
+        subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', pre_track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if can_delete_file("/tmp/radioPlayer_quit"): 
             os.remove("/tmp/radioPlayer_quit")
             exit()
