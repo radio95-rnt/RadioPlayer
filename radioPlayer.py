@@ -160,9 +160,18 @@ def main():
     arg = sys.argv[1] if len(sys.argv) > 1 else None
     play_newest_first = False
     pre_track_path = None
+    
+    if can_delete_file("/tmp/radioPlayer_arg") and not arg:
+        with open("/tmp/radioPlayer_arg", "r") as f:
+            arg = f.read()
+        os.remove("/tmp/radioPlayer_arg")
 
     if arg:
-        if arg.lower() == "n":
+        if arg.lower() == "-h":
+            print("/tmp/radioPlayer_quit")
+            print("/tmp/radioPlayer_arg")
+            exit(95)
+        elif arg.lower() == "n":
             play_newest_first = True
             print("Newest song will be played first")
         elif os.path.isfile(arg):
