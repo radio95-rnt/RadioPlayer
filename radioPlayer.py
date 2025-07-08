@@ -162,7 +162,7 @@ def main():
     play_newest_first = False
     pre_track_path = None
     
-    if can_delete_file("/tmp/radioPlayer_arg") and not arg:
+    if can_delete_file("/tmp/radioPlayer_arg"):
         with open("/tmp/radioPlayer_arg", "r") as f:
             arg = f.read()
         os.remove("/tmp/radioPlayer_arg")
