@@ -163,10 +163,8 @@ def main():
     pre_track_path = None
     
     if can_delete_file("/tmp/radioPlayer_arg"):
-        arg = None
         with open("/tmp/radioPlayer_arg", "r") as f:
-            arg = f.read()
-        if arg == None: exit(95)
+            arg = f.read().strip()
         os.remove("/tmp/radioPlayer_arg")
 
     if arg:
