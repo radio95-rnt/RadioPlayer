@@ -47,7 +47,12 @@ def update_rds(track_name):
             prt = rds_base.format(rds_default_name)
 
         f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        f.sendto(f"TEXT={prt}\r\n".encode(), ("127.0.0.1", 5000))
+        f.settimeout(1.0)
+        try:
+            f.sendto(f"TEXT={prt}\r\n".encode(), ("127.0.0.1", 5000))
+        except socket.timeout:
+            print("Could not send to RDS, timeout.")
+            return
 
         try:
             f.sendto(f"RTP={rds_default_rtp_data},{len(str(name_table[track_name]))-1}\r\n".encode(), ("127.0.0.1", 5000))
