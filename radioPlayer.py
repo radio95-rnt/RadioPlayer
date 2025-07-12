@@ -91,7 +91,7 @@ def get_newest_track(tracks):
     
     return newest_track
 
-def play_playlist(playlist_path, play_newest_first=False):
+def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False):
     last_modified_time = get_playlist_modification_time(playlist_path)
     tracks = load_playlist(playlist_path)
     if not tracks:
@@ -123,20 +123,20 @@ def play_playlist(playlist_path, play_newest_first=False):
         night_playlist_path = os.path.join(playlist_dir, current_day, 'night')
         late_night_playlist_path = os.path.join(playlist_dir, current_day, 'late_night')
 
-        if DAY_START <= current_hour < DAY_END:
+        if DAY_START <= current_hour < DAY_END and not custom_playlist:
             if playlist_path != day_playlist_path:
                 print("Time changed to day hours, switching playlist...")
                 return
-        elif MORNING_START <= current_hour < MORNING_END:
+        elif MORNING_START <= current_hour < MORNING_END and not custom_playlist:
             if playlist_path != morning_playlist_path:
                 print("Time changed to morning hours, switching playlist...")
                 return
-        elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
+        elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END and not custom_playlist:
             if playlist_path != late_night_playlist_path:
                 print("Time changed to late night hours, switching playlist...")
                 return
         else:
-            if playlist_path != night_playlist_path:
+            if playlist_path != night_playlist_path and not custom_playlist:
                 print("Time changed to night hours, switching playlist...")
                 return
 
@@ -200,7 +200,7 @@ def main():
     while True:
         if selected_list:
             print("Playing custom list")
-            play_playlist(selected_list, play_newest_first)
+            play_playlist(selected_list, True, play_newest_first)
             continue
         
         current_hour = get_current_hour()
@@ -239,16 +239,16 @@ def main():
 
         if DAY_START <= current_hour < DAY_END:
             print(f"Playing {current_day} day playlist...")
-            play_playlist(day_playlist, play_newest_first)
+            play_playlist(day_playlist, False, play_newest_first)
         elif MORNING_START <= current_hour < MORNING_END:
             print(f"Playing {current_day} morning playlist...")
-            play_playlist(morning_playlist, play_newest_first)
+            play_playlist(morning_playlist, False, play_newest_first)
         elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
             print(f"Playing {current_day} late_night playlist...")
-            play_playlist(late_night_playlist, play_newest_first)
+            play_playlist(late_night_playlist, False, play_newest_first)
         else:
             print(f"Playing {current_day} night playlist...")
-            play_playlist(night_playlist, play_newest_first)
+            play_playlist(night_playlist, False, play_newest_first)
 
 
 if __name__ == '__main__':
