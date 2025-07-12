@@ -161,6 +161,7 @@ def main():
     arg = sys.argv[1] if len(sys.argv) > 1 else None
     play_newest_first = False
     pre_track_path = None
+    selected_list = None
     
     if can_delete_file("/tmp/radioPlayer_arg"):
         with open("/tmp/radioPlayer_arg", "r") as f:
@@ -175,6 +176,12 @@ def main():
         elif arg.lower() == "n":
             play_newest_first = True
             print("Newest song will be played first")
+        elif arg.startswith("list:"):
+            selected_list = arg.removeprefix("list:")
+            print(f"The list {arg} will be played instead of the daily section lists.")
+            if selected_list.endswith(";n"):
+                selected_list = selected_list.removesuffix(";n")
+                play_newest_first = True
         elif os.path.isfile(arg):
             pre_track_path = arg
             print(f"Will play requested song first: {arg}")
@@ -191,6 +198,11 @@ def main():
             exit()
 
     while True:
+        if selected_list:
+            print("Playing custom list")
+            play_playlist(selected_list, play_newest_first)
+            continue
+        
         current_hour = get_current_hour()
         current_day = get_current_day()
 
