@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os
+import os, socket
 import random
 import subprocess
 import time, datetime
@@ -46,13 +46,13 @@ def update_rds(track_name):
             print("Unknown", e)
             prt = rds_base.format(rds_default_name)
 
-        f = open(rds_path, "w")
-        f.write(f"TEXT={prt}\r\n")
+        f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        f.sendto(f"TEXT={prt}\r\n".encode(), ("127.0.0.1", 5000))
 
         try:
-            f.write(f"RTP={rds_default_rtp_data},{len(str(name_table[track_name]))-1}\r\n")
+            f.sendto(f"RTP={rds_default_rtp_data},{len(str(name_table[track_name]))-1}\r\n".encode(), ("127.0.0.1", 5000))
         except KeyError:
-            f.write(f"RTP={rds_default_rtp_data},{len(rds_default_name)-1}\r\n")
+            f.sendto(f"RTP={rds_default_rtp_data},{len(rds_default_name)-1}\r\n".encode(), ("127.0.0.1", 5000))
         f.close()
     except Exception as e:
         print(f"Error updating RDS: {e}")
