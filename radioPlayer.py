@@ -191,15 +191,15 @@ def parse_arguments():
         if arg.lower() == "-h":
             print("Control files:")
             print("Note: All of these files are one-time only, after they have been acked by the player they will be deleted")
-            print("\t/tmp/radioPlayer_quit\t-\tQuit the player")
-            print("\t/tmp/radioPlayer_reload\t-\tReload arguments from /tmp/radioPlayer_arg")
-            print("\t/tmp/radioPlayer_onplaylist\t-\tReact to quit or reload only when ending a playlist")
-            print("\t/tmp/radioPlayer_arg\t-\tContains arguments to use")
+            print("\t/tmp/radioPlayer_quit\t\t-\t\tQuit the player")
+            print("\t/tmp/radioPlayer_reload\t\t-\t\tReload arguments from /tmp/radioPlayer_arg")
+            print("\t/tmp/radioPlayer_onplaylist\t\t-\t\tReact to quit or reload only when ending a playlist")
+            print("\t/tmp/radioPlayer_arg\t\t-\t\tContains arguments to use")
             print()
             print("Arguments:")
-            print("\tn\t-\tPlay newest song first")
-            print("\tlist:playlist;options\t-\tPlay custom playlist with options")
-            print("\t/path/to/file\t-\tPlay specific file first")
+            print("\tn\t\t-\t\tPlay newest song first")
+            print("\tlist:playlist;options\t\t-\t\tPlay custom playlist with options")
+            print("\t/path/to/file\t\t-\t\tPlay specific file first")
             exit(0)
     
     if can_delete_file("/tmp/radioPlayer_arg"):
