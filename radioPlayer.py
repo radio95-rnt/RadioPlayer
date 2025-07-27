@@ -96,6 +96,18 @@ def get_newest_track(tracks):
     
     return newest_track
 
+def check_control_files():
+    """Check for control files and return action to take"""
+    if can_delete_file("/tmp/radioPlayer_quit"):
+        os.remove("/tmp/radioPlayer_quit")
+        return "quit"
+    
+    if can_delete_file("/tmp/radioPlayer_reload"):
+        os.remove("/tmp/radioPlayer_reload")
+        return "reload"
+    
+    return None
+
 def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False, do_shuffle=True):
     last_modified_time = get_playlist_modification_time(playlist_path)
     tracks = load_playlist(playlist_path)
@@ -113,7 +125,8 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             if do_shuffle: random.shuffle(tracks)
             tracks.insert(0, newest_track)
     else:
-        random.shuffle(tracks)
+        if do_shuffle:
+            random.shuffle(tracks)
 
     for track in tracks:
         current_modified_time = get_playlist_modification_time(playlist_path)
@@ -152,9 +165,13 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
 
         subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        if can_delete_file("/tmp/radioPlayer_quit"): 
-            os.remove("/tmp/radioPlayer_quit")
+        # Check control files after each song
+        action = check_control_files()
+        if action == "quit":
             exit()
+        elif action == "reload":
+            print("Reload requested, restarting with new arguments...")
+            return "reload"
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath):
@@ -162,7 +179,8 @@ def can_delete_file(filepath):
     directory = os.path.dirname(os.path.abspath(filepath)) or '.'
     return os.access(directory, os.W_OK | os.X_OK)
 
-def main():
+def parse_arguments():
+    """Parse command line arguments and return configuration"""
     arg = sys.argv[1] if len(sys.argv) > 1 else None
     play_newest_first = False
     do_shuffle = True
@@ -176,19 +194,26 @@ def main():
 
     if arg:
         if arg.lower() == "-h":
-            print("/tmp/radioPlayer_quit")
-            print("/tmp/radioPlayer_arg")
+            print("Control files:")
+            print("  /tmp/radioPlayer_quit   - Quit the player")
+            print("  /tmp/radioPlayer_reload - Reload arguments from /tmp/radioPlayer_arg")
+            print("  /tmp/radioPlayer_arg    - Contains arguments to use")
+            print()
+            print("Arguments:")
+            print("  n                      - Play newest song first")
+            print("  list:playlist;options  - Play custom playlist with options")
+            print("  /path/to/file          - Play specific file first")
             exit(95)
         elif arg.lower() == "n":
             play_newest_first = True
             print("Newest song will be played first")
         elif arg.startswith("list:"):
             selected_list = arg.removeprefix("list:")
-            print(f"The list {arg} will be played instead of the daily section lists.")
-            for arg in selected_list.split(";"):
-                if arg == "n":
+            print(f"The list {selected_list.split(';')[0]} will be played instead of the daily section lists.")
+            for option in selected_list.split(";"):
+                if option == "n":
                     play_newest_first = True
-                elif arg == "ns":
+                elif option == "ns":
                     do_shuffle = False
             selected_list = selected_list.split(";")[0]
         elif os.path.isfile(arg):
@@ -197,67 +222,83 @@ def main():
         else:
             print(f"Invalid argument or file not found: {arg}")
 
-    if pre_track_path:
-        track_name = os.path.basename(pre_track_path)
-        print(f"Now playing: {track_name}")
-        update_rds(track_name)
-        subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', pre_track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if can_delete_file("/tmp/radioPlayer_quit"):
-            os.remove("/tmp/radioPlayer_quit")
-            exit()
+    return arg, play_newest_first, do_shuffle, pre_track_path, selected_list
 
-    while True:
-        if selected_list:
-            print("Playing custom list")
-            play_playlist(selected_list, True, play_newest_first, do_shuffle)
-            continue
+def main():
+    while True:  # Main reload loop
+        arg, play_newest_first, do_shuffle, pre_track_path, selected_list = parse_arguments()
         
-        current_hour = get_current_hour()
-        current_day = get_current_day()
+        if pre_track_path:
+            track_name = os.path.basename(pre_track_path)
+            print(f"Now playing: {track_name}")
+            update_rds(track_name)
+            subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', pre_track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            action = check_control_files()
+            if action == "quit":
+                exit()
+            elif action == "reload":
+                print("Reload requested, restarting with new arguments...")
+                continue  # Restart the main loop
 
-        morning_playlist = os.path.join(playlist_dir, current_day, 'morning')
-        day_playlist = os.path.join(playlist_dir, current_day, 'day')
-        night_playlist = os.path.join(playlist_dir, current_day, 'night')
-        late_night_playlist = os.path.join(playlist_dir, current_day, 'late_night')
+        playlist_loop_active = True
+        while playlist_loop_active:
+            if selected_list:
+                print("Playing custom list")
+                result = play_playlist(selected_list, True, play_newest_first, do_shuffle)
+                if result == "reload":
+                    playlist_loop_active = False  # Break out to reload
+                continue
+            
+            current_hour = get_current_hour()
+            current_day = get_current_day()
 
-        morning_dir = os.path.dirname(morning_playlist)
-        day_dir = os.path.dirname(day_playlist)
-        night_dir = os.path.dirname(night_playlist)
-        late_night_dir = os.path.dirname(late_night_playlist)
+            morning_playlist = os.path.join(playlist_dir, current_day, 'morning')
+            day_playlist = os.path.join(playlist_dir, current_day, 'day')
+            night_playlist = os.path.join(playlist_dir, current_day, 'night')
+            late_night_playlist = os.path.join(playlist_dir, current_day, 'late_night')
 
-        if not os.path.exists(morning_dir):
-            print(f"Creating directory: {morning_dir}")
-            os.makedirs(morning_dir, exist_ok=True)
-        if not os.path.exists(day_dir):
-            print(f"Creating directory: {day_dir}")
-            os.makedirs(day_dir, exist_ok=True)
+            morning_dir = os.path.dirname(morning_playlist)
+            day_dir = os.path.dirname(day_playlist)
+            night_dir = os.path.dirname(night_playlist)
+            late_night_dir = os.path.dirname(late_night_playlist)
 
-        if not os.path.exists(night_dir):
-            print(f"Creating directory: {night_dir}")
-            os.makedirs(night_dir, exist_ok=True)
+            if not os.path.exists(morning_dir):
+                print(f"Creating directory: {morning_dir}")
+                os.makedirs(morning_dir, exist_ok=True)
+            if not os.path.exists(day_dir):
+                print(f"Creating directory: {day_dir}")
+                os.makedirs(day_dir, exist_ok=True)
 
-        if not os.path.exists(late_night_dir):
-            print(f"Creating directory: {late_night_dir}")
-            os.makedirs(late_night_dir, exist_ok=True)
+            if not os.path.exists(night_dir):
+                print(f"Creating directory: {night_dir}")
+                os.makedirs(night_dir, exist_ok=True)
 
-        for playlist_path in [morning_playlist, day_playlist, night_playlist, late_night_playlist]:
-            if not os.path.exists(playlist_path):
-                print(f"Creating empty playlist: {playlist_path}")
-                with open(playlist_path, 'w') as f:
-                    pass
+            if not os.path.exists(late_night_dir):
+                print(f"Creating directory: {late_night_dir}")
+                os.makedirs(late_night_dir, exist_ok=True)
 
-        if DAY_START <= current_hour < DAY_END:
-            print(f"Playing {current_day} day playlist...")
-            play_playlist(day_playlist, False, play_newest_first, do_shuffle)
-        elif MORNING_START <= current_hour < MORNING_END:
-            print(f"Playing {current_day} morning playlist...")
-            play_playlist(morning_playlist, False, play_newest_first, do_shuffle)
-        elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
-            print(f"Playing {current_day} late_night playlist...")
-            play_playlist(late_night_playlist, False, play_newest_first, do_shuffle)
-        else:
-            print(f"Playing {current_day} night playlist...")
-            play_playlist(night_playlist, False, play_newest_first, do_shuffle)
+            for playlist_path in [morning_playlist, day_playlist, night_playlist, late_night_playlist]:
+                if not os.path.exists(playlist_path):
+                    print(f"Creating empty playlist: {playlist_path}")
+                    with open(playlist_path, 'w') as f:
+                        pass
+
+            if DAY_START <= current_hour < DAY_END:
+                print(f"Playing {current_day} day playlist...")
+                result = play_playlist(day_playlist, False, play_newest_first, do_shuffle)
+            elif MORNING_START <= current_hour < MORNING_END:
+                print(f"Playing {current_day} morning playlist...")
+                result = play_playlist(morning_playlist, False, play_newest_first, do_shuffle)
+            elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
+                print(f"Playing {current_day} late_night playlist...")
+                result = play_playlist(late_night_playlist, False, play_newest_first, do_shuffle)
+            else:
+                print(f"Playing {current_day} night playlist...")
+                result = play_playlist(night_playlist, False, play_newest_first, do_shuffle)
+            
+            if result == "reload":
+                playlist_loop_active = False  # Break out to reload
 
 
 if __name__ == '__main__':
