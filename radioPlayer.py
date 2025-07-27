@@ -166,7 +166,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # Check control files after each song
-        action = check_control_files()
+        action = check_control_files() and not can_delete_file("/tmp/radioPlayer_onplaylist")
         if action == "quit":
             exit()
         elif action == "reload":
@@ -195,15 +195,17 @@ def parse_arguments():
     if arg:
         if arg.lower() == "-h":
             print("Control files:")
-            print("  /tmp/radioPlayer_quit   - Quit the player")
-            print("  /tmp/radioPlayer_reload - Reload arguments from /tmp/radioPlayer_arg")
-            print("  /tmp/radioPlayer_arg    - Contains arguments to use")
+            print("Note: All of these files are one-time only, after they have been acked by the player they will be deleted")
+            print("\t/tmp/radioPlayer_quit\t-\tQuit the player")
+            print("\t/tmp/radioPlayer_reload\t-\tReload arguments from /tmp/radioPlayer_arg")
+            print("\t/tmp/radioPlayer_onplaylist\t-\tReact to quit or reload only when ending a playlist")
+            print("\t/tmp/radioPlayer_arg\t-\tContains arguments to use")
             print()
             print("Arguments:")
-            print("  n                      - Play newest song first")
-            print("  list:playlist;options  - Play custom playlist with options")
-            print("  /path/to/file          - Play specific file first")
-            exit(95)
+            print("\tn\t-\tPlay newest song first")
+            print("\tlist:playlist;options\t-\tPlay custom playlist with options")
+            print("\t/path/to/file\t-\tPlay specific file first")
+            exit(0)
         elif arg.lower() == "n":
             play_newest_first = True
             print("Newest song will be played first")
@@ -234,7 +236,7 @@ def main():
             update_rds(track_name)
             subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', pre_track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-            action = check_control_files()
+            action = check_control_files() and not can_delete_file("/tmp/radioPlayer_onplaylist")
             if action == "quit":
                 exit()
             elif action == "reload":
@@ -297,9 +299,12 @@ def main():
                 print(f"Playing {current_day} night playlist...")
                 result = play_playlist(night_playlist, False, play_newest_first, do_shuffle)
             
+            if can_delete_file("/tmp/radioPlayer_onplaylist"):
+                os.remove("/tmp/radioPlayer_onplaylist")
+
             if result == "reload":
                 playlist_loop_active = False  # Break out to reload
-
+                
 
 if __name__ == '__main__':
     main()
