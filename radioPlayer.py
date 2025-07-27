@@ -187,11 +187,6 @@ def parse_arguments():
     pre_track_path = None
     selected_list = None
     
-    if can_delete_file("/tmp/radioPlayer_arg"):
-        with open("/tmp/radioPlayer_arg", "r") as f:
-            arg = f.read().strip()
-        os.remove("/tmp/radioPlayer_arg")
-
     if arg:
         if arg.lower() == "-h":
             print("Control files:")
@@ -206,7 +201,14 @@ def parse_arguments():
             print("\tlist:playlist;options\t-\tPlay custom playlist with options")
             print("\t/path/to/file\t-\tPlay specific file first")
             exit(0)
-        elif arg.lower() == "n":
+    
+    if can_delete_file("/tmp/radioPlayer_arg"):
+        with open("/tmp/radioPlayer_arg", "r") as f:
+            arg = f.read().strip()
+        os.remove("/tmp/radioPlayer_arg")
+
+    if arg:
+        if arg.lower() == "n":
             play_newest_first = True
             print("Newest song will be played first")
         elif arg.startswith("list:"):
