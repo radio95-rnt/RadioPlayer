@@ -96,7 +96,7 @@ def get_newest_track(tracks):
     
     return newest_track
 
-def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False):
+def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False, do_shuffle=True):
     last_modified_time = get_playlist_modification_time(playlist_path)
     tracks = load_playlist(playlist_path)
     if not tracks:
@@ -104,13 +104,13 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         time.sleep(15)
         return
 
-    random.seed()
+    if do_shuffle: random.seed()
     if play_newest_first:
         newest_track = get_newest_track(tracks)
         if newest_track:
             print(f"Playing newest track first: {os.path.basename(newest_track)}")
             tracks.remove(newest_track)
-            random.shuffle(tracks)
+            if do_shuffle: random.shuffle(tracks)
             tracks.insert(0, newest_track)
     else:
         random.shuffle(tracks)
@@ -165,6 +165,7 @@ def can_delete_file(filepath):
 def main():
     arg = sys.argv[1] if len(sys.argv) > 1 else None
     play_newest_first = False
+    do_shuffle = True
     pre_track_path = None
     selected_list = None
     
@@ -184,9 +185,12 @@ def main():
         elif arg.startswith("list:"):
             selected_list = arg.removeprefix("list:")
             print(f"The list {arg} will be played instead of the daily section lists.")
-            if selected_list.endswith(";n"):
-                selected_list = selected_list.removesuffix(";n")
-                play_newest_first = True
+            for arg in selected_list.split(";"):
+                if arg == "n":
+                    play_newest_first = True
+                elif arg == "ns":
+                    do_shuffle = False
+            selected_list = selected_list.split(";")[0]
         elif os.path.isfile(arg):
             pre_track_path = arg
             print(f"Will play requested song first: {arg}")
@@ -198,14 +202,14 @@ def main():
         print(f"Now playing: {track_name}")
         update_rds(track_name)
         subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', pre_track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if can_delete_file("/tmp/radioPlayer_quit"): 
+        if can_delete_file("/tmp/radioPlayer_quit"):
             os.remove("/tmp/radioPlayer_quit")
             exit()
 
     while True:
         if selected_list:
             print("Playing custom list")
-            play_playlist(selected_list, True, play_newest_first)
+            play_playlist(selected_list, True, play_newest_first, do_shuffle)
             continue
         
         current_hour = get_current_hour()
@@ -244,16 +248,16 @@ def main():
 
         if DAY_START <= current_hour < DAY_END:
             print(f"Playing {current_day} day playlist...")
-            play_playlist(day_playlist, False, play_newest_first)
+            play_playlist(day_playlist, False, play_newest_first, do_shuffle)
         elif MORNING_START <= current_hour < MORNING_END:
             print(f"Playing {current_day} morning playlist...")
-            play_playlist(morning_playlist, False, play_newest_first)
+            play_playlist(morning_playlist, False, play_newest_first, do_shuffle)
         elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
             print(f"Playing {current_day} late_night playlist...")
-            play_playlist(late_night_playlist, False, play_newest_first)
+            play_playlist(late_night_playlist, False, play_newest_first, do_shuffle)
         else:
             print(f"Playing {current_day} night playlist...")
-            play_playlist(night_playlist, False, play_newest_first)
+            play_playlist(night_playlist, False, play_newest_first, do_shuffle)
 
 
 if __name__ == '__main__':
