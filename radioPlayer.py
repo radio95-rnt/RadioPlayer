@@ -166,7 +166,8 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # Check control files after each song
-        action = check_control_files() and not can_delete_file("/tmp/radioPlayer_onplaylist")
+        action = check_control_files()
+        if not can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
         if action == "quit":
             exit()
         elif action == "reload":
