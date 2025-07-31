@@ -5,6 +5,7 @@ import subprocess
 import time, datetime
 import sys
 from datetime import datetime
+import log95
 
 MORNING_START = 6
 MORNING_END = 10
@@ -14,12 +15,15 @@ LATE_NIGHT_START = 0
 LATE_NIGHT_END = 6
 
 playlist_dir = "/home/user/playlists"
-name_table_dir = "/home/user/mixes/name_table.txt"
+name_table_path = "/home/user/mixes/name_table.txt"
 
 rds_base = "Gramy: radio95 - {}"
 rds_default_name = "Program Godzinny"
-rds_path = "/home/user/RDS"
 rds_default_rtp_data = "4,7,7,1,17"
+
+udp_host = ("127.0.0.1", 5000)
+
+logger = log95.log95("radioPlayer")
 
 def get_current_hour():
     return datetime.now().hour
@@ -28,39 +32,47 @@ def get_current_day():
     return datetime.now().strftime('%A').lower()
 
 def load_dict_from_custom_format(file_path: str) -> dict:
-    result_dict = {}
-    with open(file_path, 'r') as file:
-        for line in file:
-            if line.strip() == "":
-                continue
-            key, value = line.split(':', 1)
-            result_dict[key.strip()] = value.strip()
-    return result_dict
+    try:
+        result_dict = {}
+        with open(file_path, 'r') as file:
+            for line in file:
+                if line.strip() == "":
+                    continue
+                key, value = line.split(':', 1)
+                result_dict[key.strip()] = value.strip()
+        return result_dict
+    except FileNotFoundError:
+        logger.error(f"{name_table_path} does not exist, or could not be accesed")
+        return {}
 
 def update_rds(track_name):
     try:
-        name_table = load_dict_from_custom_format(name_table_dir)
+        name_table = load_dict_from_custom_format(name_table_path)
         try:
             prt = rds_base.format(name_table[track_name])
         except KeyError as e:
-            print("Unknown", e)
+            logger.warning(f"File does not have a alias in the name table ({e})")
             prt = rds_base.format(rds_default_name)
 
         f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         f.settimeout(1.0)
         try:
-            f.sendto(f"TEXT={prt}\r\n".encode(), ("127.0.0.1", 5000))
+            f.sendto(f"TEXT={prt}\r\n".encode(), udp_host)
         except socket.timeout:
-            print("Could not send to RDS, timeout.")
+            logger.error("Could not send TEXT to RDS, timeout.")
             return
 
         try:
-            f.sendto(f"RTP={rds_default_rtp_data},{len(str(name_table[track_name]))-1}\r\n".encode(), ("127.0.0.1", 5000))
-        except KeyError:
-            f.sendto(f"RTP={rds_default_rtp_data},{len(rds_default_name)-1}\r\n".encode(), ("127.0.0.1", 5000))
+            try:
+                f.sendto(f"RTP={rds_default_rtp_data},{len(str(name_table[track_name]))-1}\r\n".encode(), udp_host)
+            except KeyError:
+                f.sendto(f"RTP={rds_default_rtp_data},{len(rds_default_name)-1}\r\n".encode(), udp_host)
+        except socket.timeout:
+            logger.error("Could not send TEXT to RDS, timeout.")
+            return
         f.close()
     except Exception as e:
-        print(f"Error updating RDS: {e}")
+        logger.error(f"Error updating RDS: {e}")
 
 def get_playlist_modification_time(playlist_path):
     try:
@@ -74,7 +86,7 @@ def load_playlist(playlist_path):
             tracks = [line.strip() for line in f.readlines() if line.strip()]
         return tracks
     except FileNotFoundError:
-        print(f"Warning: Playlist not found: {playlist_path}")
+        logger.error(f"Playlist not found: {playlist_path}")
         return []
 
 def get_newest_track(tracks):
@@ -85,7 +97,7 @@ def get_newest_track(tracks):
     newest_time = 0
     
     for track in tracks:
-        track_path = os.path.expanduser(track)
+        track_path = os.path.abspath(os.path.expanduser(track))
         try:
             mod_time = os.path.getmtime(track_path)
             if mod_time > newest_time:
@@ -112,7 +124,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
     last_modified_time = get_playlist_modification_time(playlist_path)
     tracks = load_playlist(playlist_path)
     if not tracks:
-        print(f"No tracks found in {playlist_path}, checking again in 15 seconds...")
+        logger.info(f"No tracks found in {playlist_path}, checking again in 15 seconds...")
         time.sleep(15)
         return
 
@@ -120,7 +132,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
     if play_newest_first:
         newest_track = get_newest_track(tracks)
         if newest_track:
-            print(f"Playing newest track first: {os.path.basename(newest_track)}")
+            logger.info(f"Playing newest track first: {os.path.basename(newest_track)}")
             tracks.remove(newest_track)
             if do_shuffle: random.shuffle(tracks)
             tracks.insert(0, newest_track)
@@ -131,7 +143,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
     for track in tracks:
         current_modified_time = get_playlist_modification_time(playlist_path)
         if current_modified_time > last_modified_time:
-            print(f"Playlist {playlist_path} has been modified, reloading...")
+            logger.info(f"Playlist {playlist_path} has been modified, reloading...")
             return
 
         current_hour = get_current_hour()
@@ -143,35 +155,35 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
 
         if DAY_START <= current_hour < DAY_END and not custom_playlist:
             if playlist_path != day_playlist_path:
-                print("Time changed to day hours, switching playlist...")
+                logger.info("Time changed to day hours, switching playlist...")
                 return
         elif MORNING_START <= current_hour < MORNING_END and not custom_playlist:
             if playlist_path != morning_playlist_path:
-                print("Time changed to morning hours, switching playlist...")
+                logger.info("Time changed to morning hours, switching playlist...")
                 return
         elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END and not custom_playlist:
             if playlist_path != late_night_playlist_path:
-                print("Time changed to late night hours, switching playlist...")
+                logger.info("Time changed to late night hours, switching playlist...")
                 return
         else:
             if playlist_path != night_playlist_path and not custom_playlist:
-                print("Time changed to night hours, switching playlist...")
+                logger.info("Time changed to night hours, switching playlist...")
                 return
 
-        track_path = os.path.expanduser(track)
+        track_path = os.path.abspath(os.path.expanduser(track))
         track_name = os.path.basename(track_path)
-        print(f"Now playing: {track_name}")
+        logger.info(f"Now playing: {track_name}")
         update_rds(track_name)
 
         subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # Check control files after each song
         action = check_control_files()
-        if not can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
+        if can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
         if action == "quit":
             exit()
         elif action == "reload":
-            print("Reload requested, restarting with new arguments...")
+            logger.info("Reload requested, restarting with new arguments...")
             return "reload"
 
 def can_delete_file(filepath):
@@ -211,10 +223,10 @@ def parse_arguments():
     if arg:
         if arg.lower() == "n":
             play_newest_first = True
-            print("Newest song will be played first")
+            logger.info("Newest song will be played first")
         elif arg.startswith("list:"):
             selected_list = arg.removeprefix("list:")
-            print(f"The list {selected_list.split(';')[0]} will be played instead of the daily section lists.")
+            logger.info(f"The list {selected_list.split(';')[0]} will be played instead of the daily section lists.")
             for option in selected_list.split(";"):
                 if option == "n":
                     play_newest_first = True
@@ -223,9 +235,9 @@ def parse_arguments():
             selected_list = selected_list.split(";")[0]
         elif os.path.isfile(arg):
             pre_track_path = arg
-            print(f"Will play requested song first: {arg}")
+            logger.info(f"Will play requested song first: {arg}")
         else:
-            print(f"Invalid argument or file not found: {arg}")
+            logger.error(f"Invalid argument or file not found: {arg}")
 
     return arg, play_newest_first, do_shuffle, pre_track_path, selected_list
 
@@ -235,21 +247,22 @@ def main():
         
         if pre_track_path:
             track_name = os.path.basename(pre_track_path)
-            print(f"Now playing: {track_name}")
+            logger.info(f"Now playing: {track_name}")
             update_rds(track_name)
             subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', pre_track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-            action = check_control_files() and not can_delete_file("/tmp/radioPlayer_onplaylist")
+            action = check_control_files()
+            if can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
             if action == "quit":
                 exit()
             elif action == "reload":
-                print("Reload requested, restarting with new arguments...")
+                logger.info("Reload requested, restarting with new arguments...")
                 continue  # Restart the main loop
 
         playlist_loop_active = True
         while playlist_loop_active:
             if selected_list:
-                print("Playing custom list")
+                logger.info("Playing custom list")
                 result = play_playlist(selected_list, True, play_newest_first, do_shuffle)
                 if result == "reload":
                     playlist_loop_active = False  # Break out to reload
@@ -267,44 +280,41 @@ def main():
             day_dir = os.path.dirname(day_playlist)
             night_dir = os.path.dirname(night_playlist)
             late_night_dir = os.path.dirname(late_night_playlist)
-
-            if not os.path.exists(morning_dir):
-                print(f"Creating directory: {morning_dir}")
-                os.makedirs(morning_dir, exist_ok=True)
-            if not os.path.exists(day_dir):
-                print(f"Creating directory: {day_dir}")
-                os.makedirs(day_dir, exist_ok=True)
-
-            if not os.path.exists(night_dir):
-                print(f"Creating directory: {night_dir}")
-                os.makedirs(night_dir, exist_ok=True)
-
-            if not os.path.exists(late_night_dir):
-                print(f"Creating directory: {late_night_dir}")
-                os.makedirs(late_night_dir, exist_ok=True)
+            
+            for dir_path in [morning_dir, day_dir, night_dir, late_night_dir]:
+                if not os.path.exists(dir_path):
+                    logger.info(f"Creating directory: {dir_path}")
+                    os.makedirs(dir_path, exist_ok=True)
 
             for playlist_path in [morning_playlist, day_playlist, night_playlist, late_night_playlist]:
                 if not os.path.exists(playlist_path):
-                    print(f"Creating empty playlist: {playlist_path}")
+                    logger.info(f"Creating empty playlist: {playlist_path}")
                     with open(playlist_path, 'w') as f:
                         pass
 
             if DAY_START <= current_hour < DAY_END:
-                print(f"Playing {current_day} day playlist...")
+                logger.info(f"Playing {current_day} day playlist...")
                 result = play_playlist(day_playlist, False, play_newest_first, do_shuffle)
             elif MORNING_START <= current_hour < MORNING_END:
-                print(f"Playing {current_day} morning playlist...")
+                logger.info(f"Playing {current_day} morning playlist...")
                 result = play_playlist(morning_playlist, False, play_newest_first, do_shuffle)
             elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
-                print(f"Playing {current_day} late_night playlist...")
+                logger.info(f"Playing {current_day} late_night playlist...")
                 result = play_playlist(late_night_playlist, False, play_newest_first, do_shuffle)
             else:
-                print(f"Playing {current_day} night playlist...")
+                logger.info(f"Playing {current_day} night playlist...")
                 result = play_playlist(night_playlist, False, play_newest_first, do_shuffle)
-            
-            if can_delete_file("/tmp/radioPlayer_onplaylist"):
+                
+            action = check_control_files()
+            if not can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
+            if action == "quit":
                 os.remove("/tmp/radioPlayer_onplaylist")
-
+                exit()
+            elif action == "reload":
+                os.remove("/tmp/radioPlayer_onplaylist")
+                logger.info("Reload requested, restarting with new arguments...")
+                result = "reload"
+            
             if result == "reload":
                 playlist_loop_active = False  # Break out to reload
                 
