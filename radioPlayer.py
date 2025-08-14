@@ -110,7 +110,7 @@ def state_writer_thread():
     """Thread that writes state every minute"""
     while True:
         try:
-            time.sleep(60)  # Update every minute instead of every second
+            time.sleep(0.5)  # Update every minute instead of every second
             with state_lock:
                 if current_state["current_file"] and current_state["start_time"]:
                     elapsed = time.time() - current_state["start_time"]
