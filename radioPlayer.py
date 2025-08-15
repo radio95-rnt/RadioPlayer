@@ -106,37 +106,6 @@ def get_audio_duration(file_path):
         logger.error(f"Error getting duration for {file_path}: {e}")
     return None
 
-def state_writer_thread():
-    """Thread that writes state every minute"""
-    while True:
-        try:
-            time.sleep(0.5)  # Update every minute instead of every second
-            with state_lock:
-                if current_state["current_file"] and current_state["start_time"]:
-                    elapsed = time.time() - current_state["start_time"]
-                    minutes = int(elapsed // 60)
-                    seconds = int(elapsed % 60)
-                    
-                    # Write simple state format: /path/to/file:MM:SS
-                    state_line = f"{current_state['current_file']}:{minutes:02d}:{seconds:02d}"
-                    
-                    try:
-                        with open("/tmp/radioPlayer_current_state", 'w') as f:
-                            f.write(state_line)
-                    except Exception as e:
-                        logger.error(f"Error writing current state: {e}")
-                        
-        except Exception as e:
-            logger.error(f"Error in state writer thread: {e}")
-            break
-
-def start_state_thread():
-    """Start the state writing thread"""
-    global state_thread
-    if state_thread is None or not state_thread.is_alive():
-        state_thread = threading.Thread(target=state_writer_thread, daemon=True)
-        state_thread.start()
-
 def update_current_state(file_path, playlist_path=None, playlist_position=0):
     """Update current state with new file"""
     with state_lock:
@@ -154,13 +123,6 @@ def clear_current_state():
         current_state["start_time"] = None
         current_state["duration"] = None
     save_state()
-    
-    # Clear the simple state file too
-    try:
-        if os.path.exists("/tmp/radioPlayer_current_state"):
-            os.remove("/tmp/radioPlayer_current_state")
-    except Exception:
-        pass
 
 def should_resume_from_state(tracks, playlist_path):
     """Check if we should resume from saved state"""
@@ -301,9 +263,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             if do_shuffle:
                 random.shuffle(tracks)
 
-    # Start the state writing thread
-    start_state_thread()
-
     for i, track in enumerate(tracks[start_index:], start_index):
         current_modified_time = get_playlist_modification_time(playlist_path)
         if current_modified_time > last_modified_time:
@@ -362,6 +321,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         action = check_control_files()
         if can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
         if action == "quit":
+            clear_state()
             exit()
         elif action == "reload":
             logger.info("Reload requested, restarting with new arguments...")
@@ -389,7 +349,6 @@ def parse_arguments():
             print("   /tmp/radioPlayer_reload        -   Reload arguments from /tmp/radioPlayer_arg")
             print("   /tmp/radioPlayer_onplaylist    -   React to quit or reload only when ending a playlist")
             print("   /tmp/radioPlayer_arg           -   Contains arguments to use")
-            print("   /tmp/radioPlayer_current_state -   Current playing state (file:MM:SS)")
             print()
             print("Arguments:")
             print("    n                        -    Play newest song first")
@@ -434,7 +393,6 @@ def main():
             track_name = os.path.basename(pre_track_path)
             logger.info(f"Now playing: {track_name}")
             update_current_state(pre_track_path)
-            start_state_thread()
             update_rds(track_name)
             subprocess.run(['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet', pre_track_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             clear_current_state()
