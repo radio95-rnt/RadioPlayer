@@ -224,6 +224,9 @@ def play_audio_with_resume(track_path, resume_seconds=0):
     """Play audio file, optionally resuming from a specific position"""
     cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
     
+    resume_seconds -= 5
+    resume_seconds = max(0, resume_seconds)
+    
     if resume_seconds > 0:
         cmd.extend(['-ss', str(resume_seconds)])
     
