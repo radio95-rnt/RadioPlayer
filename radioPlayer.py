@@ -491,9 +491,7 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        clear_state()
         logger.info("Player stopped by user")
     except Exception as e:
-        clear_state()
         logger.error(f"Unexpected error: {e}")
         raise
