@@ -384,7 +384,7 @@ def parse_arguments():
 
 def main():
     # Load state at startup
-    load_state()
+    state_loaded = load_state()
     
     while True:  # Main reload loop
         arg, play_newest_first, do_shuffle, pre_track_path, selected_list = parse_arguments()
@@ -405,6 +405,25 @@ def main():
             elif action == "reload":
                 logger.info("Reload requested, restarting with new arguments...")
                 continue  # Restart the main loop
+
+        # Check if we should resume from loaded state first
+        if state_loaded and current_state.get("current_file") and current_state.get("playlist_path"):
+            # Try to resume from the loaded state
+            if os.path.exists(current_state["playlist_path"]):
+                logger.info(f"Attempting to resume from saved state: {current_state['playlist_path']}")
+                result = play_playlist(current_state["playlist_path"], 
+                                     current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'morning') and
+                                     current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'day') and  
+                                     current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'night') and
+                                     current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'late_night'),
+                                     play_newest_first, do_shuffle)
+                state_loaded = False  # Don't try to resume again
+                if result == "reload":
+                    continue
+            else:
+                logger.warning(f"Saved playlist path no longer exists: {current_state['playlist_path']}")
+                clear_current_state()
+                state_loaded = False
 
         playlist_loop_active = True
         while playlist_loop_active:
