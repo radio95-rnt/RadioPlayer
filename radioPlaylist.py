@@ -850,7 +850,7 @@ class Application:
                     term_width, term_height = self.terminal.get_terminal_size()
                 
                 header_height = self.display.get_header_height()
-                visible_lines = term_height - (header_height + 4)
+                visible_lines = term_height - (header_height + 5)
                 
                 if self.selected_idx < self.scroll_offset:
                     self.scroll_offset = self.selected_idx
