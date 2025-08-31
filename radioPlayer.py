@@ -5,7 +5,7 @@ import subprocess
 import time, datetime
 import sys
 import threading
-import json
+import json, re
 from datetime import datetime
 import log95
 
@@ -22,10 +22,9 @@ playlist_dir = "/home/user/playlists"
 name_table_path = "/home/user/mixes/name_table.txt"
 state_file_path = "/tmp/radioPlayer_state.json"
 
-rds_basic_base = "Gramy: {}"
-rds_base = "Gramy: radio95 - {}"
+rds_base = "Gramy: {} - {}"
+rds_default_artist = "radio95"
 rds_default_name = "Program Godzinny"
-rds_default_rtp_data = "4,7,7,1,17"
 
 udp_host = ("127.0.0.1", 5000)
 
@@ -103,10 +102,10 @@ def get_audio_duration(file_path):
     """Get duration of audio file using ffprobe"""
     try:
         result = subprocess.run([
-            'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', 
+            'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
             '-of', 'default=noprint_wrappers=1:nokey=1', file_path
         ], capture_output=True, text=True)
-        
+
         if result.returncode == 0:
             duration = float(result.stdout.strip())
             return duration
@@ -136,11 +135,11 @@ def should_resume_from_state(tracks, playlist_path):
     """Check if we should resume from saved state"""
     if not current_state["current_file"] or not current_state["start_time"]:
         return False, tracks, 0
-        
+
     # Check if the saved file is still in the current playlist
     if current_state["current_file"] in tracks and current_state["playlist_path"] == playlist_path:
         elapsed = time.time() - current_state["start_time"]
-        
+
         # Only resume if less than the track duration and less than 10 minutes have passed
         if (current_state["duration"] and elapsed < current_state["duration"] and elapsed < 600):
             # Find position of the current file
@@ -150,18 +149,32 @@ def should_resume_from_state(tracks, playlist_path):
                 return True, tracks, resume_index
             except ValueError:
                 pass
-    
+
     return False, tracks, 0
 
 def update_rds(track_name: str):
     try:
         name_table: dict[str, str] = load_dict_from_custom_format(name_table_path)
         try:
-            if " - " in name_table[track_name]: prt = rds_basic_base.format(name_table[track_name])
-            else: prt = rds_base.format(name_table[track_name])
+            name = name_table[track_name]
         except KeyError as e:
             logger.warning(f"File does not have a alias in the name table ({e})")
-            prt = rds_basic_base.format(track_name.split(".", 1)[0])
+            name = track_name.split(".",1)[0]
+
+        if " - " in name:
+            count = name.count(" - ")
+            while count != 1: # yotutube reuploads, to avoid things like ilikedick123 - Micheal Jackson - Smooth Criminal
+                name = name.split(" - ", 1)[1]
+                count = name.count(" - ")
+            artist = name.split(" - ", 1)[0]
+            title = name.split(" - ", 1)[1]
+        else:
+            artist = rds_default_artist
+            title = name
+
+        title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
+
+        prt = rds_base.format(artist, title)
 
         f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         f.settimeout(1.0)
@@ -171,11 +184,16 @@ def update_rds(track_name: str):
             logger.error("Could not send TEXT to RDS, timeout.")
             return
 
+        rtp = [4] # type 1
+        rtp.append(prt.find(artist)) # start 1
+        rtp.append(len(artist)) # len 1
+        rtp.append(1) # type 2
+        rtp.append(prt.find(title)) # start 2
+        rtp.append(len(title)) # len 2
+        rtp = list(map(str, rtp))
+
         try:
-            try:
-                f.sendto(f"RTP={rds_default_rtp_data},{len(str(name_table[track_name]))-1}\r\n".encode(), udp_host)
-            except KeyError:
-                f.sendto(f"RTP={rds_default_rtp_data},{len(rds_default_name)-1}\r\n".encode(), udp_host)
+            f.sendto(f"RTP={','.join(rtp)}\r\n".encode(), udp_host)
         except socket.timeout:
             logger.error("Could not send TEXT to RDS, timeout.")
             return
@@ -201,10 +219,10 @@ def load_playlist(playlist_path):
 def get_newest_track(tracks):
     if not tracks:
         return None
-    
+
     newest_track = None
     newest_time = 0
-    
+
     for track in tracks:
         track_path = os.path.abspath(os.path.expanduser(track))
         try:
@@ -214,7 +232,7 @@ def get_newest_track(tracks):
                 newest_track = track
         except OSError:
             continue
-    
+
     return newest_track
 
 def check_control_files():
@@ -222,11 +240,11 @@ def check_control_files():
     if can_delete_file("/tmp/radioPlayer_quit"):
         os.remove("/tmp/radioPlayer_quit")
         return "quit"
-    
+
     if can_delete_file("/tmp/radioPlayer_reload"):
         os.remove("/tmp/radioPlayer_reload")
         return "reload"
-    
+
     return None
 
 def stop_all_processes():
@@ -244,7 +262,7 @@ def stop_all_processes():
                 except (subprocess.TimeoutExpired, ProcessLookupError):
                     pass
             current_process = None
-            
+
         if next_process and next_process.poll() is None:
             try:
                 next_process.terminate()
@@ -260,81 +278,81 @@ def stop_all_processes():
 def create_audio_process(track_path, resume_seconds=0, fade_in=False, volume=1.0):
     """Create ffplay process with optional fade effects and volume control"""
     cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
-    
+
     # Build filter chain
     filters = []
-    
+
     # Add fade in if requested
     if fade_in:
         filters.append(f"afade=t=in:st=0:d={CROSSFADE_DURATION}")
-    
+
     # Add volume control
     if volume != 1.0:
         filters.append(f"volume={volume}")
-    
+
     # Apply filters if any exist
     if filters:
         filter_chain = ",".join(filters)
         cmd.extend(['-af', filter_chain])
-    
+
     # Add resume position if specified
     resume_seconds = max(0, resume_seconds - 5)  # Start 5 seconds earlier for better sync
     if resume_seconds > 0:
         cmd.extend(['-ss', str(resume_seconds)])
-    
+
     cmd.append(track_path)
-    
+
     return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def play_single_track(track_path, resume_seconds=0):
     """Play a single track without crossfade (for first track or special cases)"""
     global current_process
-    
+
     with process_lock:
         current_process = create_audio_process(track_path, resume_seconds, fade_in=True)
-    
+
     # Wait for the process to complete
     current_process.wait()
-    
+
     with process_lock:
         current_process = None
 
 def play_audio_with_crossfade(current_track_path, next_track_path=None, resume_seconds=0):
     """Play audio file with crossfade to next track"""
     global current_process, next_process
-    
+
     # Get duration of current track
     duration = get_audio_duration(current_track_path)
     if not duration:
         logger.warning(f"Could not get duration for {current_track_path}, playing without crossfade")
         play_single_track(current_track_path, resume_seconds)
         return
-    
+
     # Calculate when to start the next track (5 seconds before end)
     crossfade_start_time = max(0, duration - CROSSFADE_DURATION - resume_seconds)
-    
+
     # Start current track with fade in
     with process_lock:
         current_process = create_audio_process(current_track_path, resume_seconds, fade_in=True)
-    
+
     if next_track_path and crossfade_start_time > 0:
         # Wait until it's time to start the crossfade
         time.sleep(crossfade_start_time)
-        
+
         # Check if we need to stop due to control files
         action = check_control_files()
         if action in ["quit", "reload"]:
             stop_all_processes()
             return action
-        
+
         # Start next track with fade in and reduced volume initially
         logger.info(f"Starting crossfade to: {os.path.basename(next_track_path)}")
         with process_lock:
             next_process = create_audio_process(next_track_path, fade_in=True, volume=0.8)
-        
+
         # Wait for crossfade to complete
         time.sleep(CROSSFADE_DURATION)
-        
+
         # Stop current track (it should fade out naturally)
         with process_lock:
             if current_process and current_process.poll() is None:
@@ -350,7 +368,7 @@ def play_audio_with_crossfade(current_track_path, next_track_path=None, resume_s
         current_process.wait()
         with process_lock:
             current_process = None
-    
+
     return None
 
 def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False, do_shuffle=True):
@@ -362,12 +380,12 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         return
 
     if do_shuffle: random.seed()
-    
+
     # Check if we should resume from saved state
     should_resume, tracks, resume_index = should_resume_from_state(tracks, playlist_path)
     start_index = 0
     resume_seconds = 0
-    
+
     if should_resume:
         start_index = resume_index
         with state_lock:
@@ -427,16 +445,16 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
 
         track_path = os.path.abspath(os.path.expanduser(track))
         track_name = os.path.basename(track_path)
-        
+
         # Update state before playing
         update_current_state(track_path, playlist_path, i)
-        
+
         if i == start_index and resume_seconds > 0:
             logger.info(f"Resuming: {track_name} at {resume_seconds:.0f}s")
         else:
             logger.info(f"Now playing: {track_name}")
             resume_seconds = 0
-            
+
         update_rds(track_name)
 
         # Determine next track for crossfade
@@ -444,14 +462,14 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         next_index = i + 1
         if next_index < len(tracks):
             next_track_path = os.path.abspath(os.path.expanduser(tracks[next_index]))
-        
+
         # Play with crossfade
         if i == start_index and resume_seconds > 0:
             # For resumed tracks, use simpler playback
             result = play_audio_with_crossfade(track_path, next_track_path, resume_seconds)
         else:
             result = play_audio_with_crossfade(track_path, next_track_path)
-        
+
         if result == "quit":
             stop_all_processes()
             clear_state()
@@ -460,7 +478,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             logger.info("Reload requested during playback...")
             stop_all_processes()
             return "reload"
-        
+
         # Clear state after track finishes
         clear_current_state()
 
@@ -489,7 +507,7 @@ def parse_arguments():
     do_shuffle = True
     pre_track_path = None
     selected_list = None
-    
+
     if arg:
         if arg.lower() == "-h":
             print("Control files:")
@@ -506,7 +524,7 @@ def parse_arguments():
             print()
             print("Crossfade: 5-second crossfade is automatically applied between tracks")
             exit(0)
-    
+
     if can_delete_file("/tmp/radioPlayer_arg"):
         with open("/tmp/radioPlayer_arg", "r") as f:
             arg = f.read().strip()
@@ -536,11 +554,11 @@ def parse_arguments():
 def main():
     # Load state at startup
     state_loaded = load_state()
-    
+
     try:
         while True:  # Main reload loop
             arg, play_newest_first, do_shuffle, pre_track_path, selected_list = parse_arguments()
-            
+
             if pre_track_path:
                 track_name = os.path.basename(pre_track_path)
                 logger.info(f"Now playing: {track_name}")
@@ -548,7 +566,7 @@ def main():
                 update_rds(track_name)
                 play_single_track(pre_track_path)
                 clear_current_state()
-                
+
                 action = check_control_files()
                 if can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
                 if action == "quit":
@@ -563,9 +581,9 @@ def main():
                 # Try to resume from the loaded state
                 if os.path.exists(current_state["playlist_path"]):
                     logger.info(f"Attempting to resume from saved state: {current_state['playlist_path']}")
-                    result = play_playlist(current_state["playlist_path"], 
+                    result = play_playlist(current_state["playlist_path"],
                                          current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'morning') and
-                                         current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'day') and  
+                                         current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'day') and
                                          current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'night') and
                                          current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'late_night'),
                                          play_newest_first, do_shuffle)
@@ -585,7 +603,7 @@ def main():
                     if result == "reload":
                         playlist_loop_active = False  # Break out to reload
                     continue
-                
+
                 current_hour = get_current_hour()
                 current_day = get_current_day()
 
@@ -598,7 +616,7 @@ def main():
                 day_dir = os.path.dirname(day_playlist)
                 night_dir = os.path.dirname(night_playlist)
                 late_night_dir = os.path.dirname(late_night_playlist)
-                
+
                 for dir_path in [morning_dir, day_dir, night_dir, late_night_dir]:
                     if not os.path.exists(dir_path):
                         logger.info(f"Creating directory: {dir_path}")
@@ -622,7 +640,7 @@ def main():
                 else:
                     logger.info(f"Playing {current_day} night playlist...")
                     result = play_playlist(night_playlist, False, play_newest_first, do_shuffle)
-                    
+
                 action = check_control_files()
                 if not can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
                 if action == "quit":
@@ -635,7 +653,7 @@ def main():
                         os.remove("/tmp/radioPlayer_onplaylist")
                     logger.info("Reload requested, restarting with new arguments...")
                     result = "reload"
-                
+
                 if result == "reload":
                     playlist_loop_active = False  # Break out to reload
 
