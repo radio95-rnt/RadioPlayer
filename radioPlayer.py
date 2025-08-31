@@ -157,7 +157,7 @@ def update_rds(track_name):
     try:
         name_table: dict[str, str] = load_dict_from_custom_format(name_table_path)
         try:
-            if "-" in name_table[track_name]: prt = rds_basic_base.format(name_table[track_name])
+            if " - " in name_table[track_name]: prt = rds_basic_base.format(name_table[track_name])
             else: prt = rds_base.format(name_table[track_name])
         except KeyError as e:
             logger.warning(f"File does not have a alias in the name table ({e})")
