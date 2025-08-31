@@ -278,9 +278,10 @@ def stop_all_processes():
                     pass
             next_process = None
 
-def create_audio_process(track_path, resume_seconds=0, fade_in=False, volume=1.0):
-    """Create ffplay process with optional fade effects and volume control"""
+def create_audio_process(track_path, resume_seconds=0, fade_in=False, fade_out=False):
+    """Create ffplay process with optional fade effects"""
     cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
+    duration = get_audio_duration(track_path)
 
     # Build filter chain
     filters = []
@@ -288,10 +289,8 @@ def create_audio_process(track_path, resume_seconds=0, fade_in=False, volume=1.0
     # Add fade in if requested
     if fade_in:
         filters.append(f"afade=t=in:st=0:d={CROSSFADE_DURATION}")
-
-    # Add volume control
-    if volume != 1.0:
-        filters.append(f"volume={volume}")
+    if fade_out and duration:
+        filters.append(f"afade=t=out:st={duration-CROSSFADE_DURATION}:d={CROSSFADE_DURATION}")
 
     # Apply filters if any exist
     if filters:
@@ -312,7 +311,7 @@ def play_single_track(track_path, resume_seconds=0):
     global current_process
 
     with process_lock:
-        current_process = create_audio_process(track_path, resume_seconds, fade_in=True)
+        current_process = create_audio_process(track_path, resume_seconds, fade_in=False)
 
     # Wait for the process to complete
     current_process.wait()
@@ -336,7 +335,7 @@ def play_audio_with_crossfade(current_track_path, next_track_path=None, resume_s
 
     # Start current track with fade in
     with process_lock:
-        current_process = create_audio_process(current_track_path, resume_seconds, fade_in=True)
+        current_process = create_audio_process(current_track_path, resume_seconds, fade_in=True, fade_out=True)
 
     if next_track_path and crossfade_start_time > 0:
         # Wait until it's time to start the crossfade
@@ -348,15 +347,13 @@ def play_audio_with_crossfade(current_track_path, next_track_path=None, resume_s
             stop_all_processes()
             return action
 
-        # Start next track with fade in and reduced volume initially
         logger.info(f"Starting crossfade to: {os.path.basename(next_track_path)}")
         with process_lock:
-            next_process = create_audio_process(next_track_path, fade_in=True, volume=0.8)
+            next_process = create_audio_process(next_track_path, fade_in=True, fade_out=True)
 
         # Wait for crossfade to complete
         time.sleep(CROSSFADE_DURATION)
 
-        # Stop current track (it should fade out naturally)
         with process_lock:
             if current_process and current_process.poll() is None:
                 try:
