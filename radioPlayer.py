@@ -391,7 +391,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                 if current_process and current_process.poll() is None:
                     try:
                         current_process.terminate()
-                        current_process.wait(timeout=2)
+                        current_process.wait()
                     except (subprocess.TimeoutExpired, ProcessLookupError):
                         pass
                     current_process = next_process
@@ -506,7 +506,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                 if current_process and current_process.poll() is None:
                     try:
                         current_process.terminate()
-                        current_process.wait(timeout=2)
+                        current_process.wait()
                     except (subprocess.TimeoutExpired, ProcessLookupError):
                         pass
                 current_process = next_process
