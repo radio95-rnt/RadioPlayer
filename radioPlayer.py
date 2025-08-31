@@ -5,7 +5,7 @@ import subprocess
 import time, datetime
 import sys
 import threading
-import json, re
+import json, re, unidecode
 from datetime import datetime
 import log95
 
@@ -171,6 +171,9 @@ def update_rds(track_name: str):
         else:
             artist = rds_default_artist
             title = name
+        
+        title = unidecode.unidecode(title)
+        artist = unidecode.unidecode(artist)
 
         title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
 
