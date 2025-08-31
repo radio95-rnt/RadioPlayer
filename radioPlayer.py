@@ -58,7 +58,7 @@ def load_dict_from_custom_format(file_path: str) -> dict:
         result_dict = {}
         with open(file_path, 'r') as file:
             for line in file:
-                if line.strip() == "":
+                if line.strip() == "" or line.startswith(";"):
                     continue
                 key, value = line.split(':', 1)
                 result_dict[key.strip()] = value.strip()
