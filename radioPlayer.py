@@ -329,6 +329,7 @@ def play_audio_with_crossfade(current_track_path, next_track_path=None, resume_s
     return None
 
 def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False, do_shuffle=True):
+    global current_process, next_process
     last_modified_time = get_playlist_modification_time(playlist_path)
     tracks = load_playlist(playlist_path)
     if not tracks:
