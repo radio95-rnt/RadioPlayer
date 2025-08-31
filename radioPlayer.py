@@ -352,7 +352,7 @@ def play_audio_with_crossfade(current_track_path, next_track_path=None, resume_s
             next_process = create_audio_process(next_track_path, fade_in=True, fade_out=True)
 
         # Wait for crossfade to complete
-        time.sleep(CROSSFADE_DURATION)
+        time.sleep(CROSSFADE_DURATION * 1.5)
 
         with process_lock:
             if current_process and current_process.poll() is None:
