@@ -533,7 +533,7 @@ class DisplayManager:
                           force_redraw: bool = False, state: InterfaceState = None):
         """Draw the files list, optimized to only redraw when necessary."""
         header_height = self.get_header_height()
-        content_start_row = header_height + 6
+        content_start_row = header_height + 5
         available_lines = term_height - content_start_row
 
         start_idx = scroll_offset
