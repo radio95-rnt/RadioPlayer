@@ -153,7 +153,7 @@ def should_resume_from_state(tracks, playlist_path):
     
     return False, tracks, 0
 
-def update_rds(track_name):
+def update_rds(track_name: str):
     try:
         name_table: dict[str, str] = load_dict_from_custom_format(name_table_path)
         try:
@@ -161,7 +161,7 @@ def update_rds(track_name):
             else: prt = rds_base.format(name_table[track_name])
         except KeyError as e:
             logger.warning(f"File does not have a alias in the name table ({e})")
-            prt = rds_base.format(rds_default_name)
+            prt = rds_basic_base.format(track_name.split(".", 1)[0])
 
         f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         f.settimeout(1.0)
