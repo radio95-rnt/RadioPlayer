@@ -42,6 +42,7 @@ state_thread = None
 state_lock = threading.Lock()
 
 # Crossfade management
+cross_for_cross_time = 0
 current_process = None
 next_process = None
 process_lock = threading.Lock()
@@ -329,7 +330,7 @@ def play_audio_with_crossfade(current_track_path, next_track_path=None, resume_s
     return None
 
 def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False, do_shuffle=True):
-    global current_process, next_process
+    global current_process, next_process, cross_for_cross_time
     last_modified_time = get_playlist_modification_time(playlist_path)
     tracks = load_playlist(playlist_path)
     if not tracks:
@@ -362,8 +363,45 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                 random.shuffle(tracks)
 
     for i, track in enumerate(tracks[start_index:], start_index):
-        if current_process: current_process.wait() # wait
-        
+        track_path = os.path.abspath(os.path.expanduser(track))
+        track_name = os.path.basename(track_path)
+        if current_process:
+            time.sleep(cross_for_cross_time)
+
+            # Check if we need to stop due to control files
+            action = check_control_files()
+            if action == "quit":
+                stop_all_processes()
+                clear_state()
+                exit()
+            elif action == "reload":
+                logger.info("Reload requested during playback...")
+                stop_all_processes()
+                return "reload"
+
+            logger.info(f"Starting cross-to-cross to: {os.path.basename(track_name)}")
+            with process_lock:
+                next_process = create_audio_process(track_path, fade_in=True, fade_out=True)
+            update_rds(track_name)
+
+            # Wait for crossfade to complete
+            time.sleep(CROSSFADE_DURATION * 1.5)
+
+            with process_lock:
+                if current_process and current_process.poll() is None:
+                    try:
+                        current_process.terminate()
+                        current_process.wait(timeout=2)
+                    except (subprocess.TimeoutExpired, ProcessLookupError):
+                        pass
+                    current_process = next_process
+                    next_process = None
+                else:
+                    # No crossfade, just wait for current track to finish
+                    current_process.wait()
+                    with process_lock:
+                        current_process = None
+    
         current_modified_time = get_playlist_modification_time(playlist_path)
         if current_modified_time > last_modified_time:
             logger.info(f"Playlist {playlist_path} has been modified, reloading...")
@@ -403,9 +441,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                 clear_current_state()
                 return
 
-        track_path = os.path.abspath(os.path.expanduser(track))
-        track_name = os.path.basename(track_path)
-
         # Update state before playing
         update_current_state(track_path, playlist_path, i)
 
@@ -429,9 +464,16 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             logger.warning(f"Could not get duration for {track_path}, playing without crossfade")
             play_single_track(track_path, resume_seconds)
             return
+        cross_for_cross_time = get_audio_duration(track_path)
+        if not cross_for_cross_time:
+            logger.warning(f"Could not get duration for {track_path}, playing without crossfade")
+            play_single_track(track_path, resume_seconds)
+            play_single_track(next_track_path)
+            return
 
         # Calculate when to start the next track (5 seconds before end)
         crossfade_start_time = max(0, duration - CROSSFADE_DURATION - resume_seconds)
+        cross_for_cross_time = max(0, cross_for_cross_time - CROSSFADE_DURATION)
 
         # Start current track with fade in
         with process_lock:
@@ -455,6 +497,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             logger.info(f"Starting crossfade to: {os.path.basename(next_track_path)}")
             with process_lock:
                 next_process = create_audio_process(next_track_path, fade_in=True, fade_out=True)
+            update_rds(next_track_path)
 
             # Wait for crossfade to complete
             time.sleep(CROSSFADE_DURATION * 1.5)
@@ -475,8 +518,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                 current_process = None
         
             
-        # Clear state after track finishes
-        clear_current_state()
+        update_current_state(next_track_path, playlist_path, i+1)
 
         # Check control files after each song
         action = check_control_files()
