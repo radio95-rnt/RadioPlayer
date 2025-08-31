@@ -22,6 +22,7 @@ playlist_dir = "/home/user/playlists"
 name_table_path = "/home/user/mixes/name_table.txt"
 state_file_path = "/tmp/radioPlayer_state.json"
 
+rds_basic_base = "Gramy: {}"
 rds_base = "Gramy: radio95 - {}"
 rds_default_name = "Program Godzinny"
 rds_default_rtp_data = "4,7,7,1,17"
@@ -154,9 +155,10 @@ def should_resume_from_state(tracks, playlist_path):
 
 def update_rds(track_name):
     try:
-        name_table = load_dict_from_custom_format(name_table_path)
+        name_table: dict[str, str] = load_dict_from_custom_format(name_table_path)
         try:
-            prt = rds_base.format(name_table[track_name])
+            if name_table[track_name].startswith("!"): prt = rds_basic_base.format(name_table[track_name].removeprefix("!"))
+            else: prt = rds_base.format(name_table[track_name])
         except KeyError as e:
             logger.warning(f"File does not have a alias in the name table ({e})")
             prt = rds_base.format(rds_default_name)
