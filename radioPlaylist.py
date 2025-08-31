@@ -8,7 +8,7 @@ import shutil
 import libcache
 import argparse
 from datetime import datetime
-from typing import List, Dict, Set, Tuple, Optional
+from typing import List, Dict, Set, Tuple, Optional, Union
 from dataclasses import dataclass
 
 # Configuration
@@ -35,10 +35,31 @@ class Config:
     def is_custom_mode(self) -> bool:
         return self.custom_playlist_file is not None
 
+@dataclass
+class FileItem:
+    """Represents either a single file or a folder containing files."""
+    name: str
+    is_folder: bool
+    files: List[str]  # For folders: list of contained audio files, For files: [filename]
+    
+    @property
+    def display_name(self) -> str:
+        """Name to show in the GUI."""
+        if self.is_folder:
+            return f"📁 {self.name}/"
+        return self.name
+    
+    @property
+    def all_files(self) -> List[str]:
+        """Get all file paths for playlist operations."""
+        if self.is_folder:
+            return [os.path.join(self.name, f) for f in self.files]
+        return self.files
+
 class FileManager:
     @staticmethod
     def get_audio_files(directory: str) -> List[str]:
-        """Get all audio files from the specified directory."""
+        """Get all audio files from the specified directory (legacy method for compatibility)."""
         audio_files = []
         try:
             for file in os.listdir(directory):
@@ -51,11 +72,73 @@ class FileManager:
         except PermissionError:
             print(f"Error: Permission denied for directory '{directory}'.")
             return []
+    
+    @staticmethod
+    def get_file_items(directory: str) -> List[FileItem]:
+        """Get all audio files and folders containing audio files as FileItem objects."""
+        items = []
+        try:
+            entries = sorted(os.listdir(directory))
+            
+            for entry in entries:
+                full_path = os.path.join(directory, entry)
+                
+                if os.path.isfile(full_path) and entry.lower().endswith(FORMATS):
+                    # Single audio file
+                    items.append(FileItem(name=entry, is_folder=False, files=[entry]))
+                
+                elif os.path.isdir(full_path):
+                    # Directory - check for audio files inside
+                    audio_files = []
+                    try:
+                        for file in os.listdir(full_path):
+                            if file.lower().endswith(FORMATS):
+                                audio_files.append(file)
+                    except (PermissionError, FileNotFoundError):
+                        continue
+                    
+                    if audio_files:
+                        # Folder contains audio files
+                        items.append(FileItem(name=entry, is_folder=True, files=sorted(audio_files)))
+            
+            return items
+        except FileNotFoundError:
+            print(f"Error: Directory '{directory}' not found.")
+            return []
+        except PermissionError:
+            print(f"Error: Permission denied for directory '{directory}'.")
+            return []
 
 class SearchManager:
     @staticmethod
+    def filter_file_items(items: List[FileItem], search_term: str) -> List[FileItem]:
+        """Filter and sort FileItem objects based on search term."""
+        if not search_term:
+            return items
+        
+        search_lower = search_term.lower()
+        
+        # Group items by match type
+        starts_with = []
+        contains = []
+        has_chars = []
+        
+        for item in items:
+            item_name_lower = item.name.lower()
+            
+            if item_name_lower.startswith(search_lower):
+                starts_with.append(item)
+            elif search_lower in item_name_lower:
+                contains.append(item)
+            elif SearchManager._has_matching_chars(item_name_lower, search_lower):
+                has_chars.append(item)
+        
+        # Return sorted results: starts_with first, then contains, then has_chars
+        return starts_with + contains + has_chars
+    
+    @staticmethod
     def filter_files(files: List[str], search_term: str) -> List[str]:
-        """Filter and sort files based on search term."""
+        """Filter and sort files based on search term (legacy method for compatibility)."""
         if not search_term:
             return files
         
@@ -110,10 +193,11 @@ class PlaylistManager:
                     for line in f:
                         line = line.strip()
                         if line:
-                            filename = os.path.basename(line)
-                            self.custom_playlist_files.add(filename)
+                            # Store relative path for comparison
+                            rel_path = os.path.relpath(line, FILES_DIR) if line.startswith('/') else line
+                            self.custom_playlist_files.add(rel_path)
                             # In custom mode, we'll use 'day' as the default period for display
-                            playlists["custom"]["day"].add(filename)
+                            playlists["custom"]["day"].add(rel_path)
             return playlists
         else:
             # Original functionality for weekly playlists
@@ -130,21 +214,20 @@ class PlaylistManager:
                                 for line in f:
                                     line = line.strip()
                                     if line:
-                                        filename = os.path.basename(line)
-                                        playlists[day][period].add(filename)
+                                        # Store relative path for comparison
+                                        rel_path = os.path.relpath(line, FILES_DIR) if line.startswith('/') else line
+                                        playlists[day][period].add(rel_path)
             return playlists
     
-    def update_playlist_file(self, day: str, period: str, filepath: str, add: bool):
-        """Update a playlist file by adding or removing a file."""
+    def update_playlist_file(self, day: str, period: str, file_item: FileItem, add: bool):
+        """Update a playlist file by adding or removing files from a FileItem."""
         if self.config.is_custom_mode:
-            self._update_custom_playlist(filepath, add)
+            self._update_custom_playlist(file_item, add)
         else:
-            self._update_weekly_playlist(day, period, filepath, add)
+            self._update_weekly_playlist(day, period, file_item, add)
     
-    def _update_custom_playlist(self, filepath: str, add: bool):
+    def _update_custom_playlist(self, file_item: FileItem, add: bool):
         """Update the custom playlist file."""
-        full_filepath = os.path.join(FILES_DIR, filepath)
-        
         # Ensure the directory exists
         os.makedirs(os.path.dirname(self.config.custom_playlist_file), exist_ok=True)
         
@@ -154,22 +237,31 @@ class PlaylistManager:
             with open(self.config.custom_playlist_file, 'r') as f:
                 lines = f.read().splitlines()
         
-        if add and full_filepath not in lines:
-            lines.append(full_filepath)
-            self.custom_playlist_files.add(filepath)
-        elif not add and full_filepath in lines:
-            lines.remove(full_filepath)
-            self.custom_playlist_files.discard(filepath)
+        # Get full paths for all files in the item
+        full_filepaths = [os.path.join(FILES_DIR, filepath) for filepath in file_item.all_files]
+        
+        if add:
+            for full_filepath in full_filepaths:
+                if full_filepath not in lines:
+                    lines.append(full_filepath)
+            # Update tracking set with relative paths
+            self.custom_playlist_files.update(file_item.all_files)
+        else:
+            for full_filepath in full_filepaths:
+                while full_filepath in lines:
+                    lines.remove(full_filepath)
+            # Remove from tracking set
+            for filepath in file_item.all_files:
+                self.custom_playlist_files.discard(filepath)
         
         # Write back to file
         with open(self.config.custom_playlist_file, 'w') as f:
             f.write('\n'.join(lines) + ('\n' if lines else ''))
     
-    def _update_weekly_playlist(self, day: str, period: str, filepath: str, add: bool):
+    def _update_weekly_playlist(self, day: str, period: str, file_item: FileItem, add: bool):
         """Update a weekly playlist file (original functionality)."""
         playlist_dir = self.ensure_playlist_dir(day)
         playlist_file = os.path.join(playlist_dir, period)
-        full_filepath = os.path.join(FILES_DIR, filepath)
         
         if not os.path.exists(playlist_file):
             with open(playlist_file, 'w') as f:
@@ -178,13 +270,28 @@ class PlaylistManager:
         with open(playlist_file, 'r') as f:
             lines = f.read().splitlines()
         
-        if add and full_filepath not in lines:
-            lines.append(full_filepath)
-        elif not add and full_filepath in lines:
-            lines.remove(full_filepath)
+        # Get full paths for all files in the item
+        full_filepaths = [os.path.join(FILES_DIR, filepath) for filepath in file_item.all_files]
+        
+        if add:
+            for full_filepath in full_filepaths:
+                if full_filepath not in lines:
+                    lines.append(full_filepath)
+        else:
+            for full_filepath in full_filepaths:
+                while full_filepath in lines:
+                    lines.remove(full_filepath)
         
         with open(playlist_file, 'w') as f:
             f.write('\n'.join(lines) + ('\n' if lines else ''))
+    
+    def is_file_item_in_playlist(self, file_item: FileItem, day: str, period: str, playlists: Dict) -> bool:
+        """Check if ALL files from a FileItem are in the specified playlist."""
+        if not file_item.all_files:
+            return False
+        
+        playlist_set = playlists.get(day, {}).get(period, set())
+        return all(filepath in playlist_set for filepath in file_item.all_files)
     
     def copy_day_to_all(self, playlists: Dict, source_day: str, days: List[str]) -> Dict:
         """Copy all playlists from source day to all other days."""
@@ -210,17 +317,17 @@ class PlaylistManager:
         
         return playlists
     
-    def copy_current_file_to_all(self, playlists: Dict, source_day: str, 
-                                days: List[str], current_file: str) -> Tuple[Dict, bool]:
-        """Copy current file's playlist assignments to all other days."""
+    def copy_current_item_to_all(self, playlists: Dict, source_day: str, 
+                                days: List[str], current_item: FileItem) -> Tuple[Dict, bool]:
+        """Copy current item's playlist assignments to all other days."""
         if self.config.is_custom_mode:
             # No-op in custom mode
             return playlists, False
             
-        source_periods = {
-            period: current_file in playlists[source_day][period]
-            for period in self.periods
-        }
+        # Check which periods the item's files are in
+        source_periods = {}
+        for period in self.periods:
+            source_periods[period] = self.is_file_item_in_playlist(current_item, source_day, period, playlists)
         
         if not any(source_periods.values()):
             return playlists, False
@@ -231,13 +338,16 @@ class PlaylistManager:
             
             for period, is_present in source_periods.items():
                 target_set = playlists[target_day][period]
-                full_path = os.path.join(FILES_DIR, current_file)
                 
                 if is_present:
-                    target_set.add(current_file)
+                    # Add all files from the item
+                    target_set.update(current_item.all_files)
                 else:
-                    target_set.discard(current_file)
+                    # Remove all files from the item
+                    for filepath in current_item.all_files:
+                        target_set.discard(filepath)
                 
+                # Update the playlist file
                 playlist_dir = self.ensure_playlist_dir(target_day)
                 playlist_file = os.path.join(playlist_dir, period)
                 
@@ -247,11 +357,16 @@ class PlaylistManager:
                 else:
                     lines = []
                 
-                if is_present and full_path not in lines:
-                    lines.append(full_path)
-                elif not is_present:
-                    while full_path in lines:
-                        lines.remove(full_path)
+                full_filepaths = [os.path.join(FILES_DIR, filepath) for filepath in current_item.all_files]
+                
+                if is_present:
+                    for full_filepath in full_filepaths:
+                        if full_filepath not in lines:
+                            lines.append(full_filepath)
+                else:
+                    for full_filepath in full_filepaths:
+                        while full_filepath in lines:
+                            lines.remove(full_filepath)
                 
                 with open(playlist_file, 'w') as f:
                     f.write('\n'.join(lines) + ('\n' if lines else ''))
@@ -297,12 +412,12 @@ class TerminalUtils:
 
 class StatsCalculator:
     @staticmethod
-    def calculate_category_percentages(playlists: Dict, current_day: str, config: Config) -> Optional[Tuple]:
+    def calculate_category_percentages(playlists: Dict, current_day: str, config: Config, all_file_items: List[FileItem]) -> Optional[Tuple]:
         """Calculate category distribution percentages."""
         if config.is_custom_mode:
             # In custom mode, show simple stats
             custom_files = playlists.get("custom", {}).get("day", set())
-            total_files = len(FileManager.get_audio_files(FILES_DIR))
+            total_files = sum(len(item.all_files) for item in all_file_items)
             assigned_count = len(custom_files)
             
             if total_files == 0:
@@ -359,10 +474,10 @@ class DisplayManager:
         self.config = config
     
     def draw_header(self, playlists: Dict, current_day: str, current_day_idx: int,
-                   days: List[str], term_width: int, force_redraw: bool = False,
-                   state: InterfaceState = None):
+                   days: List[str], term_width: int, all_file_items: List[FileItem], 
+                   force_redraw: bool = False, state: InterfaceState = None):
         """Draw the header, only if content has changed."""
-        result = self.stats.calculate_category_percentages(playlists, current_day, self.config)
+        result = self.stats.calculate_category_percentages(playlists, current_day, self.config, all_file_items)
         percentages, polskie_percentages, total_pl = result or ({}, {}, 0)
 
         if self.config.is_custom_mode:
@@ -377,7 +492,6 @@ class DisplayManager:
                 f"{cat[:4].capitalize()}: {percentages.get(cat, 0):.1f}% (P:{polskie_percentages.get(cat, 0):.1f}%)"
                 for cat in ['late_night', 'morning', 'day', 'night']
             ])
-            # ... (rest of your header logic for weekly mode is fine)
             day_bar = " ".join([f"\033[1;44m[{day}]\033[0m" if i == current_day_idx else f"[{day}]" for i, day in enumerate(days)])
             header_content = (category_bar, day_bar)
 
@@ -385,12 +499,17 @@ class DisplayManager:
         if force_redraw or state.last_header != header_content:
             self.terminal.move_cursor(1)
             self.terminal.clear_line()
-            # ... (your printing logic for the header)
-            print(header_content[0].center(term_width))
+            print("\033[1;37mCategory Distribution:\033[0m".center(term_width), end="", flush=True)
+            
+            self.terminal.move_cursor(2)
+            self.terminal.clear_line()
+            print(header_content[0].center(term_width), end="", flush=True)
+            
             if not self.config.is_custom_mode:
                 self.terminal.move_cursor(3)
                 self.terminal.clear_line()
-                print(header_content[1])
+                print(header_content[1], end="", flush=True)
+            
             state.last_header = header_content
     
     def get_header_height(self) -> int:
@@ -409,7 +528,7 @@ class DisplayManager:
             print(f"\033[1;33m{search_display}\033[0m")
             state.last_search = search_term
     
-    def draw_files_section(self, audio_files: List[str], playlists: Dict, selected_idx: int,
+    def draw_files_section(self, file_items: List[FileItem], playlists: Dict, selected_idx: int,
                           current_day: str, scroll_offset: int, term_width: int, term_height: int,
                           force_redraw: bool = False, state: InterfaceState = None):
         """Draw the files list, optimized to only redraw when necessary."""
@@ -418,13 +537,13 @@ class DisplayManager:
         available_lines = term_height - content_start_row
 
         start_idx = scroll_offset
-        end_idx = min(start_idx + available_lines, len(audio_files))
+        end_idx = min(start_idx + available_lines, len(file_items))
 
         # Create a snapshot of the current state to compare against the last one
         files_display_state = (
             start_idx, end_idx, selected_idx, current_day,
-            # We also need to know if the playlist data for the visible files has changed
-            tuple(f in playlists.get(current_day, {}).get('day', set()) for f in audio_files[start_idx:end_idx])
+            # We also need to know if the playlist data for the visible items has changed
+            tuple(self._get_item_playlist_status(item, playlists, current_day) for item in file_items[start_idx:end_idx])
         )
         
         if force_redraw or state.last_files_display != files_display_state:
@@ -440,44 +559,47 @@ class DisplayManager:
                 print(" ", end="")
             
             if self.config.is_custom_mode:
-                position_info = f" Custom | File {selected_idx + 1}/{len(audio_files)} "
+                position_info = f" Custom | Item {selected_idx + 1}/{len(file_items)} "
             else:
-                position_info = f" {current_day.capitalize()} | File {selected_idx + 1}/{len(audio_files)} "
+                position_info = f" {current_day.capitalize()} | Item {selected_idx + 1}/{len(file_items)} "
             padding = term_width - len(position_info) - 2
             print(position_info.center(padding), end="")
             
-            if end_idx < len(audio_files):
+            if end_idx < len(file_items):
                 print("↓", end="", flush=True)
             else:
                 print(" ", end="", flush=True)
             
             # File list
             for display_row, idx in enumerate(range(start_idx, end_idx)):
-                file = audio_files[idx]
+                item = file_items[idx]
                 line_row = content_start_row + display_row
                 self.terminal.move_cursor(line_row)
                 self.terminal.clear_line()
                 
                 if self.config.is_custom_mode:
                     # In custom mode, only show 'C' for custom playlist
-                    in_custom = file in playlists.get("custom", {}).get("day", set())
+                    in_custom = all(filepath in playlists.get("custom", {}).get("day", set()) 
+                                  for filepath in item.all_files)
                     c_color = "\033[1;32m" if in_custom else "\033[1;30m"
                     row_highlight = "\033[1;44m" if idx == selected_idx else ""
                     
                     max_filename_length = term_width - 6
-                    display_file = file
-                    if len(file) > max_filename_length:
-                        display_file = file[:max_filename_length-3] + "..."
+                    display_name = item.display_name
+                    if len(display_name) > max_filename_length:
+                        display_name = display_name[:max_filename_length-3] + "..."
                     
-                    self.terminal.move_cursor(line_row)
-                    self.terminal.clear_line()
-                    print(f"{row_highlight}[{c_color}C\033[0m{row_highlight}] {display_file}\033[0m", end="", flush=True)
+                    print(f"{row_highlight}[{c_color}C\033[0m{row_highlight}] {display_name}\033[0m", end="", flush=True)
                 else:
                     # Original weekly mode display
-                    in_late_night = file in playlists[current_day]['late_night']
-                    in_morning = file in playlists[current_day]['morning']
-                    in_day = file in playlists[current_day]['day']
-                    in_night = file in playlists[current_day]['night']
+                    in_late_night = all(filepath in playlists[current_day]['late_night'] 
+                                      for filepath in item.all_files)
+                    in_morning = all(filepath in playlists[current_day]['morning'] 
+                                   for filepath in item.all_files)
+                    in_day = all(filepath in playlists[current_day]['day'] 
+                               for filepath in item.all_files)
+                    in_night = all(filepath in playlists[current_day]['night'] 
+                                 for filepath in item.all_files)
                     
                     l_color = "\033[1;32m" if in_late_night else "\033[1;30m"
                     m_color = "\033[1;32m" if in_morning else "\033[1;30m"
@@ -487,13 +609,11 @@ class DisplayManager:
                     row_highlight = "\033[1;44m" if idx == selected_idx else ""
                     
                     max_filename_length = term_width - 15
-                    display_file = file
-                    if len(file) > max_filename_length:
-                        display_file = file[:max_filename_length-3] + "..."
+                    display_name = item.display_name
+                    if len(display_name) > max_filename_length:
+                        display_name = display_name[:max_filename_length-3] + "..."
                     
-                    self.terminal.move_cursor(line_row)
-                    self.terminal.clear_line()
-                    print(f"{row_highlight}[{l_color}L\033[0m{row_highlight}] [{m_color}M\033[0m{row_highlight}] [{d_color}D\033[0m{row_highlight}] [{n_color}N\033[0m{row_highlight}] {display_file}\033[0m", end="", flush=True)
+                    print(f"{row_highlight}[{l_color}L\033[0m{row_highlight}] [{m_color}M\033[0m{row_highlight}] [{d_color}D\033[0m{row_highlight}] [{n_color}N\033[0m{row_highlight}] {display_name}\033[0m", end="", flush=True)
             
             # Clear remaining lines
             last_end_idx = state.last_files_display[1] if state.last_files_display else 0
@@ -503,113 +623,19 @@ class DisplayManager:
                     self.terminal.clear_line()
 
             state.last_files_display = files_display_state
-        
-        # Day bar
-        day_bar = ""
-        for i, day in enumerate(days):
-            if i == current_day_idx:
-                day_bar += f"\033[1;44m[{day}]\033[0m "
-            else:
-                day_bar += f"[{day}] "
-        
-        header_content = (category_bar, day_bar.strip())
-        
-        if force_redraw or (state and state.last_header != header_content):
-            self.terminal.move_cursor(1)
-            self.terminal.clear_line()
-            print("\033[1;37mCategory Distribution:\033[0m".center(term_width), end="", flush=True)
-            
-            self.terminal.move_cursor(2)
-            self.terminal.clear_line()
-            print(category_bar.center(term_width), end="", flush=True)
-            
-            self.terminal.move_cursor(3)
-            self.terminal.clear_line()
-            print(day_bar.strip(), end="", flush=True)
-            
-            if state:
-                state.last_header = header_content
     
-    def draw_search_bar(self, search_term: str, term_width: int, force_redraw: bool = False,
-                       state: InterfaceState = None):
-        """Draw the search bar."""
-        if force_redraw or (state and state.last_search != search_term):
-            self.terminal.move_cursor(self.get_header_height() + 3)
-            self.terminal.clear_line()
-            search_display = f"Search: {search_term}"
-            if len(search_display) > term_width - 2:
-                search_display = search_display[:term_width - 5] + "..."
-            print(f"\033[1;33m{search_display}\033[0m", end="", flush=True)
-            
-            if state:
-                state.last_search = search_term
-    
-    def draw_files_section(self, audio_files: List[str], playlists: Dict, selected_idx: int, 
-                          current_day: str, scroll_offset: int, term_width: int, term_height: int,
-                          force_redraw: bool = False, state: InterfaceState = None):
-        """Draw the files list section."""
-        available_lines = term_height - 4 - self.get_header_height()  # Adjusted for search bar
-        start_idx = max(0, min(scroll_offset, len(audio_files) - available_lines))
-        end_idx = min(start_idx + available_lines, len(audio_files))
-        
-        files_display_state = (start_idx, end_idx, selected_idx, current_day)
-        
-        if force_redraw or (state and (state.last_files_display != files_display_state or 
-                                      state.last_selected_idx != selected_idx)):
-            
-            # Position info line
-            self.terminal.move_cursor(7)
-            self.terminal.clear_line()
-            
-            if start_idx > 0:
-                print("↑", end="")
-            else:
-                print(" ", end="")
-            
-            position_info = f" {current_day.capitalize()} | File {selected_idx + 1}/{len(audio_files)} "
-            padding = term_width - len(position_info) - 2
-            print(position_info.center(padding), end="")
-            
-            if end_idx < len(audio_files):
-                print("↓", end="", flush=True)
-            else:
-                print(" ", end="", flush=True)
-            
-            # File list
-            for display_row, idx in enumerate(range(start_idx, end_idx)):
-                file = audio_files[idx]
-                line_row = 4 + display_row + self.get_header_height()  # Start after header and search
-                
-                in_late_night = file in playlists[current_day]['late_night']
-                in_morning = file in playlists[current_day]['morning']
-                in_day = file in playlists[current_day]['day']
-                in_night = file in playlists[current_day]['night']
-                
-                l_color = "\033[1;32m" if in_late_night else "\033[1;30m"
-                m_color = "\033[1;32m" if in_morning else "\033[1;30m"
-                d_color = "\033[1;32m" if in_day else "\033[1;30m"
-                n_color = "\033[1;32m" if in_night else "\033[1;30m"
-                
-                row_highlight = "\033[1;44m" if idx == selected_idx else ""
-                
-                max_filename_length = term_width - 15
-                display_file = file
-                if len(file) > max_filename_length:
-                    display_file = file[:max_filename_length-3] + "..."
-                
-                self.terminal.move_cursor(line_row)
-                self.terminal.clear_line()
-                if not self.config.is_custom_mode: print(f"{row_highlight}[{l_color}L\033[0m{row_highlight}] [{m_color}M\033[0m{row_highlight}] [{d_color}D\033[0m{row_highlight}] [{n_color}N\033[0m{row_highlight}] {display_file}\033[0m", end="", flush=True)
-                else: print(f"{row_highlight}[{d_color}C\033[0m{row_highlight}] {display_file}\033[0m", end="", flush=True)
-            
-            # Clear remaining lines
-            for clear_row in range(9 + (end_idx - start_idx), term_height):
-                self.terminal.move_cursor(clear_row)
-                self.terminal.clear_line()
-            
-            if state:
-                state.last_files_display = files_display_state
-                state.last_selected_idx = selected_idx
+    def _get_item_playlist_status(self, item: FileItem, playlists: Dict, current_day: str) -> Tuple:
+        """Get playlist status for an item to use in display state comparison."""
+        if self.config.is_custom_mode:
+            return (all(filepath in playlists.get("custom", {}).get("day", set()) 
+                       for filepath in item.all_files),)
+        else:
+            return (
+                all(filepath in playlists[current_day]['late_night'] for filepath in item.all_files),
+                all(filepath in playlists[current_day]['morning'] for filepath in item.all_files),
+                all(filepath in playlists[current_day]['day'] for filepath in item.all_files),
+                all(filepath in playlists[current_day]['night'] for filepath in item.all_files)
+            )
 
 class Application:
     def __init__(self, config: Config):
@@ -633,8 +659,8 @@ class Application:
         self.in_search_mode = False
         
         # Data
-        self.all_audio_files = []
-        self.filtered_files = []
+        self.all_file_items = []
+        self.filtered_file_items = []
         self.playlists = {}
         self.days_of_week = []
     
@@ -649,12 +675,12 @@ class Application:
     
     def initialize_data(self):
         """Initialize application data."""
-        self.all_audio_files = self.file_manager.get_audio_files(FILES_DIR)
-        if not self.all_audio_files:
-            print("No audio files found. Exiting.")
+        self.all_file_items = self.file_manager.get_file_items(FILES_DIR)
+        if not self.all_file_items:
+            print("No audio files or folders found. Exiting.")
             return False
         
-        self.filtered_files = self.all_audio_files.copy()
+        self.filtered_file_items = self.all_file_items.copy()
         
         if self.config.is_custom_mode:
             self.days_of_week = ["custom"]  # Single "day" for custom mode
@@ -665,18 +691,18 @@ class Application:
         return True
     
     def update_search(self, new_search: str):
-        """Update search term and filter files."""
+        """Update search term and filter file items."""
         self.search_term = new_search
-        self.filtered_files = self.search_manager.filter_files(self.all_audio_files, self.search_term)
+        self.filtered_file_items = self.search_manager.filter_file_items(self.all_file_items, self.search_term)
         
         # Reset selection if current selection is not in filtered results
-        if self.selected_idx >= len(self.filtered_files):
-            self.selected_idx = max(0, len(self.filtered_files) - 1)
-        elif self.filtered_files and self.selected_idx < len(self.filtered_files):
-            # Keep current file selected if it's still in results
-            current_file = self.all_audio_files[self.selected_idx] if self.selected_idx < len(self.all_audio_files) else None
-            if current_file and current_file in self.filtered_files:
-                self.selected_idx = self.filtered_files.index(current_file)
+        if self.selected_idx >= len(self.filtered_file_items):
+            self.selected_idx = max(0, len(self.filtered_file_items) - 1)
+        elif self.filtered_file_items and self.selected_idx < len(self.filtered_file_items):
+            # Keep current item selected if it's still in results
+            current_item = self.all_file_items[self.selected_idx] if self.selected_idx < len(self.all_file_items) else None
+            if current_item and current_item in self.filtered_file_items:
+                self.selected_idx = self.filtered_file_items.index(current_item)
             else:
                 self.selected_idx = 0
     
@@ -703,20 +729,20 @@ class Application:
             if self.config.is_custom_mode:
                 print("UP/DOWN: Navigate | C: Toggle | /: Search | Q: Quit", end="", flush=True)
             else:
-                print("UP/DOWN: Navigate | D/N/L/M: Toggle | C: Copy day | F: Copy file | /: Search | Q: Quit", end="", flush=True)
+                print("UP/DOWN: Navigate | D/N/L/M: Toggle | C: Copy day | F: Copy item | /: Search | Q: Quit", end="", flush=True)
             
             self.terminal.move_cursor(keybind_row + 1)
             print("ESC: Exit search | ENTER: Apply search", end="", flush=True)
         
         # Draw header
         self.display.draw_header(self.playlists, current_day, self.current_day_idx, 
-                               self.days_of_week, term_width, force_redraw, self.state)
+                               self.days_of_week, term_width, self.all_file_items, force_redraw, self.state)
         
         # Draw search bar
         self.display.draw_search_bar(self.search_term, term_width, force_redraw, self.state)
         
         # Draw files section
-        self.display.draw_files_section(self.filtered_files, self.playlists, self.selected_idx,
+        self.display.draw_files_section(self.filtered_file_items, self.playlists, self.selected_idx,
                                       current_day, self.scroll_offset, term_width, term_height,
                                       force_redraw, self.state)
         
@@ -741,7 +767,7 @@ class Application:
         if key == 'A':  # Up arrow
             self.selected_idx = max(0, self.selected_idx - 1)
         elif key == 'B':  # Down arrow
-            self.selected_idx = min(len(self.filtered_files) - 1, self.selected_idx + 1)
+            self.selected_idx = min(len(self.filtered_file_items) - 1, self.selected_idx + 1)
         elif key == 'C' and not self.config.is_custom_mode:  # Right arrow (disabled in custom mode)
             self.current_day_idx = (self.current_day_idx + 1) % len(self.days_of_week)
         elif key == 'D' and not self.config.is_custom_mode:  # Left arrow (disabled in custom mode)
@@ -749,40 +775,46 @@ class Application:
         elif key == '5':  # Page Up
             self.selected_idx = max(0, self.selected_idx - visible_lines)
         elif key == '6':  # Page Down
-            self.selected_idx = min(len(self.filtered_files) - 1, self.selected_idx + visible_lines)
+            self.selected_idx = min(len(self.filtered_file_items) - 1, self.selected_idx + visible_lines)
         elif key == '1':  # Home
             self.selected_idx = 0
         elif key == '4':  # End
-            self.selected_idx = len(self.filtered_files) - 1
+            self.selected_idx = len(self.filtered_file_items) - 1
     
     def toggle_playlist(self, period: str):
-        """Toggle current file in specified playlist period."""
-        if not self.filtered_files:
+        """Toggle current file item in specified playlist period."""
+        if not self.filtered_file_items:
             return
         
         current_day = self.days_of_week[self.current_day_idx]
-        file = self.filtered_files[self.selected_idx]
+        file_item = self.filtered_file_items[self.selected_idx]
         
         if self.config.is_custom_mode:
             # In custom mode, all operations work with the "day" period
-            is_in_playlist = file in self.playlists["custom"]["day"]
+            is_in_playlist = self.playlist_manager.is_file_item_in_playlist(file_item, "custom", "day", self.playlists)
             
             if is_in_playlist:
-                self.playlists["custom"]["day"].remove(file)
+                # Remove all files from the item
+                for filepath in file_item.all_files:
+                    self.playlists["custom"]["day"].discard(filepath)
             else:
-                self.playlists["custom"]["day"].add(file)
+                # Add all files from the item
+                self.playlists["custom"]["day"].update(file_item.all_files)
             
-            self.playlist_manager.update_playlist_file("custom", "day", file, not is_in_playlist)
+            self.playlist_manager.update_playlist_file("custom", "day", file_item, not is_in_playlist)
         else:
             # Original weekly mode
-            is_in_playlist = file in self.playlists[current_day][period]
+            is_in_playlist = self.playlist_manager.is_file_item_in_playlist(file_item, current_day, period, self.playlists)
             
             if is_in_playlist:
-                self.playlists[current_day][period].remove(file)
+                # Remove all files from the item
+                for filepath in file_item.all_files:
+                    self.playlists[current_day][period].discard(filepath)
             else:
-                self.playlists[current_day][period].add(file)
+                # Add all files from the item
+                self.playlists[current_day][period].update(file_item.all_files)
             
-            self.playlist_manager.update_playlist_file(current_day, period, file, not is_in_playlist)
+            self.playlist_manager.update_playlist_file(current_day, period, file_item, not is_in_playlist)
     
     def handle_search_input(self, key: str):
         """Handle search input."""
@@ -872,7 +904,7 @@ class Application:
                 elif key == ' ':
                     header_height = self.display.get_header_height()
                     visible_lines = term_height - (header_height + 5)
-                    self.selected_idx = min(len(self.filtered_files) - 1, self.selected_idx + visible_lines)
+                    self.selected_idx = min(len(self.filtered_file_items) - 1, self.selected_idx + visible_lines)
                 elif key.lower() == 'c':
                     if self.config.is_custom_mode:
                         # In custom mode, 'c' toggles the custom playlist
@@ -893,29 +925,30 @@ class Application:
                 elif key.lower() == 'l' and not self.config.is_custom_mode:
                     self.toggle_playlist('late_night')
                 elif key.lower() == 'f' and not self.config.is_custom_mode:
-                    if self.filtered_files:
+                    if self.filtered_file_items:
                         current_day = self.days_of_week[self.current_day_idx]
-                        current_file = self.filtered_files[self.selected_idx]
+                        current_item = self.filtered_file_items[self.selected_idx]
                         
-                        self.playlists, success = self.playlist_manager.copy_current_file_to_all(
-                            self.playlists, current_day, self.days_of_week, current_file)
+                        self.playlists, success = self.playlist_manager.copy_current_item_to_all(
+                            self.playlists, current_day, self.days_of_week, current_item)
                         
                         if success:
-                            self.flash_message = f"File '{current_file}' copied to all days!"
+                            item_name = current_item.display_name
+                            self.flash_message = f"Item '{item_name}' copied to all days!"
                         else:
-                            self.flash_message = f"File not in any playlist! Add it first."
+                            self.flash_message = f"Item not in any playlist! Add it first."
                         self.message_timer = 0
                 elif key.isupper() and len(key) == 1 and key.isalpha():
-                    # Jump to file starting with letter
+                    # Jump to item starting with letter
                     target_letter = key.lower()
                     found_idx = -1
-                    for i in range(self.selected_idx + 1, len(self.filtered_files)):
-                        if self.filtered_files[i].lower().startswith(target_letter):
+                    for i in range(self.selected_idx + 1, len(self.filtered_file_items)):
+                        if self.filtered_file_items[i].name.lower().startswith(target_letter):
                             found_idx = i
                             break
                     if found_idx == -1:
                         for i in range(0, self.selected_idx):
-                            if self.filtered_files[i].lower().startswith(target_letter):
+                            if self.filtered_file_items[i].name.lower().startswith(target_letter):
                                 found_idx = i
                                 break
                     if found_idx != -1:
