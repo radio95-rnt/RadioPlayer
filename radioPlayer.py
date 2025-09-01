@@ -378,9 +378,8 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         current_modified_time = get_playlist_modification_time(playlist_path)
         if current_modified_time > last_modified_time:
             logger.info(f"Playlist {playlist_path} has been modified, reloading...")
-            stop_all_processes()
-            clear_current_state()
-            return
+            return_pending = True
+            continue
 
         current_hour = get_current_hour()
         current_day = get_current_day()
@@ -406,7 +405,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                 logger.info("Time changed to night hours, switching playlist...")
                 return_pending = True
         
-        if return_pending and not current_process: return
+        if return_pending and not current_process: continue
         
         if current_process:
             time.sleep(cross_for_cross_time)
