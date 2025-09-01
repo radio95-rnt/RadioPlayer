@@ -79,7 +79,7 @@ def update_rds(track_name: str):
             has_name = True
         except KeyError as e:
             has_name = False
-            name = track_name.split(".",1)[0]
+            name = ".".join(track_name.split(".")[:-1])
 
         if " - " in name:
             count = name.count(" - ")
