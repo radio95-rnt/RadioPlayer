@@ -624,11 +624,14 @@ def main():
                 # Try to resume from the loaded state
                 if os.path.exists(current_state["playlist_path"]):
                     logger.info(f"Attempting to resume from saved state: {current_state['playlist_path']}")
+                    
+                    # Check if the saved playlist is a time-based playlist (not custom)
+                    # A time-based playlist ends with 'morning', 'day', 'night', or 'late_night'
+                    saved_playlist_name = os.path.basename(current_state["playlist_path"])
+                    is_time_based_playlist = saved_playlist_name in ['morning', 'day', 'night', 'late_night']
+                    
                     result = play_playlist(current_state["playlist_path"],
-                                         current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'morning') and
-                                         current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'day') and
-                                         current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'night') and
-                                         current_state["playlist_path"] != os.path.join(playlist_dir, get_current_day(), 'late_night'),
+                                         not is_time_based_playlist,  # custom_playlist = NOT time-based
                                          play_newest_first, do_shuffle)
                     state_loaded = False  # Don't try to resume again
                     if result == "reload":
