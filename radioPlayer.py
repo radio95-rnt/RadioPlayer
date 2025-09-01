@@ -20,7 +20,6 @@ CROSSFADE_DURATION = 5  # seconds
 
 playlist_dir = "/home/user/playlists"
 name_table_path = "/home/user/mixes/name_table.txt"
-state_file_path = "/tmp/radioPlayer_state.json"
 
 rds_base = "Gramy: {} - {}"
 rds_default_artist = "radio95"
@@ -29,8 +28,6 @@ rds_default_name = "Program Godzinny"
 udp_host = ("127.0.0.1", 5000)
 
 logger = log95.log95("radioPlayer")
-
-# Global variables for state tracking
 
 # Crossfade management
 cross_for_cross_time = 0
@@ -48,60 +45,6 @@ class Time:
             return os.path.getmtime(playlist_path)
         except OSError:
             return 0
-
-class StateManager:
-    def __init__(self) -> None:
-        self._reset()
-        self._state_lock = threading.Lock()
-    def _reset(self):
-        self._current_state = {
-            "current_file": None,
-            "start_time": None,
-            "duration": None,
-            "playlist_path": None,
-            "playlist_position": 0
-        }
-    def save_state(self):
-        try:
-            with self._state_lock:
-                with open(state_file_path, 'w') as f:
-                    json.dump(self._current_state, f)
-        except Exception as e:
-            logger.error(f"Error saving state: {e}")
-    def load_state(self):
-        try:
-            if os.path.exists(state_file_path):
-                with open(state_file_path, 'r') as f:
-                    loaded_state = json.load(f)
-                    with self._state_lock:
-                        self._current_state.update(loaded_state)
-                    logger.info(f"Loaded state: {self._current_state}")
-                    return True
-        except Exception as e:
-            logger.error(f"Error loading state: {e}")
-        return False
-    def clear_state(self):
-        with self._state_lock:
-            self._reset()
-            try:
-                if os.path.exists(state_file_path):
-                    os.remove(state_file_path)
-            except Exception as e:
-                logger.error(f"Error clearing state: {e}")
-    def update_current_state(self, file_path, playlist_path=None, playlist_position=0):
-        with self._state_lock:
-            self._current_state["current_file"] = file_path
-            self._current_state["start_time"] = time.time()
-            self._current_state["duration"] = get_audio_duration(file_path)
-            self._current_state["playlist_path"] = playlist_path
-            self._current_state["playlist_position"] = playlist_position
-        self.save_state()
-    def get_state(self):
-        with self._state_lock:
-            return self._current_state.copy()
-
-
-stateman = StateManager()
 
 def load_dict_from_custom_format(file_path: str) -> dict:
     try:
@@ -127,20 +70,6 @@ def get_audio_duration(file_path):
         if result.returncode == 0: return float(result.stdout.strip())
     except Exception as e: logger.warning(f"Exception while reading audio duration: {e}")
     return None
-
-def should_resume_from_state(tracks, playlist_path):
-    if not stateman.get_state()["current_file"] or not stateman.get_state()["start_time"]: return False, tracks, 0
-
-    # Check if the saved file is still in the current playlist
-    if stateman.get_state()["current_file"] in tracks and stateman.get_state()["playlist_path"] == playlist_path:
-        elapsed = time.time() - stateman.get_state()["start_time"]
-        if (stateman.get_state()["duration"] and elapsed < stateman.get_state()["duration"] and elapsed < 600):
-            # Find position of the current file
-            try:
-                logger.info(f"Resuming from {os.path.basename(stateman.get_state()['current_file'])} at {elapsed:.0f}s")
-                return True, tracks, tracks.index(stateman.get_state()["current_file"])
-            except ValueError: pass
-    return False, tracks, 0
 
 def update_rds(track_name: str):
     try:
@@ -251,7 +180,7 @@ def stop_all_processes():
                     pass
             next_process = None
 
-def create_audio_process(track_path, resume_seconds=0, fade_in=False, fade_out=False):
+def create_audio_process(track_path, fade_in=False, fade_out=False):
     """Create ffplay process with optional fade effects"""
     cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
     duration = get_audio_duration(track_path)
@@ -270,36 +199,22 @@ def create_audio_process(track_path, resume_seconds=0, fade_in=False, fade_out=F
         filter_chain = ",".join(filters)
         cmd.extend(['-af', filter_chain])
 
-    # Add resume position if specified
-    resume_seconds = max(0, resume_seconds - 5)  # Start 5 seconds earlier for better sync
-    if resume_seconds > 0:
-        cmd.extend(['-ss', str(resume_seconds)])
-
     cmd.append(track_path)
 
     return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-def play_single_track(track_path, resume_seconds=0):
+def play_single_track(track_path):
     """Play a single track without crossfade (for first track or special cases)"""
     global current_process
 
     with process_lock:
-        current_process = create_audio_process(track_path, resume_seconds, fade_in=False)
+        current_process = create_audio_process(track_path, fade_in=False, fade_out=False)
 
     # Wait for the process to complete
     current_process.wait()
 
     with process_lock:
         current_process = None
-
-def play_audio_with_crossfade(current_track_path, next_track_path=None, resume_seconds=0):
-    """Play audio file with crossfade to next track"""
-    global current_process, next_process
-
-    # Get duration of current track
-
-
-    return None
 
 def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False, do_shuffle=True):
     global current_process, next_process, cross_for_cross_time
@@ -312,33 +227,25 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
 
     if do_shuffle: random.seed()
 
-    # Check if we should resume from saved state
-    should_resume, tracks, resume_index = should_resume_from_state(tracks, playlist_path)
     start_index = 0
-    resume_seconds = 0
 
-    if should_resume:
-        start_index = resume_index
-        resume_seconds = time.time() - stateman.get_state()["start_time"]
+    # Normal playlist preparation
+    if play_newest_first:
+        newest_track = get_newest_track(tracks)
+        if newest_track:
+            logger.info(f"Playing newest track first: {os.path.basename(newest_track)}")
+            tracks.remove(newest_track)
+            if do_shuffle: random.shuffle(tracks)
+            tracks.insert(0, newest_track)
     else:
-        # Normal playlist preparation
-        if play_newest_first:
-            newest_track = get_newest_track(tracks)
-            if newest_track:
-                logger.info(f"Playing newest track first: {os.path.basename(newest_track)}")
-                tracks.remove(newest_track)
-                if do_shuffle: random.shuffle(tracks)
-                tracks.insert(0, newest_track)
-        else:
-            if do_shuffle:
-                random.shuffle(tracks)
+        if do_shuffle:
+            random.shuffle(tracks)
                 
     return_pending = False
 
     for i, track in enumerate(tracks[start_index:], start_index):
         if return_pending: 
             stop_all_processes()
-            stateman.clear_state()
             return
         track_path = os.path.abspath(os.path.expanduser(track))
         track_name = os.path.basename(track_path)
@@ -381,7 +288,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             action = check_control_files()
             if action == "quit":
                 stop_all_processes()
-                stateman.clear_state()
                 exit()
             elif action == "reload":
                 logger.info("Reload requested during playback...")
@@ -392,7 +298,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             with process_lock:
                 next_process = create_audio_process(track_path, fade_in=True, fade_out=True)
             update_rds(track_name)
-            stateman.update_current_state(track_path, playlist_path, i)
 
             # Wait for crossfade to complete
             time.sleep(CROSSFADE_DURATION * 1.5)
@@ -413,14 +318,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                         current_process = None
             continue
 
-        # Update state before playing
-        stateman.update_current_state(track_path, playlist_path, i)
-
-        if i == start_index and resume_seconds > 0:
-            logger.info(f"Resuming: {track_name} at {resume_seconds:.0f}s")
-        else:
-            logger.info(f"Now playing: {track_name}")
-            resume_seconds = 0
+        logger.info(f"Now playing: {track_name}")
 
         update_rds(track_name)
 
@@ -434,22 +332,22 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         duration = get_audio_duration(track_path)
         if not duration:
             logger.warning(f"Could not get duration for {track_path}, playing without crossfade")
-            play_single_track(track_path, resume_seconds)
+            play_single_track(track_path)
             return
         cross_for_cross_time = get_audio_duration(track_path)
         if not cross_for_cross_time:
             logger.warning(f"Could not get duration for {track_path}, playing without crossfade")
-            play_single_track(track_path, resume_seconds)
+            play_single_track(track_path)
             play_single_track(next_track_path)
             return
 
         # Calculate when to start the next track (5 seconds before end)
-        crossfade_start_time = max(0, duration - CROSSFADE_DURATION - resume_seconds)
+        crossfade_start_time = max(0, duration - CROSSFADE_DURATION)
         cross_for_cross_time = max(0, cross_for_cross_time - CROSSFADE_DURATION)
 
         # Start current track with fade in
         with process_lock:
-            current_process = create_audio_process(track_path, resume_seconds, fade_in=True, fade_out=True)
+            current_process = create_audio_process(track_path, fade_in=True, fade_out=True)
 
         if next_track_path and crossfade_start_time > 0:
             # Wait until it's time to start the crossfade
@@ -459,7 +357,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             action = check_control_files()
             if action == "quit":
                 stop_all_processes()
-                stateman.clear_state()
                 exit()
             elif action == "reload":
                 logger.info("Reload requested during playback...")
@@ -490,20 +387,16 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                 current_process = None
 
 
-        stateman.update_current_state(next_track_path, playlist_path, i+1)
-
         # Check control files after each song
         action = check_control_files()
         if can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
         if action == "quit":
             stop_all_processes()
-            stateman.clear_state()
             exit()
         elif action == "reload":
             logger.info("Reload requested, restarting with new arguments...")
             stop_all_processes()
             return "reload"
-        stateman.clear_state()
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath):
@@ -563,9 +456,6 @@ def parse_arguments():
     return arg, play_newest_first, do_shuffle, pre_track_path, selected_list
 
 def main():
-    # Load state at startup
-    state_loaded = stateman.load_state()
-
     try:
         while True:  # Main reload loop
             arg, play_newest_first, do_shuffle, pre_track_path, selected_list = parse_arguments()
@@ -573,41 +463,16 @@ def main():
             if pre_track_path:
                 track_name = os.path.basename(pre_track_path)
                 logger.info(f"Now playing: {track_name}")
-                stateman.update_current_state(pre_track_path)
                 update_rds(track_name)
                 play_single_track(pre_track_path)
-                stateman.clear_state()
 
                 action = check_control_files()
                 if can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
                 if action == "quit":
-                    stateman.clear_state()
                     exit()
                 elif action == "reload":
                     logger.info("Reload requested, restarting with new arguments...")
                     continue  # Restart the main loop
-
-            # Check if we should resume from loaded state first
-            if state_loaded and stateman.get_state().get("current_file") and stateman.get_state().get("playlist_path"):
-                # Try to resume from the loaded state
-                if os.path.exists(stateman.get_state()["playlist_path"]):
-                    logger.info(f"Attempting to resume from saved state: {stateman.get_state()['playlist_path']}")
-                    
-                    # Check if the saved playlist is a time-based playlist (not custom)
-                    # A time-based playlist ends with 'morning', 'day', 'night', or 'late_night'
-                    saved_playlist_name = os.path.basename(stateman.get_state()["playlist_path"])
-                    is_time_based_playlist = saved_playlist_name in ['morning', 'day', 'night', 'late_night']
-                    
-                    result = play_playlist(stateman.get_state()["playlist_path"],
-                                         not is_time_based_playlist,  # custom_playlist = NOT time-based
-                                         play_newest_first, do_shuffle)
-                    state_loaded = False  # Don't try to resume again
-                    if result == "reload":
-                        continue
-                else:
-                    logger.warning(f"Saved playlist path no longer exists: {stateman.get_state()['playlist_path']}")
-                    stateman.clear_state()
-                    state_loaded = False
 
             playlist_loop_active = True
             while playlist_loop_active:
@@ -659,7 +524,6 @@ def main():
                 if action == "quit":
                     if os.path.exists("/tmp/radioPlayer_onplaylist"):
                         os.remove("/tmp/radioPlayer_onplaylist")
-                    stateman.clear_state()
                     exit()
                 elif action == "reload":
                     if os.path.exists("/tmp/radioPlayer_onplaylist"):
