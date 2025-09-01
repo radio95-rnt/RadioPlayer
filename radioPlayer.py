@@ -328,7 +328,7 @@ def play_audio_with_crossfade(current_track_path, next_track_path=None, resume_s
     global current_process, next_process
 
     # Get duration of current track
-    
+
 
     return None
 
@@ -364,10 +364,48 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         else:
             if do_shuffle:
                 random.shuffle(tracks)
+                
+    return_pending = False
 
     for i, track in enumerate(tracks[start_index:], start_index):
+        if return_pending: 
+            stop_all_processes()
+            clear_current_state()
+            return
         track_path = os.path.abspath(os.path.expanduser(track))
         track_name = os.path.basename(track_path)
+
+        current_modified_time = get_playlist_modification_time(playlist_path)
+        if current_modified_time > last_modified_time:
+            logger.info(f"Playlist {playlist_path} has been modified, reloading...")
+            stop_all_processes()
+            clear_current_state()
+            return
+
+        current_hour = get_current_hour()
+        current_day = get_current_day()
+        morning_playlist_path = os.path.join(playlist_dir, current_day, 'morning')
+        day_playlist_path = os.path.join(playlist_dir, current_day, 'day')
+        night_playlist_path = os.path.join(playlist_dir, current_day, 'night')
+        late_night_playlist_path = os.path.join(playlist_dir, current_day, 'late_night')
+
+        if DAY_START <= current_hour < DAY_END and not custom_playlist:
+            if playlist_path != day_playlist_path:
+                logger.info("Time changed to day hours, switching playlist...")
+                return_pending = True
+        elif MORNING_START <= current_hour < MORNING_END and not custom_playlist:
+            if playlist_path != morning_playlist_path:
+                logger.info("Time changed to morning hours, switching playlist...")
+                return_pending = True
+        elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END and not custom_playlist:
+            if playlist_path != late_night_playlist_path:
+                logger.info("Time changed to late night hours, switching playlist...")
+                return_pending = True
+        else:
+            if playlist_path != night_playlist_path and not custom_playlist:
+                logger.info("Time changed to night hours, switching playlist...")
+                return_pending = True
+        
         if current_process:
             time.sleep(cross_for_cross_time)
 
@@ -386,6 +424,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             with process_lock:
                 next_process = create_audio_process(track_path, fade_in=True, fade_out=True)
             update_rds(track_name)
+            update_current_state(track_path, playlist_path, i)
 
             # Wait for crossfade to complete
             time.sleep(CROSSFADE_DURATION * 1.5)
@@ -404,45 +443,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                     current_process.wait()
                     with process_lock:
                         current_process = None
-    
-        current_modified_time = get_playlist_modification_time(playlist_path)
-        if current_modified_time > last_modified_time:
-            logger.info(f"Playlist {playlist_path} has been modified, reloading...")
-            stop_all_processes()
-            clear_current_state()
-            return
-
-        current_hour = get_current_hour()
-        current_day = get_current_day()
-        morning_playlist_path = os.path.join(playlist_dir, current_day, 'morning')
-        day_playlist_path = os.path.join(playlist_dir, current_day, 'day')
-        night_playlist_path = os.path.join(playlist_dir, current_day, 'night')
-        late_night_playlist_path = os.path.join(playlist_dir, current_day, 'late_night')
-
-        if DAY_START <= current_hour < DAY_END and not custom_playlist:
-            if playlist_path != day_playlist_path:
-                logger.info("Time changed to day hours, switching playlist...")
-                stop_all_processes()
-                clear_current_state()
-                return
-        elif MORNING_START <= current_hour < MORNING_END and not custom_playlist:
-            if playlist_path != morning_playlist_path:
-                logger.info("Time changed to morning hours, switching playlist...")
-                stop_all_processes()
-                clear_current_state()
-                return
-        elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END and not custom_playlist:
-            if playlist_path != late_night_playlist_path:
-                logger.info("Time changed to late night hours, switching playlist...")
-                stop_all_processes()
-                clear_current_state()
-                return
-        else:
-            if playlist_path != night_playlist_path and not custom_playlist:
-                logger.info("Time changed to night hours, switching playlist...")
-                stop_all_processes()
-                clear_current_state()
-                return
 
         # Update state before playing
         update_current_state(track_path, playlist_path, i)
@@ -460,8 +460,8 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         next_index = i + 1
         if next_index < len(tracks):
             next_track_path = os.path.abspath(os.path.expanduser(tracks[next_index]))
-        
-        
+
+
         duration = get_audio_duration(track_path)
         if not duration:
             logger.warning(f"Could not get duration for {track_path}, playing without crossfade")
@@ -519,8 +519,8 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             current_process.wait()
             with process_lock:
                 current_process = None
-        
-            
+
+
         update_current_state(next_track_path, playlist_path, i+1)
 
         # Check control files after each song
@@ -534,6 +534,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             logger.info("Reload requested, restarting with new arguments...")
             stop_all_processes()
             return "reload"
+        clear_state()
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath):
