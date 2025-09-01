@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import time
 import os
 import sys
 import termios
@@ -289,6 +290,7 @@ class PlaylistManager:
                     f.write(line + '\n')
                 except UnicodeEncodeError as e:
                     print("⚠️ Encoding error in line:", repr(line))
+                    time.sleep(5)
                     exit()
     
     def is_file_item_in_playlist(self, file_item: FileItem, day: str, period: str, playlists: Dict) -> bool:
