@@ -158,8 +158,9 @@ def update_rds(track_name: str):
         name_table: dict[str, str] = load_dict_from_custom_format(name_table_path)
         try:
             name = name_table[track_name]
+            has_name = True
         except KeyError as e:
-            logger.warning(f"File does not have a alias in the name table ({e})")
+            has_name = False
             name = track_name.split(".",1)[0]
 
         if " - " in name:
@@ -172,7 +173,8 @@ def update_rds(track_name: str):
         else:
             artist = rds_default_artist
             title = name
-        
+            if not has_name: logger.warning(f"File does not have a alias in the name table ({track_name})")
+
         title = unidecode.unidecode(title)
         artist = unidecode.unidecode(artist)
 
