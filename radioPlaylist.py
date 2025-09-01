@@ -283,8 +283,13 @@ class PlaylistManager:
                 while full_filepath in lines:
                     lines.remove(full_filepath)
         
-        with open(playlist_file, 'w') as f:
-            f.write('\n'.join(lines) + ('\n' if lines else ''))
+        with open(playlist_file, 'w', encoding='utf-8', errors='strict') as f:
+            for line in lines:
+                try:
+                    f.write(line + '\n')
+                except UnicodeEncodeError as e:
+                    print("⚠️ Encoding error in line:", repr(line))
+                    raise
     
     def is_file_item_in_playlist(self, file_item: FileItem, day: str, period: str, playlists: Dict) -> bool:
         """Check if ALL files from a FileItem are in the specified playlist."""
