@@ -84,11 +84,11 @@ class ProcessManager:
                 if process.process.poll() is not None:
                     self.processes.remove(process)
             return bool(self.processes)
-    def stop_all(self):
+    def stop_all(self, timeout: float | None = 2):
         with self.lock:
             for process in self.processes:
                 process.process.terminate()
-                process.process.wait(2)
+                process.process.wait(timeout)
                 self.processes.remove(process)
     def wait_all(self, timeout: float | None = None):
         with self.lock:
