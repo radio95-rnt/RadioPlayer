@@ -5,7 +5,8 @@ import subprocess
 import time, datetime
 import sys
 import threading
-import json, re, unidecode
+import re, unidecode
+from dataclasses import dataclass
 from datetime import datetime
 import log95
 
@@ -29,11 +30,8 @@ udp_host = ("127.0.0.1", 5000)
 
 logger = log95.log95("radioPlayer")
 
-# Crossfade management
-cross_for_cross_time = 0
-current_process = None
-next_process = None
-process_lock = threading.Lock()
+exit_pending = False
+reload_pending = False
 
 class Time:
     @staticmethod
@@ -45,6 +43,60 @@ class Time:
             return os.path.getmtime(playlist_path)
         except OSError:
             return 0
+
+@dataclass
+class Process:
+    process: subprocess.Popen
+    track: str
+
+class ProcessManager:
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.processes: list[Process] = []
+    def play(self, track_path, fade_in=False, fade_out=False):
+        cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
+        duration = get_audio_duration(track_path)
+
+        # Build filter chain
+        filters = []
+
+        # Add fade in if requested
+        if fade_in:
+            filters.append(f"afade=t=in:st=0:d={CROSSFADE_DURATION}")
+        if fade_out and duration:
+            filters.append(f"afade=t=out:st={duration-CROSSFADE_DURATION}:d={CROSSFADE_DURATION}")
+
+        # Apply filters if any exist
+        if filters:
+            filter_chain = ",".join(filters)
+            cmd.extend(['-af', filter_chain])
+
+        cmd.append(track_path)
+
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        pr = Process(proc, track_path)
+        with self.lock:
+            self.processes.append(pr)
+        return pr
+    def anything_playing(self):
+        with self.lock:
+            for process in self.processes[:]:
+                if process.process.poll() is not None:
+                    self.processes.remove(process)
+            return bool(self.processes)
+    def stop_all(self):
+        with self.lock:
+            for process in self.processes:
+                process.process.terminate()
+                process.process.wait(2)
+                self.processes.remove(process)
+    def wait_all(self, timeout: float | None = None):
+        with self.lock:
+            for process in self.processes:
+                process.process.wait(timeout)
+                self.processes.remove(process)
+
+procman = ProcessManager()
 
 def load_dict_from_custom_format(file_path: str) -> dict:
     try:
@@ -153,71 +205,11 @@ def check_control_files():
 
     return None
 
-def stop_all_processes():
-    """Stop all ffplay processes"""
-    global current_process, next_process
-    with process_lock:
-        if current_process and current_process.poll() is None:
-            try:
-                current_process.terminate()
-                current_process.wait(timeout=2)
-            except (subprocess.TimeoutExpired, ProcessLookupError):
-                try:
-                    current_process.kill()
-                    current_process.wait(timeout=2)
-                except (subprocess.TimeoutExpired, ProcessLookupError): pass
-            current_process = None
-
-        if next_process and next_process.poll() is None:
-            try:
-                next_process.terminate()
-                next_process.wait(timeout=2)
-            except (subprocess.TimeoutExpired, ProcessLookupError):
-                try:
-                    next_process.kill()
-                    next_process.wait(timeout=2)
-                except (subprocess.TimeoutExpired, ProcessLookupError):
-                    pass
-            next_process = None
-
-def create_audio_process(track_path, fade_in=False, fade_out=False):
-    """Create ffplay process with optional fade effects"""
-    cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
-    duration = get_audio_duration(track_path)
-
-    # Build filter chain
-    filters = []
-
-    # Add fade in if requested
-    if fade_in:
-        filters.append(f"afade=t=in:st=0:d={CROSSFADE_DURATION}")
-    if fade_out and duration:
-        filters.append(f"afade=t=out:st={duration-CROSSFADE_DURATION}:d={CROSSFADE_DURATION}")
-
-    # Apply filters if any exist
-    if filters:
-        filter_chain = ",".join(filters)
-        cmd.extend(['-af', filter_chain])
-
-    cmd.append(track_path)
-
-    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-def play_single_track(track_path):
-    """Play a single track without crossfade (for first track or special cases)"""
-    global current_process
-
-    with process_lock:
-        current_process = create_audio_process(track_path, fade_in=False, fade_out=False)
-
-    # Wait for the process to complete
-    current_process.wait()
-
-    with process_lock:
-        current_process = None
+def play_single_track(track_path, wait: bool = True):
+    pr = procman.play(track_path)
+    if wait: pr.process.wait()
 
 def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False, do_shuffle=True):
-    global current_process, next_process, cross_for_cross_time
     last_modified_time = Time.get_playlist_modification_time(playlist_path)
     tracks = load_playlist(playlist_path)
     if not tracks:
@@ -240,13 +232,21 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
     else:
         if do_shuffle:
             random.shuffle(tracks)
-                
+
     return_pending = False
 
     for i, track in enumerate(tracks[start_index:], start_index):
-        if return_pending: 
-            stop_all_processes()
+        if return_pending:
+            procman.wait_all()
             return
+        action = check_control_files()
+        if action == "quit":
+            procman.wait_all()
+            exit()
+        elif action == "reload":
+            logger.info("Reload requested, restarting with new arguments...")
+            procman.wait_all()
+            return "reload"
         track_path = os.path.abspath(os.path.expanduser(track))
         track_name = os.path.basename(track_path)
 
@@ -278,124 +278,26 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             if playlist_path != night_playlist_path and not custom_playlist:
                 logger.info("Time changed to night hours, switching playlist...")
                 return_pending = True
-        
-        if return_pending and not current_process: continue
-        
-        if current_process:
-            time.sleep(cross_for_cross_time)
 
-            # Check if we need to stop due to control files
-            action = check_control_files()
-            if action == "quit":
-                stop_all_processes()
-                exit()
-            elif action == "reload":
-                logger.info("Reload requested during playback...")
-                stop_all_processes()
-                return "reload"
-
-            logger.info(f"Starting cross-to-cross to: {os.path.basename(track_name)}")
-            with process_lock:
-                next_process = create_audio_process(track_path, fade_in=True, fade_out=True)
-            update_rds(track_name)
-
-            # Wait for crossfade to complete
-            time.sleep(CROSSFADE_DURATION * 1.5)
-
-            with process_lock:
-                if current_process and current_process.poll() is None:
-                    try:
-                        current_process.terminate()
-                        current_process.wait(5)
-                    except (subprocess.TimeoutExpired, ProcessLookupError):
-                        pass
-                    current_process = next_process
-                    next_process = None
-                else:
-                    # No crossfade, just wait for current track to finish
-                    current_process.wait()
-                    with process_lock:
-                        current_process = None
-            continue
+        if return_pending and not procman.anything_playing(): continue
 
         logger.info(f"Now playing: {track_name}")
 
         update_rds(track_name)
-
-        # Determine next track for crossfade
-        next_track_path = None
-        next_index = i + 1
-        if next_index < len(tracks):
-            next_track_path = os.path.abspath(os.path.expanduser(tracks[next_index]))
-
 
         duration = get_audio_duration(track_path)
         if not duration:
             logger.warning(f"Could not get duration for {track_path}, playing without crossfade")
             play_single_track(track_path)
             return
-        cross_for_cross_time = get_audio_duration(track_path)
-        if not cross_for_cross_time:
-            logger.warning(f"Could not get duration for {track_path}, playing without crossfade")
-            play_single_track(track_path)
-            play_single_track(next_track_path)
-            return
 
         # Calculate when to start the next track (5 seconds before end)
         crossfade_start_time = max(0, duration - CROSSFADE_DURATION)
-        cross_for_cross_time = max(0, cross_for_cross_time - CROSSFADE_DURATION)
 
         # Start current track with fade in
-        with process_lock:
-            current_process = create_audio_process(track_path, fade_in=True, fade_out=True)
-
-        if next_track_path and crossfade_start_time > 0:
-            # Wait until it's time to start the crossfade
-            time.sleep(crossfade_start_time)
-
-            # Check if we need to stop due to control files
-            action = check_control_files()
-            if action == "quit":
-                stop_all_processes()
-                exit()
-            elif action == "reload":
-                logger.info("Reload requested during playback...")
-                stop_all_processes()
-                return "reload"
-
-            logger.info(f"Starting crossfade to: {os.path.basename(next_track_path)}")
-            with process_lock:
-                next_process = create_audio_process(next_track_path, fade_in=True, fade_out=True)
-            update_rds(os.path.basename(next_track_path))
-
-            # Wait for crossfade to complete
-            time.sleep(CROSSFADE_DURATION * 1.5)
-
-            with process_lock:
-                if current_process and current_process.poll() is None:
-                    try:
-                        current_process.terminate()
-                        current_process.wait(5)
-                    except (subprocess.TimeoutExpired, ProcessLookupError):
-                        pass
-                current_process = next_process
-                next_process = None
-        else:
-            # No crossfade, just wait for current track to finish
-            current_process.wait()
-            with process_lock:
-                current_process = None
-
-
-        # Check control files after each song
-        action = check_control_files()
-        if action == "quit":
-            stop_all_processes()
-            exit()
-        elif action == "reload":
-            logger.info("Reload requested, restarting with new arguments...")
-            stop_all_processes()
-            return "reload"
+        procman.play(track_path, True, True)
+        
+        time.sleep(crossfade_start_time)        
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath):
@@ -528,13 +430,13 @@ def main():
 
     except KeyboardInterrupt:
         logger.info("Player stopped by user")
-        stop_all_processes()
+        procman.stop_all()
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        stop_all_processes()
+        procman.stop_all()
         raise
     finally:
-        stop_all_processes()
+        procman.stop_all()
 
 if __name__ == '__main__':
     main()
