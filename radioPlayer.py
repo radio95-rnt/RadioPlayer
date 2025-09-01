@@ -411,6 +411,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                     current_process.wait()
                     with process_lock:
                         current_process = None
+                continue
 
         # Update state before playing
         stateman.update_current_state(track_path, playlist_path, i)
