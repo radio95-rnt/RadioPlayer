@@ -184,7 +184,7 @@ class PlaylistManager:
     
     def load_playlists(self, days: List[str]) -> Dict[str, Dict[str, Set[str]]]:
         """Load all playlists from disk."""
-        if self.config.is_custom_mode:
+        if self.config.is_custom_mode and self.config.custom_playlist_file:
             # In custom mode, we only need one "day" entry
             playlists = {"custom": {period: set() for period in self.periods}}
             # Load existing custom playlist if it exists
@@ -228,6 +228,7 @@ class PlaylistManager:
     
     def _update_custom_playlist(self, file_item: FileItem, add: bool):
         """Update the custom playlist file."""
+        if not self.config.custom_playlist_file: raise Exception
         # Ensure the directory exists
         os.makedirs(os.path.dirname(self.config.custom_playlist_file), exist_ok=True)
         
@@ -472,8 +473,9 @@ class DisplayManager:
     
     def draw_header(self, playlists: Dict, current_day: str, current_day_idx: int,
                    days: List[str], term_width: int, all_file_items: List[FileItem], 
-                   force_redraw: bool = False, state: InterfaceState = None):
+                   force_redraw: bool = False, state: InterfaceState | None = None):
         """Draw the header, only if content has changed."""
+        if not state: raise Exception
         result = self.stats.calculate_category_percentages(playlists, current_day, self.config, all_file_items)
         percentages, polskie_percentages, total_pl = result or ({}, {}, 0)
 
@@ -514,8 +516,9 @@ class DisplayManager:
         return 2 if self.config.is_custom_mode else 3
     
     def draw_search_bar(self, search_term: str, term_width: int, force_redraw: bool = False,
-                       state: InterfaceState = None):
+                       state: InterfaceState | None = None):
         """Draw the search bar, only if the search term has changed."""
+        if not state: raise Exception
         # Optimization: Only redraw if search term changes
         if force_redraw or state.last_search != search_term:
             search_row = self.get_header_height() + 3
@@ -527,8 +530,9 @@ class DisplayManager:
     
     def draw_files_section(self, file_items: List[FileItem], playlists: Dict, selected_idx: int,
                           current_day: str, scroll_offset: int, term_width: int, term_height: int,
-                          force_redraw: bool = False, state: InterfaceState = None):
+                          force_redraw: bool = False, state: InterfaceState | None = None):
         """Draw the files list, optimized to only redraw when necessary."""
+        if not state: raise Exception
         header_height = self.get_header_height()
         content_start_row = header_height + 5
         available_lines = term_height - content_start_row
