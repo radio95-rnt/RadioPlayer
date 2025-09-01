@@ -187,6 +187,7 @@ def update_rds(track_name: str):
         except socket.timeout:
             logger.error("Could not send TEXT to RDS, timeout.")
             return
+        logger.info("RT set to", prt)
 
         rtp = [4] # type 1
         rtp.append(prt.find(artist)) # start 1
