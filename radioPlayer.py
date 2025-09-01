@@ -389,7 +389,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
 
         # Check control files after each song
         action = check_control_files()
-        if can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
         if action == "quit":
             stop_all_processes()
             exit()
@@ -418,7 +417,6 @@ def parse_arguments():
             print("    Note: All of these files are one-time only, after they have been acked by the player they will be deleted")
             print("   /tmp/radioPlayer_quit          -   Quit the player")
             print("   /tmp/radioPlayer_reload        -   Reload arguments from /tmp/radioPlayer_arg")
-            print("   /tmp/radioPlayer_onplaylist    -   React to quit or reload only when ending a playlist")
             print("   /tmp/radioPlayer_arg           -   Contains arguments to use")
             print()
             print("Arguments:")
@@ -453,12 +451,12 @@ def parse_arguments():
         else:
             logger.error(f"Invalid argument or file not found: {arg}")
 
-    return arg, play_newest_first, do_shuffle, pre_track_path, selected_list
+    return play_newest_first, do_shuffle, pre_track_path, selected_list
 
 def main():
     try:
         while True:  # Main reload loop
-            arg, play_newest_first, do_shuffle, pre_track_path, selected_list = parse_arguments()
+            play_newest_first, do_shuffle, pre_track_path, selected_list = parse_arguments()
 
             if pre_track_path:
                 track_name = os.path.basename(pre_track_path)
@@ -467,7 +465,6 @@ def main():
                 play_single_track(pre_track_path)
 
                 action = check_control_files()
-                if can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
                 if action == "quit":
                     exit()
                 elif action == "reload":
@@ -520,14 +517,9 @@ def main():
                     result = play_playlist(night_playlist, False, play_newest_first, do_shuffle)
 
                 action = check_control_files()
-                if not can_delete_file("/tmp/radioPlayer_onplaylist"): action = None
                 if action == "quit":
-                    if os.path.exists("/tmp/radioPlayer_onplaylist"):
-                        os.remove("/tmp/radioPlayer_onplaylist")
                     exit()
                 elif action == "reload":
-                    if os.path.exists("/tmp/radioPlayer_onplaylist"):
-                        os.remove("/tmp/radioPlayer_onplaylist")
                     logger.info("Reload requested, restarting with new arguments...")
                     result = "reload"
 
