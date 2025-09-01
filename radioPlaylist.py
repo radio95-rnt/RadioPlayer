@@ -329,9 +329,6 @@ class PlaylistManager:
         for period in self.periods:
             source_periods[period] = self.is_file_item_in_playlist(current_item, source_day, period, playlists)
         
-        if not any(source_periods.values()):
-            return playlists, False
-        
         for target_day in days:
             if target_day == source_day:
                 continue
