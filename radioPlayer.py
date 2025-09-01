@@ -406,6 +406,8 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
                 logger.info("Time changed to night hours, switching playlist...")
                 return_pending = True
         
+        if return_pending and not current_process: return
+        
         if current_process:
             time.sleep(cross_for_cross_time)
 
