@@ -17,7 +17,7 @@ DAY_END = 20
 LATE_NIGHT_START = 0
 LATE_NIGHT_END = 6
 
-CROSSFADE_DURATION = 5  # seconds
+CROSSFADE_DURATION = 3  # seconds
 
 playlist_dir = "/home/user/playlists"
 name_table_path = "/home/user/mixes/name_table.txt"
