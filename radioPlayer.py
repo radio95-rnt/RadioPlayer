@@ -91,7 +91,7 @@ class ProcessManager:
 
         cmd.append(track_path)
 
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         pr = Process(proc, track_path, time.time(), duration)
         with self.lock: self.processes.append(pr)
         return pr
