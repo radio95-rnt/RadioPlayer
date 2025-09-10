@@ -10,11 +10,10 @@ from dataclasses import dataclass
 from datetime import datetime
 import log95
 
-def print_wait(ttw: float, frequency: float, duration: float=-1, suffix: str=""):
+def print_wait(ttw: float, frequency: float, duration: float=-1, suffix: str="", bias: float = 0):
     interval = 1.0 / frequency
     elapsed = 0.0
-    if duration == -1: 
-        duration = ttw
+    if duration == -1: duration = ttw
     
     def format_time(seconds):
         hours = int(seconds // 3600)
@@ -24,14 +23,14 @@ def print_wait(ttw: float, frequency: float, duration: float=-1, suffix: str="")
     
     try:
         while elapsed < ttw:
-            print(f"{suffix}{format_time(elapsed)} / {format_time(duration)}", end="\r")
+            print(f"{suffix}{format_time(elapsed+bias)} / {format_time(duration)}", end="\r")
             time.sleep(interval)
             elapsed += interval
     except KeyboardInterrupt:
         print()
         raise
     
-    print(f"{suffix}{format_time(ttw)} / {format_time(duration)}")
+    print(f"{suffix}{format_time(ttw+bias)} / {format_time(duration)}")
 
 MORNING_START = 6
 MORNING_END = 10
@@ -54,6 +53,7 @@ udp_host = ("127.0.0.1", 5000)
 logger = log95.log95("radioPlayer")
 
 exit_pending = False
+reload_pending = False
 intr_time = 0
 
 class Time:
@@ -132,7 +132,12 @@ def handle_sigint(signum, frame):
         procman.stop_all(None)
         exit(0)
 
+def handle_sighup(signum, frame):
+    global reload_pending
+    reload_pending = True
+
 signal.signal(signal.SIGINT, handle_sigint)
+signal.signal(signal.SIGHUP, handle_sighup) # type: ignore
 
 def load_dict_from_custom_format(file_path: str) -> dict[str, str]:
     try:
@@ -157,7 +162,7 @@ def update_rds(track_name: str):
             has_name = False
             name = track_name.rsplit(".", 1)[0]
         
-        name = re.sub(r'^\s*\d+\s*[-.]?\s*', '', name) # get rid of a 
+        name = re.sub(r'^\s*\d+\s*[-.]?\s*', '', name)
 
         if " - " in name:
             count = name.count(" - ")
@@ -218,19 +223,6 @@ def get_newest_track(tracks):
 
     return newest_track
 
-def check_control_files():
-    global exit_pending
-    """Check for control files and return action to take"""
-    if exit_pending:
-        exit_pending = False
-        return "quit"
-    
-    if can_delete_file("/tmp/radioPlayer_reload"):
-        os.remove("/tmp/radioPlayer_reload")
-        return "reload"
-
-    return None
-
 def check_if_playlist_modifed(playlist_path: str, custom_playlist: bool = False):
     current_day, current_hour = Time.get_day_hour()
     morning_playlist_path = os.path.join(playlist_dir, current_day, 'morning')
@@ -285,12 +277,11 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             logger.info("Return reached, next song will reload the playlist.")
             procman.wait_all()
             return
-        action = check_control_files()
-        if action == "quit":
+        if exit_pending:
             logger.info("Quit received, waiting for song end.")
             procman.wait_all()
             exit()
-        elif action == "reload":
+        elif reload_pending:
             logger.info("Reload requested, restarting with new arguments...")
             procman.wait_all()
             return "reload"
@@ -329,7 +320,6 @@ def parse_arguments():
         if arg.lower() == "-h":
             print("Control files:")
             print("    Note: All of these files are one-time only, after they have been acked by the player they will be deleted")
-            print("   /tmp/radioPlayer_reload        -   Reload arguments from /tmp/radioPlayer_arg")
             print("   /tmp/radioPlayer_arg           -   Contains arguments to use")
             print()
             print("Arguments:")
@@ -337,7 +327,7 @@ def parse_arguments():
             print("    list:playlist;options    -    Play custom playlist with options")
             print("    /path/to/file            -    Play specific file first")
             print()
-            print("Crossfade: 5-second crossfade is automatically applied between tracks")
+            print(f"Crossfade: {CROSSFADE_DURATION}-second crossfade is automatically applied between tracks")
             exit(0)
 
     if can_delete_file("/tmp/radioPlayer_arg"):
@@ -373,10 +363,9 @@ def main():
                 update_rds(track_name)
                 procman.play(pre_track_path).process.wait()
 
-                action = check_control_files()
-                if action == "quit":
+                if exit_pending:
                     exit()
-                elif action == "reload":
+                elif reload_pending:
                     logger.info("Reload requested, restarting with new arguments...")
                     continue  # Restart the main loop
 
@@ -423,9 +412,8 @@ def main():
                     logger.info(f"Playing {current_day} night playlist...")
                     result = play_playlist(night_playlist, False, play_newest_first, do_shuffle)
 
-                action = check_control_files()
-                if action == "quit": exit()
-                elif action == "reload":
+                if exit_pending: exit()
+                elif reload_pending:
                     logger.info("Reload requested, restarting with new arguments...")
                     result = "reload"
 
