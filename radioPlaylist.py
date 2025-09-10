@@ -20,7 +20,7 @@ POLISH_INDICATORS = ("Polskie", "Dzem")
 
 @dataclass
 class InterfaceState:
-    last_header: Optional[Tuple] = None
+    last_header: Optional[str] = None
     last_files_display: Optional[Tuple] = None
     last_selected_idx: int = -1
     last_current_day_idx: int = -1
@@ -415,55 +415,6 @@ class TerminalUtils:
     def get_terminal_size() -> os.terminal_size:
         return shutil.get_terminal_size()
 
-class StatsCalculator:
-    @staticmethod
-    def calculate_category_percentages(playlists: Dict, current_day: str, config: Config, all_file_items: List[FileItem]) -> Optional[Tuple]:
-        """Calculate category distribution percentages."""
-        if config.is_custom_mode:
-            # In custom mode, show simple stats
-            custom_files = playlists.get("custom", {}).get("day", set())
-            total_files = sum(len(item.all_files) for item in all_file_items)
-            assigned_count = len(custom_files)
-            
-            if total_files == 0:
-                return None
-                
-            assigned_percent = (assigned_count / total_files) * 100
-            polskie_count = sum(1 for file in custom_files if any(element in file for element in POLISH_INDICATORS))
-            polskie_percent = (polskie_count / assigned_count) * 100 if assigned_count > 0 else 0
-            
-            return {"custom": assigned_percent}, {"custom": polskie_percent}, polskie_percent
-        
-        # Original weekly mode calculation
-        periods = ['late_night', 'morning', 'day', 'night']
-        category_counts = {period: 0 for period in periods}
-        polskie_counts = {period: 0 for period in periods}
-        
-        for period in periods:
-            for file in playlists[current_day][period]:
-                category_counts[period] += 1
-                if any(element in file for element in POLISH_INDICATORS):
-                    polskie_counts[period] += 1
-        
-        total_count = sum(category_counts.values())
-        if total_count == 0:
-            return None
-        
-        percentages = {
-            period: (count / total_count) * 100 
-            for period, count in category_counts.items()
-        }
-        
-        polskie_percentages = {
-            period: (polskie_counts[period] / category_counts[period]) * 100 
-            if category_counts[period] > 0 else 0
-            for period in periods
-        }
-        
-        total_pl = (sum(polskie_counts.values()) / sum(category_counts.values())) * 100
-        
-        return percentages, polskie_percentages, total_pl
-
 class DateUtils:
     @staticmethod
     def get_days_of_week() -> List[str]:
@@ -473,9 +424,8 @@ class DateUtils:
         return days[today:] + days[:today]
 
 class DisplayManager:
-    def __init__(self, terminal_utils: TerminalUtils, stats_calc: StatsCalculator, config: Config):
+    def __init__(self, terminal_utils: TerminalUtils, config: Config):
         self.terminal = terminal_utils
-        self.stats = stats_calc
         self.config = config
     
     def draw_header(self, playlists: Dict, current_day: str, current_day_idx: int,
@@ -483,23 +433,12 @@ class DisplayManager:
                    force_redraw: bool = False, state: InterfaceState | None = None):
         """Draw the header, only if content has changed."""
         if not state: raise Exception
-        result = self.stats.calculate_category_percentages(playlists, current_day, self.config, all_file_items)
-        percentages, polskie_percentages, total_pl = result or ({}, {}, 0)
 
         if self.config.is_custom_mode:
             # Custom mode header
-            custom_percent = percentages.get("custom", 0)
-            polskie_percent = polskie_percentages.get("custom", 0)
-            category_bar = f"Custom Playlist: {self.config.custom_playlist_file} | Selected: {custom_percent:.1f}% | Polish: {polskie_percent:.1f}%"
-            header_content = (category_bar, "")
+            header_content = f"Custom Playlist: {self.config.custom_playlist_file}"
         else:
-            # Weekly mode header
-            category_bar = " | ".join([
-                f"{cat[:4].capitalize()}: {percentages.get(cat, 0):.1f}% (P:{polskie_percentages.get(cat, 0):.1f}%)"
-                for cat in ['late_night', 'morning', 'day', 'night']
-            ])
-            day_bar = " ".join([f"\033[1;44m[{day}]\033[0m" if i == current_day_idx else f"[{day}]" for i, day in enumerate(days)])
-            header_content = (category_bar, day_bar)
+            header_content = " ".join([f"\033[1;44m[{day}]\033[0m" if i == current_day_idx else f"[{day}]" for i, day in enumerate(days)])
 
         # Optimization: Only redraw if content has changed or if forced
         if force_redraw or state.last_header != header_content:
@@ -509,18 +448,13 @@ class DisplayManager:
             
             self.terminal.move_cursor(2)
             self.terminal.clear_line()
-            print(header_content[0].center(term_width), end="", flush=True)
-            
-            if not self.config.is_custom_mode:
-                self.terminal.move_cursor(3)
-                self.terminal.clear_line()
-                print(header_content[1], end="", flush=True)
+            print(header_content.center(term_width), end="", flush=True)
             
             state.last_header = header_content
     
     def get_header_height(self) -> int:
         """Get the height of the header section."""
-        return 2 if self.config.is_custom_mode else 3
+        return 2
     
     def draw_search_bar(self, search_term: str, term_width: int, force_redraw: bool = False,
                        state: InterfaceState | None = None):
@@ -652,8 +586,7 @@ class Application:
         self.search_manager = SearchManager()
         self.playlist_manager = PlaylistManager(config)
         self.terminal = TerminalUtils()
-        self.stats = StatsCalculator()
-        self.display = DisplayManager(self.terminal, self.stats, config)
+        self.display = DisplayManager(self.terminal, config)
         self.terminal_cache = libcache.Cache()
         self.state = InterfaceState()
         
