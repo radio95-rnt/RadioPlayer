@@ -430,10 +430,6 @@ def main():
                     result = "reload"
 
                 if result == "reload":  play_loop = False
-
-    except KeyboardInterrupt:
-        logger.info("Player stopped by user")
-        procman.stop_all()
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         procman.stop_all()
