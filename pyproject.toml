@@ -3,12 +3,13 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "RadioTools"
-version = "0"
-description = "RadioTools"
-authors = [{ name = "KubaPro010" }]
-dependencies = ["log95", "libcache", "unidecode"]
+name = "radio-tools"
+version = "0.1"
+dependencies = []
+
+[tool.setuptools]
+py-modules = ["radioPlaylist", "radioPlayer"]
 
 [project.scripts]
-radioPlayer = "radioPlayer:main"
-radioPlaylist = "radioPlaylist:main"
+radio-playlist = "radioPlaylist:main"
+radio-player = "radioPlayer:main"
