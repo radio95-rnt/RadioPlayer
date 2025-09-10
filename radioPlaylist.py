@@ -9,7 +9,7 @@ import shutil
 import libcache
 import argparse
 from datetime import datetime
-from typing import List, Dict, Set, Tuple, Optional, Union
+from typing import List, Dict, Set, Tuple, Optional
 from dataclasses import dataclass
 
 # Configuration
@@ -916,6 +916,15 @@ def main():
     """Main entry point."""
     args = parse_arguments()
     
+    fd = sys.stdin.fileno()
+    original_settings = termios.tcgetattr(fd)
+
+    new_settings = termios.tcgetattr(fd)
+    new_settings[3] = new_settings[3] & ~termios.ECHOCTL
+    termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
+    
     config = Config(custom_playlist_file=args.playlist)
     app = Application(config)
-    exit(app.run())
+    code = app.run()
+    termios.tcsetattr(fd, termios.TCSADRAIN, original_settings)
+    exit(code)
