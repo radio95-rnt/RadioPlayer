@@ -277,7 +277,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             logger.info("Return reached, next song will reload the playlist.")
             procman.wait_all()
             return
-        if exit_pending:
+        elif exit_pending:
             logger.info("Quit received, waiting for song end.")
             procman.wait_all()
             exit()
@@ -423,5 +423,3 @@ def main():
         procman.stop_all()
         raise
     finally: procman.stop_all()
-
-if __name__ == '__main__': main()

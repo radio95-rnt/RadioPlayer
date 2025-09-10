@@ -989,8 +989,4 @@ def main():
     
     config = Config(custom_playlist_file=args.playlist)
     app = Application(config)
-    return app.run()
-
-
-if __name__ == "__main__":
-    exit(main())
+    exit(app.run())

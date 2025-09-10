@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "RadioTools"
+version = "0"
+description = "RadioTools"
+authors = [{ name = "KubaPro010" }]
+dependencies = ["log95", "libcache", "unidecode"]
+
+[project.scripts]
+radioPlayer = "radioPlayer:main"
+radioPlaylist = "radioPlaylist:main"
