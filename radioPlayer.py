@@ -130,6 +130,7 @@ def handle_sigint(signum, frame):
     else:
         logger.warning("Force-Quit pending")
         procman.stop_all(None)
+        exit(0)
 
 signal.signal(signal.SIGINT, handle_sigint)
 
