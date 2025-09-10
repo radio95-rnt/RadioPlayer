@@ -471,11 +471,11 @@ class DisplayManager:
         """Draw the files list, optimized to only redraw when necessary."""
         if not state: raise Exception
         header_height = self.get_header_height()
-        content_start_row = header_height + 5
+        content_start_row = header_height + 6
         available_lines = term_height - content_start_row
 
         start_idx = scroll_offset
-        end_idx = min(start_idx + available_lines, len(file_items))
+        end_idx = min(start_idx + available_lines, len(file_items)) + 1
 
         # Create a snapshot of the current state to compare against the last one
         files_display_state = (
@@ -487,7 +487,7 @@ class DisplayManager:
         if force_redraw or state.last_files_display != files_display_state:
             
             # Position info line
-            position_row = header_height + 4
+            position_row = header_height + 5
             self.terminal.move_cursor(position_row)
             self.terminal.clear_line()
             
