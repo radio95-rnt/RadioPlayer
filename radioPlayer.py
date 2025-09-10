@@ -3,7 +3,7 @@ import os, socket
 import random
 import subprocess
 import time, datetime
-import sys
+import sys, signal
 import threading
 import re, unidecode
 from dataclasses import dataclass
@@ -31,18 +31,15 @@ udp_host = ("127.0.0.1", 5000)
 logger = log95.log95("radioPlayer")
 
 exit_pending = False
-reload_pending = False
+intr_time = 0
 
 class Time:
     @staticmethod
-    def get_day_hour():
-        return datetime.now().strftime('%A').lower(), datetime.now().hour
+    def get_day_hour(): return datetime.now().strftime('%A').lower(), datetime.now().hour
     @staticmethod
     def get_playlist_modification_time(playlist_path):
-        try:
-            return os.path.getmtime(playlist_path)
-        except OSError:
-            return 0
+        try: return os.path.getmtime(playlist_path)
+        except OSError: return 0
 
 @dataclass
 class Process:
@@ -56,14 +53,8 @@ class ProcessManager:
         self.lock = threading.Lock()
         self.processes: list[Process] = []
     def _get_audio_duration(self, file_path):
-        try:
-            result = subprocess.run([
-                'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
-                '-of', 'default=noprint_wrappers=1:nokey=1', file_path
-            ], capture_output=True, text=True)
-
-            if result.returncode == 0: return float(result.stdout.strip())
-        except Exception as e: logger.warning(f"Exception while reading audio duration: {e}")
+        result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path], capture_output=True, text=True)
+        if result.returncode == 0: return float(result.stdout.strip())
         return None
     def play(self, track_path: str, fade_in: bool=False, fade_out: bool=False) -> Process:
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
@@ -105,7 +96,21 @@ class ProcessManager:
 
 procman = ProcessManager()
 
-def load_dict_from_custom_format(file_path: str) -> dict:
+def handle_sigint(signum, frame):
+    global exit_pending, intr_time
+    logger.info("Received SIGINT")
+    if (time.time() - intr_time) > 10:
+        intr_time = time.time()
+        logger.info("Will quit on song end.")
+        exit_pending = True
+        return
+    else:
+        logger.warning("Force-Quit pending")
+        procman.stop_all(None)
+
+signal.signal(signal.SIGINT, handle_sigint)
+
+def load_dict_from_custom_format(file_path: str) -> dict[str, str]:
     try:
         result_dict = {}
         with open(file_path, 'r') as file:
@@ -120,17 +125,19 @@ def load_dict_from_custom_format(file_path: str) -> dict:
 
 def update_rds(track_name: str):
     try:
-        name_table: dict[str, str] = load_dict_from_custom_format(name_table_path)
+        name_table = load_dict_from_custom_format(name_table_path)
         try:
             name = name_table[track_name]
             has_name = True
         except KeyError as e:
             has_name = False
-            name = ".".join(track_name.split(".")[:-1])
+            name = track_name.rsplit(".", 1)[0]
+        
+        name = re.sub(r'^\s*\d+\s*[-.]?\s*', '', name) # get rid of a 
 
         if " - " in name:
             count = name.count(" - ")
-            while count != 1: # yotutube reuploads, to avoid things like ilikedick123 - Micheal Jackson - Smooth Criminal
+            while count != 1: # youtube reuploads, to avoid things like ilikedick123 - Micheal Jackson - Smooth Criminal
                 name = name.split(" - ", 1)[1]
                 count = name.count(" - ")
             artist = name.split(" - ", 1)[0]
@@ -142,7 +149,7 @@ def update_rds(track_name: str):
 
         title = unidecode.unidecode(title)
         artist = unidecode.unidecode(artist)
-
+        
         title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
 
         prt = rds_base.format(artist, title)
@@ -158,9 +165,8 @@ def update_rds(track_name: str):
         rtp.append(1) # type 2
         rtp.append(prt.find(title)) # start 2
         rtp.append(len(title)) # len 2
-        rtp = list(map(str, rtp))
 
-        f.sendto(f"RTP={','.join(rtp)}\r\n".encode(), udp_host)
+        f.sendto(f"RTP={','.join(list(map(str, rtp)))}\r\n".encode(), udp_host)
         f.close()
     except Exception as e: logger.error(f"Error updating RDS: {e}")
 
@@ -189,11 +195,12 @@ def get_newest_track(tracks):
     return newest_track
 
 def check_control_files():
+    global exit_pending
     """Check for control files and return action to take"""
-    if can_delete_file("/tmp/radioPlayer_quit"):
-        os.remove("/tmp/radioPlayer_quit")
+    if exit_pending:
+        exit_pending = False
         return "quit"
-
+    
     if can_delete_file("/tmp/radioPlayer_reload"):
         os.remove("/tmp/radioPlayer_reload")
         return "reload"
@@ -298,7 +305,6 @@ def parse_arguments():
         if arg.lower() == "-h":
             print("Control files:")
             print("    Note: All of these files are one-time only, after they have been acked by the player they will be deleted")
-            print("   /tmp/radioPlayer_quit          -   Quit the player")
             print("   /tmp/radioPlayer_reload        -   Reload arguments from /tmp/radioPlayer_arg")
             print("   /tmp/radioPlayer_arg           -   Contains arguments to use")
             print()
