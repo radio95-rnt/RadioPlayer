@@ -10,6 +10,29 @@ from dataclasses import dataclass
 from datetime import datetime
 import log95
 
+def print_wait(ttw: float, frequency: float, duration: float=-1, suffix: str=""):
+    interval = 1.0 / frequency
+    elapsed = 0.0
+    if duration == -1: 
+        duration = ttw
+    
+    def format_time(seconds):
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    
+    try:
+        while elapsed < ttw:
+            print(f"{suffix}{format_time(elapsed)} / {format_time(duration)}", end="\r")
+            time.sleep(interval)
+            elapsed += interval
+    except KeyboardInterrupt:
+        print()
+        raise
+    
+    print(f"{suffix}{format_time(ttw)} / {format_time(duration)}")
+
 MORNING_START = 6
 MORNING_END = 10
 DAY_START = 10
@@ -286,7 +309,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         update_rds(track_name)
         
         pr = procman.play(track_path, True, True)
-        time.sleep(pr.duration - CROSSFADE_DURATION)
+        print_wait(pr.duration - CROSSFADE_DURATION, 1, pr.duration, f"{track_name}:")
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath): return False
