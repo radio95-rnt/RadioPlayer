@@ -309,7 +309,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         update_rds(track_name)
         
         pr = procman.play(track_path, True, True)
-        print_wait(pr.duration - CROSSFADE_DURATION, 1, pr.duration, f"{track_name}:")
+        print_wait(pr.duration - CROSSFADE_DURATION, 1, pr.duration, f"{track_name}: ")
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath): return False
