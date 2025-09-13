@@ -41,6 +41,8 @@ LATE_NIGHT_END = 6
 
 CROSSFADE_DURATION = 3  # seconds
 
+JINGIEL_FILE = "/home/user/Jingiel.mp3"
+
 playlist_dir = "/home/user/playlists"
 name_table_path = "/home/user/mixes/name_table.txt"
 
@@ -302,6 +304,9 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         
         pr = procman.play(track_path, True, True)
         print_wait(pr.duration - CROSSFADE_DURATION, 1, pr.duration, f"{track_name}: ")
+        if JINGIEL_FILE and random.choice([False, True, False]):
+            # play jingiel
+            procman.play(JINGIEL_FILE, True, False).process.wait()
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath): return False
