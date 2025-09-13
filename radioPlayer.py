@@ -273,6 +273,8 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         if do_shuffle: random.shuffle(tracks)
 
     return_pending = False
+    
+    to_fade_in = True
 
     for i, track in enumerate(tracks[start_index:], start_index):
         if return_pending:
@@ -302,11 +304,15 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         logger.info(f"Now playing: {track_name}")
         update_rds(track_name)
         
-        pr = procman.play(track_path, True, True)
+        pr = procman.play(track_path, to_fade_in, True)
         print_wait(pr.duration - CROSSFADE_DURATION, 1, pr.duration, f"{track_name}: ")
         if JINGIEL_FILE and random.choice([False, True, False]):
-            # play jingiel
-            procman.play(JINGIEL_FILE, True, False).process.wait()
+            logger.info("Playing the jingiel")
+            time.sleep(CROSSFADE_DURATION)
+            procman.play(JINGIEL_FILE, False, False).process.wait()
+            to_fade_in = False
+        else:
+            to_fade_in = True
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath): return False
