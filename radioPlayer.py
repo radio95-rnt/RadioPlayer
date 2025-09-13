@@ -306,7 +306,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         
         pr = procman.play(track_path, to_fade_in, True)
         print_wait(pr.duration - CROSSFADE_DURATION, 1, pr.duration, f"{track_name}: ")
-        if JINGIEL_FILE and random.choice([False, True, False]):
+        if JINGIEL_FILE and random.choice([False, True, False, False]):
             logger.info("Playing the jingiel")
             time.sleep(CROSSFADE_DURATION / 2)
             procman.play(JINGIEL_FILE, False, False).process.wait()
