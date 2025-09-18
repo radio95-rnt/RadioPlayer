@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import log95
 
-def print_wait(ttw: float, frequency: float, duration: float=-1, suffix: str="", bias: float = 0):
+def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="", bias: float = 0):
     interval = 1.0 / frequency
     elapsed = 0.0
     if duration == -1: duration = ttw
@@ -23,14 +23,14 @@ def print_wait(ttw: float, frequency: float, duration: float=-1, suffix: str="",
     
     try:
         while elapsed < ttw:
-            print(f"{suffix}{format_time(elapsed+bias)} / {format_time(duration)}", end="\r")
+            print(f"{prefix}{format_time(elapsed+bias)} / {format_time(duration)}", end="\r", flush=True)
             time.sleep(interval)
             elapsed += interval
-    except KeyboardInterrupt:
+    except Exception:
         print()
         raise
     
-    print(f"{suffix}{format_time(ttw+bias)} / {format_time(duration)}")
+    print(f"{prefix}{format_time(ttw+bias)} / {format_time(duration)}")
 
 MORNING_START = 6
 MORNING_END = 10
