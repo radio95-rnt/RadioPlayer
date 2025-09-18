@@ -472,10 +472,10 @@ class DisplayManager:
         if not state: raise Exception
         header_height = self.get_header_height()
         content_start_row = header_height + 6
-        available_lines = term_height - content_start_row
+        available_lines = term_height - content_start_row + 1
 
         start_idx = scroll_offset
-        end_idx = min(start_idx + available_lines, len(file_items)) + 1
+        end_idx = min(start_idx + available_lines, len(file_items))
 
         # Create a snapshot of the current state to compare against the last one
         files_display_state = (
