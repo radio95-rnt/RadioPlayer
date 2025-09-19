@@ -41,20 +41,17 @@ class FileItem:
     """Represents either a single file or a folder containing files."""
     name: str
     is_folder: bool
-    files: List[str]  # For folders: list of contained audio files, For files: [filename]
+    files: List[str]
     
     @property
     def display_name(self) -> str:
-        """Name to show in the GUI."""
         if self.is_folder:
             return f"📁 {self.name}/"
         return self.name
     
     @property
     def all_files(self) -> List[str]:
-        """Get all file paths for playlist operations."""
-        if self.is_folder:
-            return [os.path.join(self.name, f) for f in self.files]
+        if self.is_folder: return [os.path.join(self.name, f) for f in self.files]
         return self.files
 
 class FileManager:
@@ -64,8 +61,7 @@ class FileManager:
         audio_files = []
         try:
             for file in os.listdir(directory):
-                if file.lower().endswith(FORMATS):
-                    audio_files.append(file)
+                if file.lower().endswith(FORMATS): audio_files.append(file)
             return sorted(audio_files)
         except FileNotFoundError:
             print(f"Error: Directory '{directory}' not found.")
@@ -93,10 +89,8 @@ class FileManager:
                     audio_files = []
                     try:
                         for file in os.listdir(full_path):
-                            if file.lower().endswith(FORMATS):
-                                audio_files.append(file)
-                    except (PermissionError, FileNotFoundError):
-                        continue
+                            if file.lower().endswith(FORMATS): audio_files.append(file)
+                    except (PermissionError, FileNotFoundError): continue
                     
                     if audio_files:
                         # Folder contains audio files
@@ -113,9 +107,7 @@ class FileManager:
 class SearchManager:
     @staticmethod
     def filter_file_items(items: List[FileItem], search_term: str) -> List[FileItem]:
-        """Filter and sort FileItem objects based on search term."""
-        if not search_term:
-            return items
+        if not search_term: return items
         
         search_lower = search_term.lower()
         
@@ -127,19 +119,14 @@ class SearchManager:
         for item in items:
             item_name_lower = item.name.lower()
             
-            if item_name_lower.startswith(search_lower):
-                starts_with.append(item)
-            elif search_lower in item_name_lower:
-                contains.append(item)
-            elif SearchManager._has_matching_chars(item_name_lower, search_lower):
-                has_chars.append(item)
+            if item_name_lower.startswith(search_lower): starts_with.append(item)
+            elif search_lower in item_name_lower: contains.append(item)
+            elif SearchManager._has_matching_chars(item_name_lower, search_lower): has_chars.append(item)
         
-        # Return sorted results: starts_with first, then contains, then has_chars
         return starts_with + contains + has_chars
     
     @staticmethod
     def filter_files(files: List[str], search_term: str) -> List[str]:
-        """Filter and sort files based on search term (legacy method for compatibility)."""
         if not search_term:
             return files
         
@@ -153,14 +140,10 @@ class SearchManager:
         for file in files:
             file_lower = file.lower()
             
-            if file_lower.startswith(search_lower):
-                starts_with.append(file)
-            elif search_lower in file_lower:
-                contains.append(file)
-            elif SearchManager._has_matching_chars(file_lower, search_lower):
-                has_chars.append(file)
+            if file_lower.startswith(search_lower): starts_with.append(file)
+            elif search_lower in file_lower: contains.append(file)
+            elif SearchManager._has_matching_chars(file_lower, search_lower): has_chars.append(file)
         
-        # Return sorted results: starts_with first, then contains, then has_chars
         return starts_with + contains + has_chars
     
     @staticmethod
@@ -179,8 +162,7 @@ class PlaylistManager:
     def ensure_playlist_dir(self, day: str) -> str:
         """Ensure playlist directory exists for the given day."""
         playlist_dir = os.path.expanduser(os.path.join(PLAYLISTS_DIR, day))
-        if not os.path.exists(playlist_dir):
-            os.makedirs(playlist_dir)
+        if not os.path.exists(playlist_dir): os.makedirs(playlist_dir)
         return playlist_dir
     
     def load_playlists(self, days: List[str]) -> Dict[str, Dict[str, Set[str]]]:
@@ -266,11 +248,9 @@ class PlaylistManager:
         playlist_file = os.path.join(playlist_dir, period)
         
         if not os.path.exists(playlist_file):
-            with open(playlist_file, 'w') as f:
-                pass
+            with open(playlist_file, 'w') as f: pass
         
-        with open(playlist_file, 'r') as f:
-            lines = f.read().splitlines()
+        with open(playlist_file, 'r') as f: lines = f.read().splitlines()
         
         # Get full paths for all files in the item
         full_filepaths = [os.path.join(FILES_DIR, filepath) for filepath in file_item.all_files]
@@ -295,8 +275,7 @@ class PlaylistManager:
     
     def is_file_item_in_playlist(self, file_item: FileItem, day: str, period: str, playlists: Dict) -> bool:
         """Check if ALL files from a FileItem are in the specified playlist."""
-        if not file_item.all_files:
-            return False
+        if not file_item.all_files: return False
         
         playlist_set = playlists.get(day, {}).get(period, set())
         return all(filepath in playlist_set for filepath in file_item.all_files)
@@ -304,7 +283,6 @@ class PlaylistManager:
     def copy_day_to_all(self, playlists: Dict, source_day: str, days: List[str]) -> Dict:
         """Copy all playlists from source day to all other days."""
         if self.config.is_custom_mode:
-            # No-op in custom mode
             return playlists
             
         for target_day in days:
@@ -383,12 +361,12 @@ class TerminalUtils:
     def get_char() -> str:
         """Get a single character from stdin."""
         fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
+        old_settings = termios.tcgetattr(fd) # type: ignore
         try:
-            tty.setraw(sys.stdin.fileno())
+            tty.setraw(sys.stdin.fileno()) # type: ignore
             ch = sys.stdin.read(1)
         finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings) # type: ignore
         return ch
     
     @staticmethod
@@ -428,8 +406,8 @@ class DisplayManager:
         self.terminal = terminal_utils
         self.config = config
     
-    def draw_header(self, playlists: Dict, current_day: str, current_day_idx: int,
-                   days: List[str], term_width: int, all_file_items: List[FileItem], 
+    def draw_header(self, current_day_idx: int,
+                   days: List[str], term_width: int, 
                    force_redraw: bool = False, state: InterfaceState | None = None):
         """Draw the header, only if content has changed."""
         if not state: raise Exception
@@ -448,18 +426,13 @@ class DisplayManager:
             
             state.last_header = header_content
     
-    def get_header_height(self) -> int:
-        """Get the height of the header section."""
-        return 1
-    
-    def draw_search_bar(self, search_term: str, term_width: int, force_redraw: bool = False,
+    def draw_search_bar(self, search_term: str, force_redraw: bool = False,
                        state: InterfaceState | None = None):
         """Draw the search bar, only if the search term has changed."""
         if not state: raise Exception
         # Optimization: Only redraw if search term changes
         if force_redraw or state.last_search != search_term:
-            search_row = self.get_header_height() + 3
-            self.terminal.move_cursor(search_row)
+            self.terminal.move_cursor(4)
             self.terminal.clear_line()
             search_display = f"Search: {search_term}"
             print(f"\033[1;33m{search_display}\033[0m")
@@ -470,9 +443,7 @@ class DisplayManager:
                           force_redraw: bool = False, state: InterfaceState | None = None):
         """Draw the files list, optimized to only redraw when necessary."""
         if not state: raise Exception
-        header_height = self.get_header_height()
-        content_start_row = header_height + 6
-        available_lines = term_height - content_start_row + 1
+        available_lines = term_height - 6
 
         start_idx = scroll_offset
         end_idx = min(start_idx + available_lines, len(file_items))
@@ -487,14 +458,11 @@ class DisplayManager:
         if force_redraw or state.last_files_display != files_display_state:
             
             # Position info line
-            position_row = header_height + 5
-            self.terminal.move_cursor(position_row)
+            self.terminal.move_cursor(6)
             self.terminal.clear_line()
             
-            if start_idx > 0:
-                print("↑", end="")
-            else:
-                print(" ", end="")
+            if start_idx > 0: print("↑", end="")
+            else: print(" ", end="")
             
             if self.config.is_custom_mode:
                 position_info = f" Custom | Item {selected_idx + 1}/{len(file_items)} "
@@ -511,7 +479,7 @@ class DisplayManager:
             # File list
             for display_row, idx in enumerate(range(start_idx, end_idx)):
                 item = file_items[idx]
-                line_row = content_start_row + display_row
+                line_row = 7 + display_row
                 self.terminal.move_cursor(line_row)
                 self.terminal.clear_line()
                 
@@ -557,7 +525,7 @@ class DisplayManager:
             last_end_idx = state.last_files_display[1] if state.last_files_display else 0
             if end_idx < last_end_idx:
                  for i in range(end_idx, last_end_idx):
-                    self.terminal.move_cursor(content_start_row + (i - start_idx))
+                    self.terminal.move_cursor(7 + (i - start_idx))
                     self.terminal.clear_line()
 
             state.last_files_display = files_display_state
@@ -659,24 +627,22 @@ class Application:
             self.terminal.hide_cursor()
             
             # Draw static elements
-            header_height = self.display.get_header_height()
-            keybind_row = header_height + 1
             
-            self.terminal.move_cursor(keybind_row)
+            self.terminal.move_cursor(2)
             if self.config.is_custom_mode:
                 print("UP/DOWN: Navigate | C: Toggle | /: Search | Q: Quit", end="", flush=True)
             else:
                 print("UP/DOWN: Navigate | D/N/L/M: Toggle | C: Copy day | F: Copy item | /: Search | Q: Quit", end="", flush=True)
             
-            self.terminal.move_cursor(keybind_row + 1)
+            self.terminal.move_cursor(3)
             print("ESC: Exit search | ENTER: Apply search", end="", flush=True)
         
         # Draw header
-        self.display.draw_header(self.playlists, current_day, self.current_day_idx, 
-                               self.days_of_week, term_width, self.all_file_items, force_redraw, self.state)
+        self.display.draw_header(self.current_day_idx, 
+                               self.days_of_week, term_width, force_redraw, self.state)
         
         # Draw search bar
-        self.display.draw_search_bar(self.search_term, term_width, force_redraw, self.state)
+        self.display.draw_search_bar(self.search_term, force_redraw, self.state)
         
         # Draw files section
         self.display.draw_files_section(self.filtered_file_items, self.playlists, self.selected_idx,
@@ -685,8 +651,7 @@ class Application:
         
         # Handle message display
         if self.flash_message != self.state.last_message:
-            message_row = self.display.get_header_height() + 5
-            self.terminal.move_cursor(message_row)
+            self.terminal.move_cursor(6)
             self.terminal.clear_line()
             if self.flash_message:
                 print(f"\033[1;32m{self.flash_message}\033[0m", end="", flush=True)
@@ -698,8 +663,7 @@ class Application:
         if term_width is None or term_height is None:
             term_width, term_height = self.terminal.get_terminal_size()
         
-        header_height = self.display.get_header_height()
-        visible_lines = term_height - (header_height + 5)
+        visible_lines = term_height - 6
         
         if key == 'A':  # Up arrow
             self.selected_idx = max(0, self.selected_idx - 1)
@@ -786,8 +750,7 @@ class Application:
                 if term_width is None or term_height is None:
                     term_width, term_height = self.terminal.get_terminal_size()
                 
-                header_height = self.display.get_header_height()
-                visible_lines = term_height - (header_height + 5)
+                visible_lines = term_height - 6
                 
                 if self.selected_idx < self.scroll_offset:
                     self.scroll_offset = self.selected_idx
@@ -824,24 +787,18 @@ class Application:
                     continue
                 
                 # Handle regular input
-                if key == 'q':
-                    break
-                elif key == '/':
-                    self.in_search_mode = True
+                if key == 'q': break
+                elif key == '/': self.in_search_mode = True
                 elif key == '\x1b':  # Escape sequences
                     next_key = self.terminal.get_char()
                     if next_key == '[':
                         arrow_key = self.terminal.get_char()
                         self.handle_navigation_key(arrow_key)
                         if arrow_key in ['5', '6', '1', '4']:
-                            try:
-                                self.terminal.get_char()  # Consume the ~ character
-                            except:
-                                pass
+                            try: self.terminal.get_char()  # Consume the ~ character
+                            except: pass
                 elif key == ' ':
-                    header_height = self.display.get_header_height()
-                    visible_lines = term_height - (header_height + 5)
-                    self.selected_idx = min(len(self.filtered_file_items) - 1, self.selected_idx + visible_lines)
+                    self.selected_idx = min(len(self.filtered_file_items) - 1, self.selected_idx + (term_height - 6))
                 elif key.lower() == 'c':
                     if self.config.is_custom_mode:
                         # In custom mode, 'c' toggles the custom playlist
@@ -849,31 +806,24 @@ class Application:
                     else:
                         # In weekly mode, 'c' copies day to all
                         current_day = self.days_of_week[self.current_day_idx]
-                        self.playlists = self.playlist_manager.copy_day_to_all(
-                            self.playlists, current_day, self.days_of_week)
+                        self.playlists = self.playlist_manager.copy_day_to_all(self.playlists, current_day, self.days_of_week)
                         self.flash_message = f"Playlists from {current_day} copied to all other days!"
                         self.message_timer = 0
-                elif key.lower() == 'm' and not self.config.is_custom_mode:
-                    self.toggle_playlist('morning')
-                elif key.lower() == 'd' and not self.config.is_custom_mode:
-                    self.toggle_playlist('day')
-                elif key.lower() == 'n' and not self.config.is_custom_mode:
-                    self.toggle_playlist('night')
-                elif key.lower() == 'l' and not self.config.is_custom_mode:
-                    self.toggle_playlist('late_night')
+                elif key.lower() == 'm' and not self.config.is_custom_mode: self.toggle_playlist('morning')
+                elif key.lower() == 'd' and not self.config.is_custom_mode: self.toggle_playlist('day')
+                elif key.lower() == 'n' and not self.config.is_custom_mode: self.toggle_playlist('night')
+                elif key.lower() == 'l' and not self.config.is_custom_mode: self.toggle_playlist('late_night')
                 elif key.lower() == 'f' and not self.config.is_custom_mode:
                     if self.filtered_file_items:
                         current_day = self.days_of_week[self.current_day_idx]
                         current_item = self.filtered_file_items[self.selected_idx]
                         
-                        self.playlists, success = self.playlist_manager.copy_current_item_to_all(
-                            self.playlists, current_day, self.days_of_week, current_item)
+                        self.playlists, success = self.playlist_manager.copy_current_item_to_all(self.playlists, current_day, self.days_of_week, current_item)
                         
                         if success:
                             item_name = current_item.display_name
                             self.flash_message = f"Item '{item_name}' copied to all days!"
-                        else:
-                            self.flash_message = f"Item not in any playlist! Add it first."
+                        else: self.flash_message = f"Item not in any playlist! Add it first."
                         self.message_timer = 0
                 elif key.isupper() and len(key) == 1 and key.isalpha():
                     # Jump to item starting with letter
@@ -888,8 +838,7 @@ class Application:
                             if self.filtered_file_items[i].name.lower().startswith(target_letter):
                                 found_idx = i
                                 break
-                    if found_idx != -1:
-                        self.selected_idx = found_idx
+                    if found_idx != -1: self.selected_idx = found_idx
         
         finally:
             self.terminal.show_cursor()
@@ -917,14 +866,14 @@ def main():
     args = parse_arguments()
     
     fd = sys.stdin.fileno()
-    original_settings = termios.tcgetattr(fd)
+    original_settings = termios.tcgetattr(fd) # type: ignore
 
-    new_settings = termios.tcgetattr(fd)
-    new_settings[3] = new_settings[3] & ~termios.ECHOCTL
-    termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
+    new_settings = termios.tcgetattr(fd) # type: ignore
+    new_settings[3] = new_settings[3] & ~termios.ECHOCTL # type: ignore
+    termios.tcsetattr(fd, termios.TCSADRAIN, new_settings) # type: ignore
     
     config = Config(custom_playlist_file=args.playlist)
     app = Application(config)
     code = app.run()
-    termios.tcsetattr(fd, termios.TCSADRAIN, original_settings)
+    termios.tcsetattr(fd, termios.TCSADRAIN, original_settings) # type: ignore
     exit(code)
