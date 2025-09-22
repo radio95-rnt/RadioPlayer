@@ -102,7 +102,7 @@ class ProcessManager:
             for process in self.processes[:]:
                 if process.process.poll() is not None: self.processes.remove(process)
             return bool(self.processes)
-    def stop_all(self, timeout: float | None = 2) -> bool:
+    def stop_all(self, timeout: float | None = None) -> bool:
         success = True
         with self.lock:
             for process in self.processes:
@@ -131,7 +131,7 @@ def handle_sigint(signum, frame):
         return
     else:
         logger.warning("Force-Quit pending")
-        procman.stop_all(None)
+        procman.stop_all()
         exit(0)
 
 def handle_sighup(signum, frame):
