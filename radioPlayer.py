@@ -32,12 +32,12 @@ def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="",
     
     print(f"{prefix}{format_time(ttw+bias)} / {format_time(duration)}")
 
-MORNING_START = 6
-MORNING_END = 10
-DAY_START = 10
-DAY_END = 20
+MORNING_START = 5
+MORNING_END = 11
+DAY_START = 11
+DAY_END = 19
 LATE_NIGHT_START = 0
-LATE_NIGHT_END = 6
+LATE_NIGHT_END = 5
 
 CROSSFADE_DURATION = 5  # seconds
 
