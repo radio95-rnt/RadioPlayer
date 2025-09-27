@@ -248,8 +248,8 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
     last_jingiel = True
     for track in tracks:
         if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
+            playlist.append((track, True, False, True))
             playlist.append((JINGIEL_FILE, False, False, False))
-            playlist.append((track, False, True, True))
             last_jingiel = True
         else:
             playlist.append((track, True, True, True))
@@ -288,8 +288,10 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
         if i + 1 < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[i+1][0])}")
         
         pr = procman.play(track_path, to_fade_in, to_fade_out)
-        if official: print_wait(pr.duration - CROSSFADE_DURATION, 1, pr.duration, f"{track_name}: ")
-        else: time.sleep(pr.duration)
+        ttw = pr.duration
+        if to_fade_out: ttw -= CROSSFADE_DURATION
+        if official: print_wait(ttw, 1, pr.duration, f"{track_name}: ")
+        else: time.sleep(ttw)
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath): return False
