@@ -259,8 +259,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
 
     if do_shuffle: random.seed()
 
-    start_index = 0
-
     # Normal playlist preparation
     if play_newest_first:
         newest_track = get_newest_track(tracks)
@@ -271,12 +269,22 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
             tracks.insert(0, newest_track)
     else:
         if do_shuffle: random.shuffle(tracks)
+    
+    playlist: list[tuple[str, bool, bool, bool]] = [] # name, fade in, fade out, official
+    last_jingiel = True
+    for track in tracks:
+        if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
+            playlist.append((JINGIEL_FILE, False, False, False))
+            playlist.append((track, False, True, True))
+            last_jingiel = True
+        else:
+            playlist.append((track, True, True, True))
+            last_jingiel = False
+    del last_jingiel
 
     return_pending = False
     
-    to_fade_in = False
-
-    for i, track in enumerate(tracks[start_index:], start_index):
+    for i, (track, to_fade_in, to_fade_out, official) in enumerate(playlist):
         if return_pending:
             logger.info("Return reached, next song will reload the playlist.")
             procman.wait_all()
@@ -302,16 +310,12 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         if return_pending and not procman.anything_playing(): continue
 
         logger.info(f"Now playing: {track_name}")
-        update_rds(track_name)
+        if official: update_rds(track_name)
+        if i + 1 < len(playlist): logger.info(f"Next up: {os.path.basename(tracks[i+1][0])}")
         
-        pr = procman.play(track_path, to_fade_in, True)
-        print_wait(pr.duration - CROSSFADE_DURATION, 1, pr.duration, f"{track_name}: ")
-        if JINGIEL_FILE and random.choice([False, True, False, False]) and to_fade_in:
-            logger.info("Playing the jingiel")
-            procman.play(JINGIEL_FILE, False, False).process.wait()
-            to_fade_in = False
-        else:
-            to_fade_in = True
+        pr = procman.play(track_path, to_fade_in, to_fade_out)
+        if official: print_wait(pr.duration - CROSSFADE_DURATION, 1, pr.duration, f"{track_name}: ")
+        else: time.sleep(pr.duration)
 
 def can_delete_file(filepath):
     if not os.path.isfile(filepath): return False
