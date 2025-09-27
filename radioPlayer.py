@@ -208,23 +208,6 @@ def load_playlist(playlist_path):
         logger.error(f"Playlist not found: {playlist_path}")
         return []
 
-def get_newest_track(tracks):
-    if not tracks: return None
-
-    newest_track = None
-    newest_time = 0
-
-    for track in tracks:
-        track_path = os.path.abspath(os.path.expanduser(track))
-        try:
-            mod_time = os.path.getmtime(track_path)
-            if mod_time > newest_time:
-                newest_time = mod_time
-                newest_track = track
-        except OSError: continue
-
-    return newest_track
-
 def check_if_playlist_modifed(playlist_path: str, custom_playlist: bool = False):
     current_day, current_hour = Time.get_day_hour()
     morning_playlist_path = os.path.join(playlist_dir, current_day, 'morning')
@@ -249,7 +232,7 @@ def check_if_playlist_modifed(playlist_path: str, custom_playlist: bool = False)
             logger.info("Time changed to night hours, switching playlist...")
             return True
 
-def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=False, do_shuffle=True):
+def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
     last_modified_time = Time.get_playlist_modification_time(playlist_path)
     tracks = load_playlist(playlist_path)
     if not tracks:
@@ -257,18 +240,9 @@ def play_playlist(playlist_path, custom_playlist: bool=False, play_newest_first=
         time.sleep(15)
         return
 
-    if do_shuffle: random.seed()
-
-    # Normal playlist preparation
-    if play_newest_first:
-        newest_track = get_newest_track(tracks)
-        if newest_track:
-            logger.info(f"Playing newest track first: {os.path.basename(newest_track)}")
-            tracks.remove(newest_track)
-            if do_shuffle: random.shuffle(tracks)
-            tracks.insert(0, newest_track)
-    else:
-        if do_shuffle: random.shuffle(tracks)
+    if do_shuffle: 
+        random.seed()
+        random.shuffle(tracks)
     
     playlist: list[tuple[str, bool, bool, bool]] = [] # name, fade in, fade out, official
     last_jingiel = True
@@ -325,7 +299,6 @@ def can_delete_file(filepath):
 def parse_arguments():
     """Parse command line arguments and return configuration"""
     arg = sys.argv[1] if len(sys.argv) > 1 else None
-    play_newest_first = False
     do_shuffle = True
     pre_track_path = None
     selected_list = None
@@ -337,7 +310,6 @@ def parse_arguments():
             print("   /tmp/radioPlayer_arg           -   Contains arguments to use")
             print()
             print("Arguments:")
-            print("    n                        -    Play newest song first")
             print("    list:playlist;options    -    Play custom playlist with options")
             print("    /path/to/file            -    Play specific file first")
             print()
@@ -349,27 +321,23 @@ def parse_arguments():
         os.remove("/tmp/radioPlayer_arg")
 
     if arg:
-        if arg.lower() == "n":
-            play_newest_first = True
-            logger.info("Newest song will be played first")
-        elif arg.startswith("list:"):
+        if arg.startswith("list:"):
             selected_list = arg.removeprefix("list:")
             logger.info(f"The list {selected_list.split(';')[0]} will be played instead of the daily section lists.")
             for option in selected_list.split(";"):
-                if option == "n": play_newest_first = True
-                elif option == "ns": do_shuffle = False
+                if option == "s": do_shuffle = False
             selected_list = selected_list.split(";")[0]
         elif os.path.isfile(arg):
             pre_track_path = arg
             logger.info(f"Will play requested song first: {arg}")
         else: logger.error(f"Invalid argument or file not found: {arg}")
 
-    return play_newest_first, do_shuffle, pre_track_path, selected_list
+    return do_shuffle, pre_track_path, selected_list
 
 def main():
     try:
         while True:
-            play_newest_first, do_shuffle, pre_track_path, selected_list = parse_arguments()
+            do_shuffle, pre_track_path, selected_list = parse_arguments()
 
             if pre_track_path:
                 track_name = os.path.basename(pre_track_path)
@@ -387,7 +355,7 @@ def main():
             while play_loop:
                 if selected_list:
                     logger.info("Playing custom list")
-                    result = play_playlist(selected_list, True, play_newest_first, do_shuffle)
+                    result = play_playlist(selected_list, True, do_shuffle)
                     if result == "reload": play_loop = False
                     continue
 
@@ -415,16 +383,16 @@ def main():
 
                 if DAY_START <= current_hour < DAY_END:
                     logger.info(f"Playing {current_day} day playlist...")
-                    result = play_playlist(day_playlist, False, play_newest_first, do_shuffle)
+                    result = play_playlist(day_playlist, False, do_shuffle)
                 elif MORNING_START <= current_hour < MORNING_END:
                     logger.info(f"Playing {current_day} morning playlist...")
-                    result = play_playlist(morning_playlist, False, play_newest_first, do_shuffle)
+                    result = play_playlist(morning_playlist, False, do_shuffle)
                 elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
                     logger.info(f"Playing {current_day} late_night playlist...")
-                    result = play_playlist(late_night_playlist, False, play_newest_first, do_shuffle)
+                    result = play_playlist(late_night_playlist, False, do_shuffle)
                 else:
                     logger.info(f"Playing {current_day} night playlist...")
-                    result = play_playlist(night_playlist, False, play_newest_first, do_shuffle)
+                    result = play_playlist(night_playlist, False, do_shuffle)
 
                 if exit_pending: exit()
                 elif reload_pending:
