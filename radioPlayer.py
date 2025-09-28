@@ -8,7 +8,7 @@ import threading
 import re, unidecode
 from dataclasses import dataclass
 from datetime import datetime
-import log95
+import log95, glob
 
 def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="", bias: float = 0):
     interval = 1.0 / frequency
@@ -247,13 +247,15 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
     playlist: list[tuple[str, bool, bool, bool]] = [] # name, fade in, fade out, official
     last_jingiel = True
     for track in tracks:
-        if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
-            playlist.append((track, True, False, True))
-            playlist.append((JINGIEL_FILE, False, False, False))
-            last_jingiel = True
-        else:
-            playlist.append((track, True, True, True))
-            last_jingiel = False
+        tr = [f for f in glob.glob(track) if os.path.isfile(f)]
+        for track2 in tr:
+            if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
+                playlist.append((track2, True, False, True))
+                playlist.append((JINGIEL_FILE, False, False, False))
+                last_jingiel = True
+            else:
+                playlist.append((track2, True, True, True))
+                last_jingiel = False
     del last_jingiel
 
     return_pending = False
