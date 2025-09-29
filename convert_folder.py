@@ -21,6 +21,6 @@ for plist in playlist_files:
     with open(plist, "w") as f:
         f.writelines([i + "\n" for i in files])
         for dir in dirs:
-            base = f"/home/user/mixes/{dir}/*."
+            base = f"/home/user/mixes/{dir}/*"
             for format in  FORMATS:
                 f.write(base + format + "\n")
