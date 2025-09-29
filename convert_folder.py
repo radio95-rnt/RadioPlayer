@@ -19,8 +19,8 @@ for plist in playlist_files:
         if dir not in dirs and dir != "mixes": dirs.append(dir)
         if dir == "mixes": files.append(line)
     with open(plist, "w") as f:
-        f.writelines(files)
+        f.writelines([i + "\n" for i in files])
         for dir in dirs:
             base = f"/home/user/mixes/{dir}/*."
             for format in  FORMATS:
-                f.write(base + format)
+                f.write(base + format + "\n")
