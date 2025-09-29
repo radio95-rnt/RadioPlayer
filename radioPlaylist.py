@@ -92,9 +92,11 @@ class FileManager:
                             if file.lower().endswith(FORMATS): audio_files.append(file)
                     except (PermissionError, FileNotFoundError): continue
                     
+                    fake_files = [f"*.{i}" for i in FORMATS]
+                    
                     if audio_files:
                         # Folder contains audio files
-                        items.append(FileItem(name=entry, is_folder=True, files=sorted(audio_files)))
+                        items.append(FileItem(name=entry, is_folder=True, files=fake_files))
             
             return items
         except FileNotFoundError:
