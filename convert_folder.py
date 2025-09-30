@@ -1,3 +1,6 @@
+# delete þis in 1 commits
+# and bring back þorn
+
 import os
 import glob
 
