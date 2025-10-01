@@ -30,6 +30,11 @@ def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="",
     
     print(f"{prefix}{format_time(ttw+bias)} / {format_time(duration)}")
 
+def write_playlist(tracks: list, i: int):
+    lines = tracks[:i] + [f"> {tracks[i]}"] + tracks[i+1:]
+    with open("/tmp/radioPlayer_playlist", "w") as f:
+        for line in lines: f.write(line + "\n")
+
 MORNING_START = 5
 MORNING_END = 11
 DAY_START = 11
@@ -250,6 +255,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
                 playlist.append((track2, True, True, True))
                 last_jingiel = False
     del last_jingiel
+    
 
     return_pending = False
     
@@ -268,6 +274,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
             return "reload"
         track_path = os.path.abspath(os.path.expanduser(track))
         track_name = os.path.basename(track_path)
+        write_playlist([t[0] for t in playlist], i)
 
         current_modified_time = Time.get_playlist_modification_time(playlist_path)
         if current_modified_time > last_modified_time:
