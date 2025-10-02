@@ -239,7 +239,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
 
     if do_shuffle: 
         random.seed()
-        random.shuffle(lines)
+        for _ in range(random.randrange(1,10)): random.shuffle(lines)
     
     playlist: list[tuple[str, bool, bool, bool]] = [] # name, fade in, fade out, official
     last_jingiel = True
@@ -255,7 +255,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
                 playlist.append((track2, True, True, True))
                 last_jingiel = False
     del last_jingiel
-    
 
     return_pending = False
     
