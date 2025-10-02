@@ -239,13 +239,14 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
 
     if do_shuffle: 
         random.seed()
-        for _ in range(random.randrange(1,10)): random.shuffle(lines)
+        random.shuffle(lines)
     
     playlist: list[tuple[str, bool, bool, bool]] = [] # name, fade in, fade out, official
     last_jingiel = True
     for line in lines:
         if line.startswith(";") or not line.strip(): continue
         tr = [f for f in glob.glob(line) if os.path.isfile(f)]
+        if do_shuffle: random.shuffle(tr)
         for track2 in tr:
             if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
                 playlist.append((track2, True, False, True))
