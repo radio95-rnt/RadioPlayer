@@ -236,25 +236,25 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
         logger.info(f"No tracks found in {playlist_path}, checking again in 15 seconds...")
         time.sleep(15)
         return
-
+    
+    glob_lines = []
+    for line in lines:
+        if line.startswith(";") or not line.strip(): continue
+        glob_lines.extend([f for f in glob.glob(line) if os.path.isfile(f)])
+    
     if do_shuffle: 
-        random.seed()
-        random.shuffle(lines)
+        random.shuffle(glob_lines)
     
     playlist: list[tuple[str, bool, bool, bool]] = [] # name, fade in, fade out, official
     last_jingiel = True
-    for line in lines:
-        if line.startswith(";") or not line.strip(): continue
-        tr = [f for f in glob.glob(line) if os.path.isfile(f)]
-        if do_shuffle: random.shuffle(tr)
-        for track2 in tr:
-            if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
-                playlist.append((track2, True, False, True))
-                playlist.append((JINGIEL_FILE, False, False, False))
-                last_jingiel = True
-            else:
-                playlist.append((track2, True, True, True))
-                last_jingiel = False
+    for glob_line in glob_lines:
+        if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
+            playlist.append((glob_line, True, False, True))
+            playlist.append((JINGIEL_FILE, False, False, False))
+            last_jingiel = True
+        else:
+            playlist.append((glob_line, True, True, True))
+            last_jingiel = False
     del last_jingiel
 
     return_pending = False
