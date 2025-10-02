@@ -237,13 +237,26 @@ def play_playlist(playlist_path, custom_playlist: bool=False, do_shuffle=True):
         time.sleep(15)
         return
     
+    def check_for_imports(lines: list[str], seen=None) -> list[str]:
+        if seen is None: seen = set()
+        out = []
+        for line in lines:
+            if line.startswith("@"):
+                target = line.removeprefix("@")
+                if target not in seen:
+                    seen.add(target)
+                    sub_lines = load_filelines(target)
+                    out.extend(check_for_imports(sub_lines, seen))
+            else: out.append(line)
+        return out
+    lines = check_for_imports(lines)
+
     glob_lines = []
     for line in lines:
         if line.startswith(";") or not line.strip(): continue
         glob_lines.extend([f for f in glob.glob(line) if os.path.isfile(f)])
     
-    if do_shuffle: 
-        random.shuffle(glob_lines)
+    if do_shuffle: random.shuffle(glob_lines)
     
     playlist: list[tuple[str, bool, bool, bool]] = [] # name, fade in, fade out, official
     last_jingiel = True
