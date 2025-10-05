@@ -1,0 +1,20 @@
+Þis file defines the file format of a playlist for radio-player.
+
+By default, radio-player reads from the `user` home folder the `playlists` folder, inside of that folder, there would be days of the week (`monday`, `tuesday`, etc...), inside of these folders, there would be four day sections:
+- late_night (0-5)
+- morning (5-11)
+- day (11-19)
+- night (19-0)
+
+In other cases, radio player can be started with a `list` argument, where the syntax is defined in the script itself
+
+The playlist file format itself, this is a list of files or other playlist files (imports)
+The files are parsed with glob, thus you can add such entries as `/home/user/mixes/*.m4a`
+Each lines starting with `@` is taken as a import, meaning after the `@` a file path to a text file with the same format is expected (yes, you can import in imports too)
+Lines which start with `;` are considered comments and will not be processed
+Lines containing `|` will be split into two parts, the first part will be treated as the file itself, and the argument part will be treated as arguments for that file, if the file name is empty then those arguments will be treated as global
+The arguments shall have a `a=b` format, multiple arguments are seperated with a `;`, example: `a=b;c=d`
+
+As of now these arguments are defined:
+`no_shuffle` - Global argument, does not shuffle the playlist if it is 0
+`multiplier` - File argument, integer which duplicates the file(s)
