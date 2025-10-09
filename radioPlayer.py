@@ -37,7 +37,7 @@ def write_playlist(tracks: list, i: int):
         for line in lines: 
             try: f.write(line + "\n")
             except UnicodeEncodeError:
-                print(line)
+                print(line.encode('utf-8', errors='ignore').decode('utf-8'))
                 raise
 
 MORNING_START = 5
