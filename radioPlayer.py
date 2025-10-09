@@ -34,7 +34,11 @@ def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="",
 def write_playlist(tracks: list, i: int):
     lines = tracks[:i] + [f"> {tracks[i]}"] + tracks[i+1:]
     with open("/tmp/radioPlayer_playlist", "w") as f:
-        for line in lines: f.write(line + "\n")
+        for line in lines: 
+            try: f.write(line + "\n")
+            except UnicodeEncodeError:
+                print(line)
+                raise
 
 MORNING_START = 5
 MORNING_END = 11
