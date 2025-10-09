@@ -179,9 +179,6 @@ def process_for_rds(track_name: str):
         artist = rds_default_artist
         title = name
         if not has_name: logger.warning(f"File does not have a alias in the name table ({track_name})")
-
-    title = unidecode.unidecode(title)
-    artist = unidecode.unidecode(artist)
     
     title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
     
@@ -204,7 +201,7 @@ def update_rds(prt: str, rtp: str):
 
 def load_filelines(path):
     try:
-        with open(path, 'r') as f: return [line.strip() for line in f.readlines() if line.strip()]
+        with open(path, 'r') as f: return [unidecode.unidecode(line.strip()) for line in f.readlines() if unidecode.unidecode(line.strip())]
     except FileNotFoundError:
         logger.error(f"Playlist not found: {path}")
         return []
