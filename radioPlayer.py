@@ -10,12 +10,16 @@ import log95, copy
 from pathlib import Path
 
 class PlayerModule:
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool]]):
+    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict]]):
         pass
     def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool):
         pass
+class PlaylistModifierModule:
+    def modify(self, global_args: dict, playlist: list[tuple[str, bool, bool, bool, dict]]):
+        return playlist
 
 simple_modules: list[PlayerModule] = []
+playlist_modifier_modules: list[PlaylistModifierModule] = []
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 MODULES_DIR = SCRIPT_DIR / "modules"
@@ -222,34 +226,33 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
         logger.info(f"Exception while parsing playlist, retrying in 15 seconds...")
         time.sleep(15)
         return
-    lines_args = copy.deepcopy(parsed)
-    lines = []
-    for (lns, args) in lines_args:
+
+    playlist: list[tuple[str, bool, bool, bool, dict]] = [] # name, fade in, fade out, official, args
+    for (lns, args) in parsed:
         lns: list[str]
         args: dict[str, str]
+        for line in lns: playlist.append((line, True, True, True, args))
 
-        for i in range(int(args.get("multiplier", 1))): lines.extend(lns)
-    
-    cross_fade = int(global_args.get("crossfade", 5))
-    if int(global_args.get("no_shuffle", 0)) == 0: random.shuffle(lines)
-    
-    playlist: list[tuple[str, bool, bool, bool]] = [] # name, fade in, fade out, official
-    last_jingiel = True
-    for line in lines:
-        if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
-            playlist.append((line, True, False, True))
-            playlist.append((JINGIEL_FILE, False, False, False))
-            last_jingiel = True
-        else:
-            playlist.append((line, True, True, True))
-            last_jingiel = False
-    del last_jingiel
+    for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist)
+
+    # last_jingiel = True
+    # for line in lines:
+    #     if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
+    #         playlist.append((line, True, False, True))
+    #         playlist.append((JINGIEL_FILE, False, False, False))
+    #         last_jingiel = True
+    #     else:
+    #         playlist.append((line, True, True, True))
+    #         last_jingiel = False
+    # del last_jingiel
 
     for module in simple_modules: module.on_new_playlist(playlist)
 
     return_pending = False
+
+    cross_fade = int(global_args.get("crossfade", 5))
     
-    for i, (track, to_fade_in, to_fade_out, official) in enumerate(playlist):
+    for i, (track, to_fade_in, to_fade_out, official, args) in enumerate(playlist):
         if return_pending:
             logger.info("Return reached, next song will reload the playlist.")
             procman.wait_all()
@@ -332,6 +335,11 @@ def main():
             
             if md := getattr(module, "module", None):
                 simple_modules.append(md)
+            elif md := getattr(module, "playlistmod", None):
+                if isinstance(md, tuple):
+                    md, index = md
+                    playlist_modifier_modules.insert(index, md)
+                else: playlist_modifier_modules.append(md)
     
     try:
         while True:

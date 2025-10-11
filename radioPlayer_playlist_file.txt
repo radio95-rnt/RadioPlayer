@@ -14,7 +14,3 @@ Each lines starting with `@` is taken as a import, meaning after the `@` a file 
 Lines which start with `;` are considered comments and will not be processed
 Lines containing `|` will be split into two parts, the first part will be treated as the file itself, and the argument part will be treated as arguments for that file, if the file name is empty then those arguments will be treated as global
 The arguments shall have a `a=b` format, multiple arguments are seperated with a `;`, example: `a=b;c=d`
-
-As of now these arguments are defined:
-`no_shuffle` - Global argument, does not shuffle the playlist if it is 0
-`multiplier` - File argument, integer which duplicates the file(s)
