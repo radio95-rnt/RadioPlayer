@@ -4,9 +4,8 @@ import time, datetime
 import os, subprocess, importlib.util
 import sys, signal, threading, glob
 import unidecode
-import random
 from dataclasses import dataclass
-import log95, copy
+import log95
 from pathlib import Path
 
 class PlayerModule:
@@ -53,8 +52,6 @@ DAY_START = 11
 DAY_END = 19
 LATE_NIGHT_START = 0
 LATE_NIGHT_END = 5
-
-JINGIEL_FILE = "/home/user/Jingiel.mp3"
 
 playlist_dir = "/home/user/playlists"
 
@@ -234,17 +231,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
         for line in lns: playlist.append((line, True, True, True, args))
 
     for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist)
-
-    # last_jingiel = True
-    # for line in lines:
-    #     if not last_jingiel and random.choice([False, True, False, False]) and JINGIEL_FILE:
-    #         playlist.append((line, True, False, True))
-    #         playlist.append((JINGIEL_FILE, False, False, False))
-    #         last_jingiel = True
-    #     else:
-    #         playlist.append((line, True, True, True))
-    #         last_jingiel = False
-    # del last_jingiel
 
     for module in simple_modules: module.on_new_playlist(playlist)
 
