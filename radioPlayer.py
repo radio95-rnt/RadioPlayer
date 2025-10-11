@@ -115,7 +115,8 @@ class ProcessManager:
     def wait_all(self, timeout: float | None = None) -> None:
         with self.lock:
             for process in self.processes:
-                process.process.wait(timeout)
+                try: process.process.wait(timeout)
+                except: process.process.terminate()
                 self.processes.remove(process)
 
 procman = ProcessManager()
