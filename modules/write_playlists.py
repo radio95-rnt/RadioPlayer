@@ -1,25 +1,23 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from player_modules import PlayerModule
-
-def write_playlist(tracks: list, i: int):
-    lines = tracks[:i] + [f"> {tracks[i]}"] + tracks[i+1:]
-    with open("/tmp/radioPlayer_playlist", "w") as f:
-        for line in lines: 
-            try: f.write(line + "\n")
-            except UnicodeEncodeError:
-                print(line.encode('utf-8', errors='ignore').decode('utf-8'))
-                raise
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    class PlayerModule:
+        def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool]]):
+            pass
+        def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool):
+            pass
 
 class Module(PlayerModule):
     def __init__(self) -> None:
         self.playlist = []
-    def on_new_playlist(self, playlist: list[str]):
-        self.playlist = playlist
-    def on_new_track(self, track: str, index: int):
-        write_playlist(self.playlist, index)
+    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool]]):
+        self.playlist = [t[0] for t in playlist]
+    def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool):
+        lines = self.playlist[:index] + [f"> {self.playlist[index]}"] + self.playlist[index+1:]
+        with open("/tmp/radioPlayer_playlist", "w") as f:
+            for line in lines: 
+                try: f.write(line + "\n")
+                except UnicodeEncodeError:
+                    print(line.encode('utf-8', errors='ignore').decode('utf-8'))
+                    raise
 
 module = Module()
