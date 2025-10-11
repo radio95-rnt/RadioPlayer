@@ -76,3 +76,5 @@ class Module(PlayerModule):
         if official:
             rds_rt, rds_rtp = update_rds(os.path.basename(track))
             logger.info(f"RT set to '{rds_rt}' (RTP: {rds_rtp})")
+
+module = Module()
