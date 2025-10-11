@@ -103,8 +103,7 @@ class ProcessManager:
         return pr
     def anything_playing(self) -> bool:
         with self.lock:
-            for process in self.processes:
-                if process.process.poll() is not None: self.processes.remove(process)
+            self.processes = [p for p in self.processes if p.process.poll() is None]
             return bool(self.processes)
     def stop_all(self, timeout: float | None = None) -> None:
         with self.lock:
@@ -228,7 +227,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
     for (lns, args) in parsed:
         lns: list[str]
         args: dict[str, str]
-        for line in lns: playlist.append((line, True, True, True, args))
+        for line in lns: playlist.append((line, True, True, True, args)) # simple entry, just to convert to a format taken by the modules
 
     for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist)
 
