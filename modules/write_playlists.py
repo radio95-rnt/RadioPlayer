@@ -16,3 +16,5 @@ class Module(PlayerModule):
         self.playlist = playlist
     def on_new_track(self, track: str, index: int):
         write_playlist(self.playlist, index)
+
+module = Module()
