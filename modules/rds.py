@@ -57,7 +57,7 @@ def update_rds(track_name: str):
     prt = rds_base.format(artist, title)
     rtp = [4] # type 1
     rtp.append(prt.find(artist)) # start 1
-    rtp.append(len(artist)) # len 1
+    rtp.append(len(artist) - 1) # len 1
     rtp.append(1) # type 2
     rtp.append(prt.find(title)) # start 2
     rtp.append(len(title) - 1) # len 2
