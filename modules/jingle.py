@@ -6,9 +6,7 @@ Takes an file argument to initialize, which is the absolute path to the jingle f
 Reacts to the 'no_jingle' argument, for global usage it does not add jingles to the playlist, and for file usage it does not add the jingle after the file
 """
 
-import random, log95
-
-logger = log95.log95("JINGLE-GEN")
+import random
 
 class PlaylistModifierModule:
     def modify(self, global_args: dict, playlist: list[tuple[str, bool, bool, bool, dict]]):
@@ -16,7 +14,6 @@ class PlaylistModifierModule:
 
 class Module(PlaylistModifierModule):
     def __init__(self, file: str) -> None:
-        logger.info("Generating jingles with the following random state:", repr(random.getstate()))
         self.file = file
     def modify(self, global_args: dict, playlist: list[tuple[str, bool, bool, bool, dict]]):
         if int(global_args.get("no_jingle", 0)): return playlist
@@ -31,5 +28,6 @@ class Module(PlaylistModifierModule):
                 out.append((track, True, True, True, args))
                 last_jingiel = False
         del last_jingiel
+        return out
 
 playlistmod = (Module("/home/user/Jingiel.mp3"), 1)
