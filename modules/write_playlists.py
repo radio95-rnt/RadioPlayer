@@ -1,4 +1,9 @@
-from ..player_modules import PlayerModule
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from player_modules import PlayerModule
 
 def write_playlist(tracks: list, i: int):
     lines = tracks[:i] + [f"> {tracks[i]}"] + tracks[i+1:]
