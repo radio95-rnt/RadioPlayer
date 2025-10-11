@@ -239,11 +239,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
     cross_fade = int(global_args.get("crossfade", 5))
     
     for i, (track, to_fade_in, to_fade_out, official, args) in enumerate(playlist):
-        if return_pending:
-            logger.info("Return reached, next song will reload the playlist.")
-            procman.wait_all()
-            return
-        elif exit_pending:
+        if exit_pending:
             logger.info("Quit received, waiting for song end.")
             procman.wait_all()
             exit()
@@ -251,6 +247,10 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
             logger.info("Reload requested, restarting with new arguments after song ending")
             procman.wait_all()
             return "reload"
+        elif return_pending:
+            logger.info("Return reached, next song will reload the playlist.")
+            procman.wait_all()
+            return
         track_path = os.path.abspath(os.path.expanduser(track))
         for module in simple_modules: module.on_new_track(i, track_path, to_fade_in, to_fade_out, official)
         track_name = os.path.basename(track_path)
