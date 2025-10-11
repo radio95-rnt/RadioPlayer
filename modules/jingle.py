@@ -25,7 +25,7 @@ class Module(PlaylistModifierModule):
         for (track, _, _, _, args) in playlist:
             if not last_jingiel and random.choice([False, True, False, False]) and self.file and int(args.get("no_jingle", 0)) == 0:
                 out.append((track, True, False, True, args))
-                out.append((self.file, False, False, False, args))
+                out.append((self.file, False, False, False, {}))
                 last_jingiel = True
             else:
                 out.append((track, True, True, True, args))
