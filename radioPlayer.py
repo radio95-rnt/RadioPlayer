@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 DEBUG = False
 import time, datetime
-import os, subprocess
+import os, subprocess, importlib.util
 import sys, signal, threading, glob
 import re, unidecode
 import random
 import socket
 from dataclasses import dataclass
 import log95, copy
+from pathlib import Path
+from player_modules import PlayerModule
+
+simple_modules: list[PlayerModule] = []
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+MODULES_DIR = SCRIPT_DIR / ".." / "modules"
+MODULES_DIR = MODULES_DIR.resolve()
 
 def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="", bias: float = 0):
     interval = 1.0 / frequency
@@ -30,15 +38,6 @@ def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="",
         raise
     
     print(f"{prefix}{format_time(ttw+bias)} / {format_time(duration)}")
-
-def write_playlist(tracks: list, i: int):
-    lines = tracks[:i] + [f"> {tracks[i]}"] + tracks[i+1:]
-    with open("/tmp/radioPlayer_playlist", "w") as f:
-        for line in lines: 
-            try: f.write(line + "\n")
-            except UnicodeEncodeError:
-                print(line.encode('utf-8', errors='ignore').decode('utf-8'))
-                raise
 
 MORNING_START = 5
 MORNING_END = 11
@@ -304,6 +303,9 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
             last_jingiel = False
     del last_jingiel
 
+    simple_playlist = [t[0] for t in playlist]
+    for module in simple_modules: module.on_new_playlist(simple_playlist)
+
     return_pending = False
     
     for i, (track, to_fade_in, to_fade_out, official) in enumerate(playlist):
@@ -320,8 +322,8 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
             procman.wait_all()
             return "reload"
         track_path = os.path.abspath(os.path.expanduser(track))
+        for module in simple_modules: module.on_new_track(track_path, i)
         track_name = os.path.basename(track_path)
-        write_playlist([t[0] for t in playlist], i)
 
         current_modified_time = Time.get_playlist_modification_time(playlist_path)
         if current_modified_time > last_modified_time:
@@ -379,6 +381,21 @@ def parse_arguments():
     return selected_list
 
 def main():
+    for filename in os.listdir(MODULES_DIR):
+        if filename.endswith(".py") and filename != "__init__.py":
+            module_name = filename[:-3]
+            module_path = MODULES_DIR / filename
+            
+            # Load module from file path directly
+            spec = importlib.util.spec_from_file_location(module_name, module_path)
+            if not spec: continue
+            module = importlib.util.module_from_spec(spec)
+            if not spec.loader: continue
+            spec.loader.exec_module(module)
+            
+            if md := getattr(module, "module", None):
+                simple_modules.append(md)
+    
     try:
         while True:
             selected_list = parse_arguments()
