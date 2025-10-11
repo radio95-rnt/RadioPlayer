@@ -214,6 +214,7 @@ def parse_playlistfile(playlist_path: str):
     return global_arguments, out
 
 def play_playlist(playlist_path, custom_playlist: bool=False):
+    procman.stop_all(1)
     last_modified_time = Time.get_playlist_modification_time(playlist_path)
     
     try:
