@@ -216,15 +216,15 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
     for i, (track, to_fade_in, to_fade_out, official, args) in enumerate(playlist):
         if exit_pending:
             logger.info("Quit received, waiting for song end.")
-            procman.wait_all(cross_fade)
+            procman.wait_all()
             exit()
         elif reload_pending:
             logger.info("Reload requested, restarting with new arguments after song ending")
-            procman.wait_all(cross_fade)
+            procman.wait_all()
             return "reload"
         elif return_pending:
             logger.info("Return reached, next song will reload the playlist.")
-            procman.wait_all(cross_fade)
+            procman.wait_all()
             return
         track_path = os.path.abspath(os.path.expanduser(track))
         for module in simple_modules: module.on_new_track(i, track_path, to_fade_in, to_fade_out, official)
