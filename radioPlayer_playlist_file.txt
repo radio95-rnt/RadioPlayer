@@ -6,6 +6,8 @@ By default, radio-player reads from the `user` home folder the `playlists` folde
 - day (11-19)
 - night (19-0)
 
+The logic defined above is included in the advisor module
+
 In other cases, radio player can be started with a `list` argument, where the syntax is defined in the script itself
 
 The playlist file format itself, this is a list of files or other playlist files (imports)

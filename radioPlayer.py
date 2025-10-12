@@ -87,7 +87,7 @@ class ProcessManager:
     def play(self, track_path: str, fade_in: bool=False, fade_out: bool=False, fade_time: int = 5) -> Process:
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
         duration = self._get_audio_duration(track_path)
-        if not duration: raise Exception("Failed to get file duration, does it actually exit?", track_path)
+        if not duration: raise Exception("Failed to get file duration, does it actually exist?", track_path)
 
         filters = []
         if fade_in: filters.append(f"afade=t=in:st=0:d={fade_time}")
