@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 DEBUG = False
-import time, datetime
+import time
 import os, subprocess, importlib.util
 import sys, signal, threading, glob
 import unidecode
@@ -9,16 +9,32 @@ import log95
 from pathlib import Path
 
 class PlayerModule:
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict]]):
+    """
+    Simple passive observer, this allows you to send the current track the your RDS encoder, or to your website
+    """
+    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): 
+        """Tuple consists of the track path, to fade out, fade in, official, and args"""
         pass
-    def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool):
-        pass
+    def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool): pass
 class PlaylistModifierModule:
-    def modify(self, global_args: dict, playlist: list[tuple[str, bool, bool, bool, dict]]):
-        return playlist
+    """
+    Playlist modifier, this type of module allows you to shuffle, or put jingles into your playlist
+    """
+    def modify(self, global_args: dict, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): return playlist
+class PlaylistAdvisor:
+    """
+    Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
+    """
+    def advise(self) -> str: return "/path/to/playlist.txt"
+    def new_playlist(self) -> int:
+        """
+        Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
+        """
+        return 0
 
 simple_modules: list[PlayerModule] = []
 playlist_modifier_modules: list[PlaylistModifierModule] = []
+playlist_advisor: PlaylistAdvisor | None = None
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 MODULES_DIR = SCRIPT_DIR / "modules"
@@ -46,29 +62,12 @@ def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="",
     
     print(f"{prefix}{format_time(ttw+bias)} / {format_time(duration)}")
 
-MORNING_START = 5
-MORNING_END = 11
-DAY_START = 11
-DAY_END = 19
-LATE_NIGHT_START = 0
-LATE_NIGHT_END = 5
-
-playlist_dir = "/home/user/playlists"
-
 logger_level = log95.log95Levels.DEBUG if DEBUG else log95.log95Levels.CRITICAL_ERROR
 logger = log95.log95("radioPlayer", logger_level)
 
 exit_pending = False
 reload_pending = False
 intr_time = 0
-
-class Time:
-    @staticmethod
-    def get_day_hour(): return datetime.datetime.now().strftime('%A').lower(), datetime.datetime.now().hour
-    @staticmethod
-    def get_playlist_modification_time(playlist_path):
-        try: return os.path.getmtime(playlist_path)
-        except OSError: return 0
 
 @dataclass
 class Process:
@@ -148,30 +147,6 @@ def load_filelines(path):
         logger.error(f"Playlist not found: {path}")
         return []
 
-def check_if_playlist_modifed(playlist_path: str, custom_playlist: bool = False):
-    current_day, current_hour = Time.get_day_hour()
-    morning_playlist_path = os.path.join(playlist_dir, current_day, 'morning')
-    day_playlist_path = os.path.join(playlist_dir, current_day, 'day')
-    night_playlist_path = os.path.join(playlist_dir, current_day, 'night')
-    late_night_playlist_path = os.path.join(playlist_dir, current_day, 'late_night')
-
-    if DAY_START <= current_hour < DAY_END and not custom_playlist:
-        if playlist_path != day_playlist_path:
-            logger.info("Time changed to day hours, switching playlist...")
-            return True
-    elif MORNING_START <= current_hour < MORNING_END and not custom_playlist:
-        if playlist_path != morning_playlist_path:
-            logger.info("Time changed to morning hours, switching playlist...")
-            return True
-    elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END and not custom_playlist:
-        if playlist_path != late_night_playlist_path:
-            logger.info("Time changed to late night hours, switching playlist...")
-            return True
-    else:
-        if playlist_path != night_playlist_path and not custom_playlist:
-            logger.info("Time changed to night hours, switching playlist...")
-            return True
-
 def parse_playlistfile(playlist_path: str):
     parser_log = log95.log95("PARSER", logger_level)
 
@@ -216,8 +191,8 @@ def parse_playlistfile(playlist_path: str):
 
 def play_playlist(playlist_path, custom_playlist: bool=False):
     procman.stop_all(1)
-    last_modified_time = Time.get_playlist_modification_time(playlist_path)
-    
+    if not playlist_advisor: raise Exception("No playlist advisor")
+
     try:
         global_args, parsed = parse_playlistfile(playlist_path)
     except Exception:
@@ -232,7 +207,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
         for line in lns: playlist.append((line, True, True, True, args)) # simple entry, just to convert to a format taken by the modules
 
     for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist)
-
     for module in simple_modules: module.on_new_playlist(playlist)
 
     return_pending = False
@@ -256,28 +230,27 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
         for module in simple_modules: module.on_new_track(i, track_path, to_fade_in, to_fade_out, official)
         track_name = os.path.basename(track_path)
 
-        current_modified_time = Time.get_playlist_modification_time(playlist_path)
-        if current_modified_time > last_modified_time:
-            logger.info(f"Playlist {playlist_path} has been modified, reloading...")
+        if not custom_playlist: refresh = playlist_advisor.new_playlist()
+        else: refresh = 0
+
+        if refresh == 1:
+            logger.info("Reloading now...")
             return_pending = True
             continue
-
-        return_pending = check_if_playlist_modifed(playlist_path, custom_playlist)
-        if return_pending and not procman.anything_playing(): continue
+        elif refresh == 2:
+            return_pending = True
+            if not procman.anything_playing(): continue
 
         logger.info(f"Now playing: {track_name}")
         if (i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[i+1][0])}")
         
         pr = procman.play(track_path, to_fade_in, to_fade_out)
+
         ttw = pr.duration
         if to_fade_out: ttw -= cross_fade
+
         if official: print_wait(ttw, 1, pr.duration, f"{track_name}: ")
         else: time.sleep(ttw)
-
-def can_delete_file(filepath):
-    if not os.path.isfile(filepath): return False
-    directory = os.path.dirname(os.path.abspath(filepath)) or '.'
-    return os.access(directory, os.W_OK | os.X_OK)
 
 def parse_arguments():
     """Parse command line arguments and return configuration"""
@@ -286,18 +259,10 @@ def parse_arguments():
 
     if arg:
         if arg.lower() == "-h":
-            print("Control files:")
-            print("    Note: All of these files are one-time only, after they have been acked by the player they will be deleted")
-            print("   /tmp/radioPlayer_arg           -   Contains arguments to use")
-            print()
             print("Arguments:")
-            print("    list:playlist;options    -    Play custom playlist with options")
+            print("    list:playlist    -    Play custom playlist, bypasses the playlist advisor")
             print()
             exit(0)
-
-    if can_delete_file("/tmp/radioPlayer_arg"):
-        with open("/tmp/radioPlayer_arg", "r") as f: arg = f.read().strip()
-        os.remove("/tmp/radioPlayer_arg")
 
     if arg:
         if arg.startswith("list:"):
@@ -308,6 +273,7 @@ def parse_arguments():
     return selected_list
 
 def main():
+    global playlist_advisor
     for filename in os.listdir(MODULES_DIR):
         if filename.endswith(".py") and filename != "__init__.py":
             module_name = filename[:-3]
@@ -327,6 +293,11 @@ def main():
                     md, index = md
                     playlist_modifier_modules.insert(index, md)
                 else: playlist_modifier_modules.append(md)
+            elif md := getattr(module, "advisor", None):
+                if playlist_advisor: raise Exception("Multiple playlist advisors")
+                playlist_advisor = md
+    
+    if not playlist_advisor: raise Exception("No advisor")
     
     try:
         while True:
@@ -339,41 +310,8 @@ def main():
                     result = play_playlist(selected_list, True)
                     if result == "reload": play_loop = False
                     continue
-
-                current_day, current_hour = Time.get_day_hour()
-
-                morning_playlist = os.path.join(playlist_dir, current_day, 'morning')
-                day_playlist = os.path.join(playlist_dir, current_day, 'day')
-                night_playlist = os.path.join(playlist_dir, current_day, 'night')
-                late_night_playlist = os.path.join(playlist_dir, current_day, 'late_night')
-
-                morning_dir = os.path.dirname(morning_playlist)
-                day_dir = os.path.dirname(day_playlist)
-                night_dir = os.path.dirname(night_playlist)
-                late_night_dir = os.path.dirname(late_night_playlist)
-
-                for dir_path in [morning_dir, day_dir, night_dir, late_night_dir]:
-                    if not os.path.exists(dir_path):
-                        logger.info(f"Creating directory: {dir_path}")
-                        os.makedirs(dir_path, exist_ok=True)
-
-                for playlist_path in [morning_playlist, day_playlist, night_playlist, late_night_playlist]:
-                    if not os.path.exists(playlist_path):
-                        logger.info(f"Creating empty playlist: {playlist_path}")
-                        with open(playlist_path, 'w'): pass
-
-                if DAY_START <= current_hour < DAY_END:
-                    logger.info(f"Playing {current_day} day playlist...")
-                    result = play_playlist(day_playlist, False)
-                elif MORNING_START <= current_hour < MORNING_END:
-                    logger.info(f"Playing {current_day} morning playlist...")
-                    result = play_playlist(morning_playlist, False)
-                elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
-                    logger.info(f"Playing {current_day} late_night playlist...")
-                    result = play_playlist(late_night_playlist, False)
-                else:
-                    logger.info(f"Playing {current_day} night playlist...")
-                    result = play_playlist(night_playlist, False)
+                
+                result = play_playlist(playlist_advisor.advise())
 
                 if exit_pending: exit()
                 elif reload_pending:
