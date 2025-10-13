@@ -26,12 +26,12 @@ class Module(ActiveModifier):
 
             if (index - 1) >= 0:
                 _, last_track_to_fade_out, _, _, _ = self.playlist[index - 1]
-            else: last_track_to_fade_out = False
+            else: last_track_to_fade_out = True
             
             if index + 1 < len(self.playlist):
                 _, _, next_track_to_fade_in, _, _ = self.playlist[index + 1]
             else:
-                next_track_to_fade_in = False
+                next_track_to_fade_in = True
 
             self.originals.append(track)
 
