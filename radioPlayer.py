@@ -224,7 +224,10 @@ def play_playlist(playlist_path):
             procman.wait_all()
             return
         
-        if active_modifier: track_tuple = active_modifier.play(i, track_tuple)
+        if active_modifier: 
+            track_tuple = active_modifier.play(i, track_tuple)
+            modified = True
+        else: modified = False
         track, to_fade_in, to_fade_out, official, args = track_tuple
 
         track_path = os.path.abspath(os.path.expanduser(track))
@@ -242,7 +245,10 @@ def play_playlist(playlist_path):
             if not procman.anything_playing(): continue
 
         logger.info(f"Now playing: {track_name}")
-        if (i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[i+1][0])}")
+        if modified:
+            if (i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[i+1][0])}")
+        else:
+            logger.info(f"Next up: {os.path.basename(playlist[i][0])}")
         
         pr = procman.play(track_path, to_fade_in, to_fade_out)
 
