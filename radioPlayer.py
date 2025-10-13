@@ -31,10 +31,17 @@ class PlaylistAdvisor:
         Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
         """
         return 0
+class ActiveModifier:
+    """
+    This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
+    """
+    def play(self, index:int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track
+    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): pass
 
 simple_modules: list[PlayerModule] = []
 playlist_modifier_modules: list[PlaylistModifierModule] = []
 playlist_advisor: PlaylistAdvisor | None = None
+active_modifier: ActiveModifier | None = None
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 MODULES_DIR = SCRIPT_DIR / "modules"
@@ -66,7 +73,6 @@ logger_level = log95.log95Levels.DEBUG if DEBUG else log95.log95Levels.CRITICAL_
 logger = log95.log95("radioPlayer", logger_level)
 
 exit_pending = False
-reload_pending = False
 intr_time = 0
 
 @dataclass
@@ -133,10 +139,6 @@ def handle_sigint(signum, frame):
         procman.stop_all()
         exit(0)
 
-def handle_sighup(signum, frame):
-    global reload_pending
-    reload_pending = True
-
 signal.signal(signal.SIGINT, handle_sigint)
 signal.signal(signal.SIGHUP, handle_sighup) # type: ignore
 
@@ -190,7 +192,6 @@ def parse_playlistfile(playlist_path: str):
     return global_arguments, out
 
 def play_playlist(playlist_path):
-    procman.stop_all(1)
     if not playlist_advisor: raise Exception("No playlist advisor")
 
     try:
@@ -208,24 +209,25 @@ def play_playlist(playlist_path):
 
     for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist)
     for module in simple_modules: module.on_new_playlist(playlist)
+    if active_modifier: active_modifier.on_new_playlist(playlist)
 
     return_pending = False
 
     cross_fade = int(global_args.get("crossfade", 5))
     
-    for i, (track, to_fade_in, to_fade_out, official, args) in enumerate(playlist):
+    for i, track_tuple in enumerate(playlist):
         if exit_pending:
             logger.info("Quit received, waiting for song end.")
             procman.wait_all()
             exit()
-        elif reload_pending:
-            logger.info("Reload requested, restarting with new arguments after song ending")
-            procman.wait_all()
-            return "reload"
         elif return_pending:
             logger.info("Return reached, next song will reload the playlist.")
             procman.wait_all()
             return
+        
+        if active_modifier: track_tuple = active_modifier.play(i, track_tuple)
+        track, to_fade_in, to_fade_out, official, args = track_tuple
+
         track_path = os.path.abspath(os.path.expanduser(track))
         for module in simple_modules: module.on_new_track(i, track_path, to_fade_in, to_fade_out, official)
         track_name = os.path.basename(track_path)
@@ -275,23 +277,19 @@ def main():
             elif md := getattr(module, "advisor", None):
                 if playlist_advisor: raise Exception("Multiple playlist advisors")
                 playlist_advisor = md
+            elif md := getattr(module, "activemod", None):
+                if active_modifier: raise Exception("Multiple active modifiers")
+                active_modifier = md
     
-    if not playlist_advisor: raise Exception("No advisor")
+    if not playlist_advisor: 
+        logger.critical_error("Playlist advisor was not found")
+        exit(1)
     
     try:
+        arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None
         while True:
-            arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None
-
-            play_loop = True
-            while play_loop:
-                result = play_playlist(playlist_advisor.advise(arg))
-
-                if exit_pending: exit()
-                elif reload_pending:
-                    logger.info("Reload requested, restarting with new arguments...")
-                    result = "reload"
-
-                if result == "reload": play_loop = False
+            play_playlist(playlist_advisor.advise(arg))
+            if exit_pending: exit()
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         procman.stop_all()
