@@ -140,7 +140,6 @@ def handle_sigint(signum, frame):
         exit(0)
 
 signal.signal(signal.SIGINT, handle_sigint)
-signal.signal(signal.SIGHUP, handle_sighup) # type: ignore
 
 def load_filelines(path):
     try:
