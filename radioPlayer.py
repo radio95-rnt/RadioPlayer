@@ -35,7 +35,7 @@ class ActiveModifier:
     """
     This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
     """
-    def play(self, index:int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track, False
+    def play(self, index:int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track
     def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): pass
 
 simple_modules: list[PlayerModule] = []
@@ -227,11 +227,13 @@ def play_playlist(playlist_path):
             procman.wait_all()
             return
         
-        track_tuple = playlist[i]
+        old_track_tuple = playlist[i]
         if active_modifier: 
-            track_tuple, to_max = active_modifier.play(i, track_tuple)
+            track_tuple = active_modifier.play(i, old_track_tuple)
             modified = True
-            if to_max: max_iterator += 1
+            if old_track_tuple != track_tuple: 
+                max_iterator += 1
+                modified = True
         else: modified = False
         track, to_fade_in, to_fade_out, official, args = track_tuple
 
