@@ -3,7 +3,7 @@ class ActiveModifier:
     This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
     """
     """Tuple consists of the track path, to fade out, fade in, official, and args"""
-    def play(self, index: int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track
+    def play(self, index: int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track, False
     def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): pass
 
 import os, log95
@@ -39,9 +39,9 @@ class Module(ActiveModifier):
 
             logger.info(f"Playing {song} instead, as instructed by toplay")
 
-            return song, last_track_to_fade_out, next_track_to_fade_in, True, {}
+            return (song, last_track_to_fade_out, next_track_to_fade_in, True, {}), True
         elif len(self.originals):
-            return self.originals.pop(0)
+            return self.originals.pop(0), False
         return track
 
 activemod = Module()
