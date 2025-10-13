@@ -5,7 +5,11 @@ class ActiveModifier:
     """Tuple consists of the track path, to fade out, fade in, official, and args"""
     def play(self, index: int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track
     def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): pass
-import os
+
+import os, log95
+
+logger = log95.log95("AC-MOD")
+
 class Module(ActiveModifier):
     def __init__(self) -> None:
         self.playlist = None
@@ -32,6 +36,8 @@ class Module(ActiveModifier):
             self.originals.append(track)
 
             with open("/tmp/radioPlayer_toplay", "w") as f: f.write('\n'.join(songs))
+
+            logger.info(f"Playing {song} instead, as instructed by toplay")
 
             return song, last_track_to_fade_out, next_track_to_fade_in, True, {}
         elif len(self.originals):
