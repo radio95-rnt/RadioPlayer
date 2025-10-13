@@ -253,9 +253,9 @@ def play_playlist(playlist_path):
 
         logger.info(f"Now playing: {track_name}")
         if modified:
-            if (i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[i+1][0])}")
-        else:
             logger.info(f"Next up: {os.path.basename(playlist[i][0])}")
+        else:
+            if (i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[i+1][0])}")
         
         pr = procman.play(track_path, to_fade_in, to_fade_out)
 
