@@ -25,7 +25,7 @@ class PlaylistAdvisor:
     """
     Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
     """
-    def advise(self) -> str: return "/path/to/playlist.txt"
+    def advise(self, arguments: str | None) -> str: return "/path/to/playlist.txt"
     def new_playlist(self) -> int:
         """
         Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
@@ -189,7 +189,7 @@ def parse_playlistfile(playlist_path: str):
         out.append(([f for f in glob.glob(line) if os.path.isfile(f)], arguments))
     return global_arguments, out
 
-def play_playlist(playlist_path, custom_playlist: bool=False):
+def play_playlist(playlist_path):
     procman.stop_all(1)
     if not playlist_advisor: raise Exception("No playlist advisor")
 
@@ -230,8 +230,7 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
         for module in simple_modules: module.on_new_track(i, track_path, to_fade_in, to_fade_out, official)
         track_name = os.path.basename(track_path)
 
-        if not custom_playlist: refresh = playlist_advisor.new_playlist()
-        else: refresh = 0
+        refresh = playlist_advisor.new_playlist()
 
         if refresh == 1:
             logger.info("Reloading now...")
@@ -251,26 +250,6 @@ def play_playlist(playlist_path, custom_playlist: bool=False):
 
         if official: print_wait(ttw, 1, pr.duration, f"{track_name}: ")
         else: time.sleep(ttw)
-
-def parse_arguments():
-    """Parse command line arguments and return configuration"""
-    arg = sys.argv[1] if len(sys.argv) > 1 else None
-    selected_list = None
-
-    if arg:
-        if arg.lower() == "-h":
-            print("Arguments:")
-            print("    list:playlist    -    Play custom playlist, bypasses the playlist advisor")
-            print()
-            exit(0)
-
-    if arg:
-        if arg.startswith("list:"):
-            selected_list = arg.removeprefix("list:")
-            logger.info(f"The list {selected_list.split(';')[0]} will be played instead of the daily section lists.")
-        else: logger.error(f"Invalid argument or file not found: {arg}")
-
-    return selected_list
 
 def main():
     global playlist_advisor
@@ -301,17 +280,11 @@ def main():
     
     try:
         while True:
-            selected_list = parse_arguments()
+            arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None
 
             play_loop = True
             while play_loop:
-                if selected_list:
-                    logger.info("Playing custom list")
-                    result = play_playlist(selected_list, True)
-                    if result == "reload": play_loop = False
-                    continue
-                
-                result = play_playlist(playlist_advisor.advise())
+                result = play_playlist(playlist_advisor.advise(arg))
 
                 if exit_pending: exit()
                 elif reload_pending:

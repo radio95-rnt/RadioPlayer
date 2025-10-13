@@ -2,7 +2,7 @@ class PlaylistAdvisor:
     """
     Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
     """
-    def advise(self) -> str: return "/path/to/playlist.txt"
+    def advise(self, arguments: str | None) -> str: return "/path/to/playlist.txt"
     def new_playlist(self) -> int:
         """
         Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
@@ -56,7 +56,13 @@ class Module(PlaylistAdvisor):
     def __init__(self) -> None:
         self.last_mod_time = 0
         self.last_playlist = None
-    def advise(self) -> str:
+        self.custom_playlist = None
+    def advise(self, arguments: str | None) -> str:
+        if self.custom_playlist: return self.custom_playlist
+        if arguments and arguments.startswith("list:"):
+            self.custom_playlist = arguments.removeprefix("list:")
+            logger.info(f"The list {arguments.split(';')[0]} will be played instead of the daily section lists.")
+            return self.custom_playlist
         current_day, current_hour = datetime.datetime.now().strftime('%A').lower(), datetime.datetime.now().hour
 
         morning_playlist = os.path.join(playlist_dir, current_day, 'morning')
@@ -100,6 +106,7 @@ class Module(PlaylistAdvisor):
             self.last_playlist = night_playlist
             return night_playlist
     def new_playlist(self) -> int:
+        if self.custom_playlist: return 0
         if not self.last_playlist: return 1
         time_change = check_if_playlist_modifed(self.last_playlist)
         if time_change:  return 2
