@@ -264,7 +264,7 @@ def play_playlist(playlist_path):
 
         if official: print_wait(ttw, 1, pr.duration, f"{track_name}: ")
         else: time.sleep(ttw)
-        i += 1
+        if modified: i += 1
 
 def main():
     global playlist_advisor, active_modifier
