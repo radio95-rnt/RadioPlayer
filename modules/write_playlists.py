@@ -13,7 +13,7 @@ class Module(PlayerModule):
         if track != self.playlist[index]:
             # discrepancy, which means that the playing file was modified by the active modifier
             # we are playing a file that was not determined in the playlist, that means it was chosen by the active modifier and made up on the fly
-            lines = self.playlist[:index] + [self.playlist[index]] + [f"> {track}"] + self.playlist[index+1:]
+            lines = self.playlist[:index] + [self.playlist[index]] + [f"> ({track})"] + self.playlist[index+1:]
         else: lines = self.playlist[:index] + [f"> {self.playlist[index]}"] + self.playlist[index+1:]
         with open("/tmp/radioPlayer_playlist", "w") as f:
             for line in lines: 
