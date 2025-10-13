@@ -213,8 +213,11 @@ def play_playlist(playlist_path):
     return_pending = False
 
     cross_fade = int(global_args.get("crossfade", 5))
+
+    max_iterator = len(playlist)
+    i = 0
     
-    for i, track_tuple in enumerate(playlist):
+    while i < max_iterator:
         if exit_pending:
             logger.info("Quit received, waiting for song end.")
             procman.wait_all()
@@ -227,6 +230,7 @@ def play_playlist(playlist_path):
         if active_modifier: 
             track_tuple = active_modifier.play(i, track_tuple)
             modified = True
+            max_iterator += 1
         else: modified = False
         track, to_fade_in, to_fade_out, official, args = track_tuple
 
