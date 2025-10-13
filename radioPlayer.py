@@ -115,14 +115,14 @@ class ProcessManager:
             for process in self.processes:
                 process.process.terminate()
                 try: process.process.wait(timeout)
-                except: process.process.kill()
-                self.processes.remove(process)
+                except subprocess.TimeoutExpired: process.process.kill()
+            self.processes.clear()
     def wait_all(self, timeout: float | None = None) -> None:
         with self.lock:
             for process in self.processes:
                 try: process.process.wait(timeout)
-                except: process.process.terminate()
-                self.processes.remove(process)
+                except subprocess.TimeoutExpired: process.process.terminate()
+            self.processes.clear()
 
 procman = ProcessManager()
 
@@ -253,7 +253,7 @@ def play_playlist(playlist_path):
         else: time.sleep(ttw)
 
 def main():
-    global playlist_advisor
+    global playlist_advisor, active_modifier
     for filename in os.listdir(MODULES_DIR):
         if filename.endswith(".py") and filename != "__init__.py":
             module_name = filename[:-3]
