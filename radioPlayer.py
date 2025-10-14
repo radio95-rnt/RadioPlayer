@@ -216,6 +216,7 @@ def play_playlist(playlist_path):
 
     max_iterator = len(playlist)
     i = 0
+    song_i = 0
     
     while i < max_iterator:
         if exit_pending:
@@ -227,14 +228,14 @@ def play_playlist(playlist_path):
             procman.wait_all()
             return
         
-        old_track_tuple = playlist[i]
+        old_track_tuple = playlist[song_i]
         if active_modifier: 
-            track_tuple = active_modifier.play(i, old_track_tuple)
-            modified = True
-            logger.debug(repr(old_track_tuple), repr(track_tuple), repr(old_track_tuple != track_tuple))
+            track_tuple = active_modifier.play(song_i, old_track_tuple)
+            logger.debug(repr(song_i), repr(old_track_tuple), repr(track_tuple), repr(old_track_tuple != track_tuple))
             if old_track_tuple != track_tuple: 
                 max_iterator += 1
                 modified = True
+            else: modified = False
         else: modified = False
         track, to_fade_in, to_fade_out, official, args = track_tuple
 
@@ -254,9 +255,9 @@ def play_playlist(playlist_path):
 
         logger.info(f"Now playing: {track_name}")
         if modified:
-            if (i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[i+1][0])}")
+            logger.info(f"Next up: {os.path.basename(playlist[song_i][0])}")
         else:
-            logger.info(f"Next up: {os.path.basename(playlist[i][0])}")
+            if (song_i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[song_i+1][0])}")
         
         pr = procman.play(track_path, to_fade_in, to_fade_out)
 
@@ -265,7 +266,9 @@ def play_playlist(playlist_path):
 
         if official: print_wait(ttw, 1, pr.duration, f"{track_name}: ")
         else: time.sleep(ttw)
-        if not modified: i += 1
+
+        i += 1
+        if not modified: song_i += 1
 
 def main():
     global playlist_advisor, active_modifier
