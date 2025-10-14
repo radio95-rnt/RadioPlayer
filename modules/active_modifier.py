@@ -48,9 +48,8 @@ class Module(ActiveModifier):
 
             self.last_track = (song, next_track_to_fade_in, last_track_to_fade_out, True, {})
             return self.last_track
-        elif len(self.originals):
-            self.last_track = self.originals.pop(0)
-        self.last_track = track
+        elif len(self.originals): self.last_track = self.originals.pop(0)
+        else: self.last_track = track
         return self.last_track
 
 activemod = Module()
