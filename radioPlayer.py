@@ -240,7 +240,7 @@ def play_playlist(playlist_path):
         track, to_fade_in, to_fade_out, official, args = track_tuple
 
         track_path = os.path.abspath(os.path.expanduser(track))
-        for module in simple_modules: module.on_new_track(i, track_path, to_fade_in, to_fade_out, official)
+        for module in simple_modules: module.on_new_track(song_i, track_path, to_fade_in, to_fade_out, official)
         track_name = os.path.basename(track_path)
 
         refresh = playlist_advisor.new_playlist()
