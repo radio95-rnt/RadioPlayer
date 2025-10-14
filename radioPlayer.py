@@ -231,6 +231,7 @@ def play_playlist(playlist_path):
         if active_modifier: 
             track_tuple = active_modifier.play(i, old_track_tuple)
             modified = True
+            logger.debug(repr(old_track_tuple), repr(track_tuple), repr(old_track_tuple != track_path))
             if old_track_tuple != track_tuple: 
                 max_iterator += 1
                 modified = True
