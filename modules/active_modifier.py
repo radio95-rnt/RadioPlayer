@@ -14,6 +14,7 @@ class Module(ActiveModifier):
     def __init__(self) -> None:
         self.playlist = None
         self.originals = []
+        self.last_track = None
     def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]):
         self.playlist = playlist
     def play(self, index: int, track: tuple[str, bool, bool, bool, dict[str, str]]):
@@ -24,14 +25,20 @@ class Module(ActiveModifier):
         if len(songs):
             song = songs.pop(0)
 
-            if (index - 1) >= 0:
-                _, last_track_to_fade_out, _, _, _ = self.playlist[index - 1]
-            else: last_track_to_fade_out = True
-            
-            if index + 1 < len(self.playlist):
-                _, _, next_track_to_fade_in, _, _ = self.playlist[index + 1]
+            if self.last_track:
+                _, last_track_to_fade_out, _, _, _ = self.last_track
             else:
+                if (index - 1) >= 0:
+                    _, last_track_to_fade_out, _, _, _ = self.playlist[index - 1]
+                else: last_track_to_fade_out = False
+            
+            if len(songs) != 0:
                 next_track_to_fade_in = True
+            else:
+                if index + 1 < len(self.playlist):
+                    _, _, next_track_to_fade_in, _, _ = self.playlist[index + 1]
+                else:
+                    next_track_to_fade_in = True
 
             self.originals.append(track)
 
@@ -39,9 +46,11 @@ class Module(ActiveModifier):
 
             logger.info(f"Playing {song} instead, as instructed by toplay")
 
-            return song, next_track_to_fade_in, last_track_to_fade_out, True, {}
+            self.last_track = (song, next_track_to_fade_in, last_track_to_fade_out, True, {})
+            return self.last_track
         elif len(self.originals):
-            return self.originals.pop(0)
-        return track
+            self.last_track = self.originals.pop(0)
+        self.last_track = track
+        return self.last_track
 
 activemod = Module()
