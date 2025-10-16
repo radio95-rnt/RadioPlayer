@@ -40,7 +40,7 @@ class Module(ActiveModifier):
                 else:
                     next_track_to_fade_in = True
 
-            self.originals.append(track)
+            if not self.originals or self.originals[-1] != track: self.originals.append(track)
 
             with open("/tmp/radioPlayer_toplay", "w") as f: f.write('\n'.join(songs))
 
