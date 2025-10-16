@@ -256,7 +256,7 @@ def play_playlist(playlist_path):
         else:
             if (song_i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[song_i+1][0])}")
 
-        pr = procman.play(track_path, to_fade_in, to_fade_out)
+        pr = procman.play(track_path, to_fade_in, to_fade_out, cross_fade)
 
         ttw = pr.duration
         if to_fade_out: ttw -= cross_fade
