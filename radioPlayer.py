@@ -232,8 +232,10 @@ def play_playlist(playlist_path):
         if active_modifier:
             track_tuple, extend = active_modifier.play(song_i, old_track_tuple)
             logger.debug(repr(song_i), repr(old_track_tuple), repr(track_tuple), repr(old_track_tuple != track_tuple))
-            if extend:
-                max_iterator += 1
+            if extend: max_iterator += 1
+        else:
+            extend = False
+            track_tuple = old_track_tuple
         track, to_fade_in, to_fade_out, official, args = track_tuple
 
         track_path = os.path.abspath(os.path.expanduser(track))
