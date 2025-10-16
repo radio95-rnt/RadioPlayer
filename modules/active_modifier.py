@@ -47,9 +47,9 @@ class Module(ActiveModifier):
             logger.info(f"Playing {song} instead, as instructed by toplay")
 
             self.last_track = (song, next_track_to_fade_in, last_track_to_fade_out, True, {})
-            return self.last_track
+            return self.last_track, True
         elif len(self.originals): self.last_track = self.originals.pop(0)
         else: self.last_track = track
-        return self.last_track
+        return self.last_track, False
 
 activemod = Module()

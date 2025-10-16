@@ -12,7 +12,7 @@ class PlayerModule:
     """
     Simple passive observer, this allows you to send the current track the your RDS encoder, or to your website
     """
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): 
+    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]):
         """Tuple consists of the track path, to fade out, fade in, official, and args"""
         pass
     def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool): pass
@@ -35,7 +35,7 @@ class ActiveModifier:
     """
     This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
     """
-    def play(self, index:int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track
+    def play(self, index:int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track, False
     def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): pass
 
 simple_modules: list[PlayerModule] = []
@@ -51,13 +51,13 @@ def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="",
     interval = 1.0 / frequency
     elapsed = 0.0
     if duration == -1: duration = ttw
-    
+
     def format_time(seconds):
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         secs = int(seconds % 60)
         return f"{hours:02d}:{minutes:02d}:{secs:02d}"
-    
+
     try:
         while elapsed < ttw:
             print(f"{prefix}{format_time(elapsed+bias)} / {format_time(duration)}", end="\r", flush=True)
@@ -66,7 +66,7 @@ def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="",
     except Exception:
         print()
         raise
-    
+
     print(f"{prefix}{format_time(ttw+bias)} / {format_time(duration)}")
 
 logger_level = log95.log95Levels.DEBUG if DEBUG else log95.log95Levels.CRITICAL_ERROR
@@ -217,7 +217,7 @@ def play_playlist(playlist_path):
     max_iterator = len(playlist)
     i = 0
     song_i = 0
-    
+
     while i < max_iterator:
         if exit_pending:
             logger.info("Quit received, waiting for song end.")
@@ -227,16 +227,13 @@ def play_playlist(playlist_path):
             logger.info("Return reached, next song will reload the playlist.")
             procman.wait_all()
             return
-        
+
         old_track_tuple = playlist[song_i]
-        if active_modifier: 
-            track_tuple = active_modifier.play(song_i, old_track_tuple)
+        if active_modifier:
+            track_tuple, extend = active_modifier.play(song_i, old_track_tuple)
             logger.debug(repr(song_i), repr(old_track_tuple), repr(track_tuple), repr(old_track_tuple != track_tuple))
-            if old_track_tuple != track_tuple: 
+            if extend:
                 max_iterator += 1
-                modified = True
-            else: modified = False
-        else: modified = False
         track, to_fade_in, to_fade_out, official, args = track_tuple
 
         track_path = os.path.abspath(os.path.expanduser(track))
@@ -254,11 +251,11 @@ def play_playlist(playlist_path):
             if not procman.anything_playing(): continue
 
         logger.info(f"Now playing: {track_name}")
-        if modified:
+        if extend:
             logger.info(f"Next up: {os.path.basename(playlist[song_i][0])}")
         else:
             if (song_i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[song_i+1][0])}")
-        
+
         pr = procman.play(track_path, to_fade_in, to_fade_out)
 
         ttw = pr.duration
@@ -268,7 +265,7 @@ def play_playlist(playlist_path):
         else: time.sleep(ttw)
 
         i += 1
-        if not modified: song_i += 1
+        if not extend: song_i += 1
 
 def main():
     global playlist_advisor, active_modifier
@@ -276,14 +273,14 @@ def main():
         if filename.endswith(".py") and filename != "__init__.py":
             module_name = filename[:-3]
             module_path = MODULES_DIR / filename
-            
+
             # Load module from file path directly
             spec = importlib.util.spec_from_file_location(module_name, module_path)
             if not spec: continue
             module = importlib.util.module_from_spec(spec)
             if not spec.loader: continue
             spec.loader.exec_module(module)
-            
+
             if md := getattr(module, "module", None):
                 simple_modules.append(md)
             elif md := getattr(module, "playlistmod", None):
@@ -297,11 +294,11 @@ def main():
             elif md := getattr(module, "activemod", None):
                 if active_modifier: raise Exception("Multiple active modifiers")
                 active_modifier = md
-    
-    if not playlist_advisor: 
+
+    if not playlist_advisor:
         logger.critical_error("Playlist advisor was not found")
         exit(1)
-    
+
     try:
         arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None
         while True:
