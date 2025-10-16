@@ -51,6 +51,7 @@ def check_if_playlist_modifed(playlist_path: str):
         if playlist_path != night_playlist_path:
             logger.info("Time changed to night hours, switching playlist...")
             return True
+    return False
 
 class Module(PlaylistAdvisor):
     def __init__(self) -> None:
