@@ -53,7 +53,8 @@ class Module(ActiveModifier):
         elif len(self.originals): self.last_track = self.originals.pop(0)
         else: self.last_track = track
 
-        if last_track_duration := get_audio_duration(self.last_track[0]):
+        last_track_duration = get_audio_duration(self.last_track[0])
+        if last_track_duration and last_track_duration > 5*60:
             now = datetime.datetime.now()
             timestamp = now.timestamp() + last_track_duration
             future = datetime.datetime.fromtimestamp(timestamp)

@@ -9,6 +9,7 @@ dependencies = []
 
 [tool.setuptools]
 py-modules = ["radioPlaylist", "radioPlayer"]
+packages = ["modules"]
 
 [project.scripts]
 radio-playlist = "radioPlaylist:main"
