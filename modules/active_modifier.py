@@ -58,10 +58,13 @@ class Module(ActiveModifier):
             timestamp = now.timestamp() + last_track_duration
             future = datetime.datetime.fromtimestamp(timestamp)
             if now.hour < MORNING_START and future.hour > MORNING_START:
+                logger.warning("Skipping track as it bleeds into the morning")
                 return None, None
             elif now.hour < DAY_END and future.hour > DAY_END:
+                logger.warning("Skipping track as it bleeds into the night")
                 return None, None
             elif future.day > now.day: # late night goes mid day, as it starts at midnight
+                logger.warning("Skipping track as it the next day")
                 return None, None
 
         return self.last_track, False
