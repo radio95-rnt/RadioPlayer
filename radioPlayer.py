@@ -278,6 +278,7 @@ def main():
                     md, index = md
                     if isinstance(md, list): playlist_modifier_modules[index:index] = md
                     else: playlist_modifier_modules.insert(index, md)
+                elif isinstance(md, list): playlist_modifier_modules.extend(md)
                 else: playlist_modifier_modules.append(md)
             if md := getattr(module, "advisor", None):
                 if playlist_advisor: raise Exception("Multiple playlist advisors")

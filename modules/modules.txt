@@ -1,0 +1,45 @@
+Modules in the radio95 radio player are quite simple.
+
+First of all, ther are in total only 4 modules:
+- Observer (PlayerModule), this module is a passive observer, you can use this as a status api or to send the song metadata to your RDS encoder
+- Modifier (PlaylistModifierModule), module which intercepts the playlist before playing and replaced it, this module can shuffle the playlist, insert jingles or intros and outros
+- (!) Advisor (PlaylistAdvisor), this module is very important and is required to run and there can be only one of these in a core session. It is responsible for picking the playlist file itself as in a file path. This can be a scheduler, or just a constant
+- Active modifier (ActiveModifier), this module is optional, but there can still be only one. This module can replace the track while playing, allowing you to skip tracks or play tracks on demand, it can also extend the playlist
+
+```python
+class PlayerModule:
+    """
+    Simple passive observer, this allows you to send the current track the your RDS encoder, or to your website
+    """
+    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]):
+        """Tuple consists of the track path, to fade out, fade in, official, and args"""
+        pass
+    def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool): pass
+class PlaylistModifierModule:
+    """
+    Playlist modifier, this type of module allows you to shuffle, or put jingles into your playlist
+    """
+    def modify(self, global_args: dict, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): return playlist
+class PlaylistAdvisor:
+    """
+    Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
+    """
+    def advise(self, arguments: str | None) -> str: return "/path/to/playlist.txt"
+    def new_playlist(self) -> int:
+        """
+        Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
+        """
+        return 0
+class ActiveModifier:
+    """
+    This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
+    """
+    def play(self, index:int, track: tuple[str, bool, bool, bool, dict[str, str]]) -> tuple[tuple[str, bool, bool, bool, dict[str, str]], bool] | tuple[None, None]: return track, False
+    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): pass
+```
+
+Each module shall have a python script in the modules directory. Each of the modules need to define one or more global variables in order to be seen by the core:
+- module (list['PlayerModule'] or 'PlayerModule'), this shall be just the list or one passive observer class
+- playlistmod ('PlaylistModifierModule', list['PlaylistModifierModule'], tuple['PlaylistModifierModule' | list['PlaylistModifierModule'], int]), module itself, list of modules or the module itself and list of them with an index integer which sets the order of modifiers (0 is first)
+- advisor ('PlaylistAdvisor')
+- activemod ('ActiveModifier')
