@@ -7,36 +7,7 @@ import unidecode
 from dataclasses import dataclass
 import log95
 from pathlib import Path
-
-class PlayerModule:
-    """
-    Simple passive observer, this allows you to send the current track the your RDS encoder, or to your website
-    """
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]):
-        """Tuple consists of the track path, to fade out, fade in, official, and args"""
-        pass
-    def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool): pass
-class PlaylistModifierModule:
-    """
-    Playlist modifier, this type of module allows you to shuffle, or put jingles into your playlist
-    """
-    def modify(self, global_args: dict, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): return playlist
-class PlaylistAdvisor:
-    """
-    Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
-    """
-    def advise(self, arguments: str | None) -> str: return "/path/to/playlist.txt"
-    def new_playlist(self) -> int:
-        """
-        Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
-        """
-        return 0
-class ActiveModifier:
-    """
-    This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
-    """
-    def play(self, index:int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track, False
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): pass
+from modules import *
 
 simple_modules: list[PlayerModule] = []
 playlist_modifier_modules: list[PlaylistModifierModule] = []
@@ -44,7 +15,8 @@ playlist_advisor: PlaylistAdvisor | None = None
 active_modifier: ActiveModifier | None = None
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-MODULES_DIR = SCRIPT_DIR / "modules"
+MODULES_PACKAGE = "modules"
+MODULES_DIR = SCRIPT_DIR / MODULES_PACKAGE
 MODULES_DIR = MODULES_DIR.resolve()
 
 def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="", bias: float = 0):
@@ -228,9 +200,12 @@ def play_playlist(playlist_path):
             procman.wait_all()
             return
 
-        old_track_tuple = playlist[song_i]
+        old_track_tuple = playlist[song_i % len(playlist)]
         if active_modifier:
             track_tuple, extend = active_modifier.play(song_i, old_track_tuple)
+            if track_tuple is None:
+                song_i += 1
+                continue
             logger.debug(repr(song_i), repr(old_track_tuple), repr(track_tuple), repr(old_track_tuple != track_tuple))
             if extend: max_iterator += 1
         else:
@@ -275,25 +250,39 @@ def main():
         if filename.endswith(".py") and filename != "__init__.py":
             module_name = filename[:-3]
             module_path = MODULES_DIR / filename
-
-            # Load module from file path directly
-            spec = importlib.util.spec_from_file_location(module_name, module_path)
+            full_module_name = f"{MODULES_PACKAGE}.{module_name}"
+            
+            spec = importlib.util.spec_from_file_location(full_module_name, module_path)
             if not spec: continue
             module = importlib.util.module_from_spec(spec)
+            
+            sys.modules[full_module_name] = module
+            
+            if MODULES_PACKAGE not in sys.modules:
+                import types
+                parent = types.ModuleType(MODULES_PACKAGE)
+                parent.__path__ = [str(MODULES_DIR)]
+                parent.__package__ = MODULES_PACKAGE
+                sys.modules[MODULES_PACKAGE] = parent
+            
+            module.__package__ = MODULES_PACKAGE
+            
             if not spec.loader: continue
             spec.loader.exec_module(module)
 
             if md := getattr(module, "module", None):
-                simple_modules.append(md)
-            elif md := getattr(module, "playlistmod", None):
+                if isinstance(md, list): simple_modules.extend(md)
+                else: simple_modules.append(md)
+            if md := getattr(module, "playlistmod", None):
                 if isinstance(md, tuple):
                     md, index = md
-                    playlist_modifier_modules.insert(index, md)
+                    if isinstance(md, list): playlist_modifier_modules[index:index] = md
+                    else: playlist_modifier_modules.insert(index, md)
                 else: playlist_modifier_modules.append(md)
-            elif md := getattr(module, "advisor", None):
+            if md := getattr(module, "advisor", None):
                 if playlist_advisor: raise Exception("Multiple playlist advisors")
                 playlist_advisor = md
-            elif md := getattr(module, "activemod", None):
+            if md := getattr(module, "activemod", None):
                 if active_modifier: raise Exception("Multiple active modifiers")
                 active_modifier = md
 
@@ -311,3 +300,4 @@ def main():
         procman.stop_all()
         raise
     finally: procman.stop_all()
+main()

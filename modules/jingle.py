@@ -8,9 +8,7 @@ Reacts to the 'no_jingle' argument, for global usage it does not add jingles to 
 
 import random
 
-class PlaylistModifierModule:
-    def modify(self, global_args: dict, playlist: list[tuple[str, bool, bool, bool, dict]]):
-        return playlist
+from . import PlaylistModifierModule
 
 class Module(PlaylistModifierModule):
     def __init__(self, file: str) -> None:

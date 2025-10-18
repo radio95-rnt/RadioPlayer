@@ -1,8 +1,4 @@
-class PlayerModule:
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict]]):
-        pass
-    def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool):
-        pass
+from . import PlayerModule
 
 class Module(PlayerModule):
     def __init__(self) -> None:

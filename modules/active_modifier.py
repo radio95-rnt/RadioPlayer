@@ -1,12 +1,14 @@
-class ActiveModifier:
-    """
-    This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
-    """
-    """Tuple consists of the track path, to fade out, fade in, official, and args"""
-    def play(self, index: int, track: tuple[str, bool, bool, bool, dict[str, str]]): return track, False
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): pass
-
+from . import ActiveModifier
 import os, log95
+import subprocess
+import datetime
+
+from .advisor import MORNING_START, DAY_END
+
+def get_audio_duration(file_path):
+    result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path], capture_output=True, text=True)
+    if result.returncode == 0: return float(result.stdout.strip())
+    return None
 
 logger = log95.log95("AC-MOD")
 
@@ -50,6 +52,18 @@ class Module(ActiveModifier):
             return self.last_track, True
         elif len(self.originals): self.last_track = self.originals.pop(0)
         else: self.last_track = track
+
+        if last_track_duration := get_audio_duration(self.last_track[0]):
+            now = datetime.datetime.now()
+            timestamp = now.timestamp() + last_track_duration
+            future = datetime.datetime.fromtimestamp(timestamp)
+            if now.hour < MORNING_START and future.hour > MORNING_START:
+                return None, None
+            elif now.hour < DAY_END and future.hour > DAY_END:
+                return None, None
+            elif future.day > now.day: # late night goes mid day, as it starts at midnight
+                return None, None
+
         return self.last_track, False
 
 activemod = Module()

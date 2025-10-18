@@ -1,14 +1,4 @@
-class PlaylistAdvisor:
-    """
-    Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
-    """
-    def advise(self, arguments: str | None) -> str: return "/path/to/playlist.txt"
-    def new_playlist(self) -> int:
-        """
-        Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
-        """
-        return 0
-
+from . import PlaylistAdvisor
 import os, datetime, log95
 
 logger = log95.log95("ADVISOR")
