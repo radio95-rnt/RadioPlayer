@@ -11,6 +11,13 @@ class PlayerModule:
         Called on every track including the ones added by the active modifier, you can check for that comparing the playlists[index] and the track
         """
         pass
+    def imc(self, imc: 'InterModuleCommunication'):
+        """
+        Receive an IMC object
+        """
+        pass
+    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object) -> object:
+        pass
 class PlaylistModifierModule:
     """
     Playlist modifier, this type of module allows you to shuffle, or put jingles into your playlist
@@ -20,6 +27,7 @@ class PlaylistModifierModule:
         global_args are playlist global args (see radioPlayer_playlist_file.txt)
         """
         return playlist
+    # No IMC, as we only run on new playlists
 class PlaylistAdvisor:
     """
     Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
@@ -34,6 +42,13 @@ class PlaylistAdvisor:
         Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
         """
         return 0
+    def imc(self, imc: 'InterModuleCommunication'):
+        """
+        Receive an IMC object
+        """
+        pass
+    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object) -> object:
+        pass
 class ActiveModifier:
     """
     This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
@@ -54,3 +69,30 @@ class ActiveModifier:
         Same behaviour as the basic module function
         """
         pass
+    def imc(self, imc: 'InterModuleCommunication'):
+        """
+        Receive an IMC object
+        """
+        pass
+    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object) -> object:
+        pass
+class InterModuleCommunication:
+    def __init__(self, advisor: PlaylistAdvisor, active_modifier: ActiveModifier | None, simple_modules: list[PlayerModule]) -> None:
+        self.advisor = advisor
+        self.active_modifier = active_modifier
+        self.simple_modules = simple_modules
+        self.names_modules: dict[str, PlaylistAdvisor | ActiveModifier | PlayerModule] = {}
+    def broadcast(self, source: PlaylistAdvisor | ActiveModifier | PlayerModule, data: object) -> None:
+        """
+        Send data to all modules
+        """
+        self.advisor.imc_data(source, data)
+        if self.active_modifier: self.active_modifier.imc_data(source, data)
+        for module in self.simple_modules: module.imc_data(source, data)
+    def register(self, module: PlaylistAdvisor | ActiveModifier | PlayerModule, name: str):
+        if name in self.names_modules.keys(): return False
+        self.names_modules[name] = module
+        return True
+    def send(self, source: PlaylistAdvisor | ActiveModifier | PlayerModule, name: str, data: object) -> object:
+        if not name in self.names_modules.keys(): raise Exception
+        return self.names_modules[name].imc_data(source, data)

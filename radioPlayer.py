@@ -290,6 +290,12 @@ def main():
     if not playlist_advisor:
         logger.critical_error("Playlist advisor was not found")
         exit(1)
+    
+    imc = InterModuleCommunication(playlist_advisor, active_modifier, simple_modules)
+
+    playlist_advisor.imc(imc)
+    if active_modifier: active_modifier.imc(imc)
+    for module in simple_modules: module.imc(imc)
 
     try:
         arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None

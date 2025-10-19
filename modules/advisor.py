@@ -1,3 +1,4 @@
+from modules import ActiveModifier, InterModuleCommunication, PlayerModule
 from . import PlaylistAdvisor
 import os, datetime, log95
 
@@ -48,6 +49,7 @@ class Module(PlaylistAdvisor):
         self.last_mod_time = 0
         self.last_playlist = None
         self.custom_playlist = None
+        self.class_imc = None
     def advise(self, arguments: str | None) -> str:
         if self.custom_playlist: return self.custom_playlist
         if arguments and arguments.startswith("list:"):
@@ -106,5 +108,10 @@ class Module(PlaylistAdvisor):
             logger.info("Playlist changed on disc, reloading...")
             return 1
         return 0
+    def imc(self, imc: InterModuleCommunication):
+        self.class_imc = imc
+        imc.register(self, "advisor")
+    def imc_data(self, source: PlayerModule | ActiveModifier | PlaylistAdvisor, data: object):
+        return self.custom_playlist
 
 advisor = Module()

@@ -1,3 +1,4 @@
+from modules import InterModuleCommunication
 from . import ActiveModifier
 import os, log95
 import subprocess
@@ -18,10 +19,12 @@ class Module(ActiveModifier):
         self.originals = []
         self.last_track = None
         self.limit_tracks = True
-    def arguments(self, arguments: str | None):
-        if arguments and arguments.startswith("list:"): self.limit_tracks = False
+        self.imc_class = None
     def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]):
         self.playlist = playlist
+
+        if not self.imc_class: return
+        self.limit_tracks = bool(self.imc_class.send(self, "advisor", None))
     def play(self, index: int, track: tuple[str, bool, bool, bool, dict[str, str]]):
         if not self.playlist: return track
         if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
@@ -73,5 +76,8 @@ class Module(ActiveModifier):
                     return None, None
 
         return self.last_track, False
+    
+    def imc(self, imc: InterModuleCommunication):
+        self.imc_class = imc
 
 activemod = Module()
