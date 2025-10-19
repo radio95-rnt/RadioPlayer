@@ -206,7 +206,6 @@ def play_playlist(playlist_path):
             if track_tuple is None:
                 song_i += 1
                 continue
-            logger.debug(repr(song_i), repr(old_track_tuple), repr(track_tuple), repr(old_track_tuple != track_tuple))
             if extend: max_iterator += 1
         else:
             extend = False
@@ -294,6 +293,7 @@ def main():
 
     try:
         arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None
+        if active_modifier: active_modifier.arguments(arg)
         while True:
             play_playlist(playlist_advisor.advise(arg))
             if exit_pending: exit()

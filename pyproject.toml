@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "radio-tools"
 version = "0.1"
-dependencies = []
+dependencies = ["log95", "unidecode", "libcache"]
 
 [tool.setuptools]
 py-modules = ["radioPlaylist", "radioPlayer"]

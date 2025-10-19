@@ -17,6 +17,9 @@ class Module(ActiveModifier):
         self.playlist = None
         self.originals = []
         self.last_track = None
+        self.limit_tracks = True
+    def arguments(self, arguments: str | None):
+        if arguments and arguments.startswith("list:"): self.limit_tracks = False
     def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]):
         self.playlist = playlist
     def play(self, index: int, track: tuple[str, bool, bool, bool, dict[str, str]]):
@@ -53,20 +56,21 @@ class Module(ActiveModifier):
         elif len(self.originals): self.last_track = self.originals.pop(0)
         else: self.last_track = track
 
-        last_track_duration = get_audio_duration(self.last_track[0])
-        if last_track_duration and last_track_duration > 5*60:
-            now = datetime.datetime.now()
-            timestamp = now.timestamp() + last_track_duration
-            future = datetime.datetime.fromtimestamp(timestamp)
-            if now.hour < MORNING_START and future.hour > MORNING_START:
-                logger.warning("Skipping track as it bleeds into the morning")
-                return None, None
-            elif now.hour < DAY_END and future.hour > DAY_END:
-                logger.warning("Skipping track as it bleeds into the night")
-                return None, None
-            elif future.day > now.day: # late night goes mid day, as it starts at midnight
-                logger.warning("Skipping track as it the next day")
-                return None, None
+        if self.limit_tracks:
+            last_track_duration = get_audio_duration(self.last_track[0])
+            if last_track_duration and last_track_duration > 5*60:
+                now = datetime.datetime.now()
+                timestamp = now.timestamp() + last_track_duration
+                future = datetime.datetime.fromtimestamp(timestamp)
+                if now.hour < MORNING_START and future.hour > MORNING_START:
+                    logger.warning("Skipping track as it bleeds into the morning")
+                    return None, None
+                elif now.hour < DAY_END and future.hour > DAY_END:
+                    logger.warning("Skipping track as it bleeds into the night")
+                    return None, None
+                elif future.day > now.day: # late night goes mid day, as it starts at midnight
+                    logger.warning("Skipping track as it the next day")
+                    return None, None
 
         return self.last_track, False
 
