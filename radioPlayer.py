@@ -302,4 +302,3 @@ def main():
         procman.stop_all()
         raise
     finally: procman.stop_all()
-main()
