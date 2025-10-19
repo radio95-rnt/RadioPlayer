@@ -214,7 +214,6 @@ def play_playlist(playlist_path):
         track, to_fade_in, to_fade_out, official, args = track_tuple
 
         track_path = os.path.abspath(os.path.expanduser(track))
-        for module in simple_modules: module.on_new_track(song_i, track_path, to_fade_in, to_fade_out, official)
         track_name = os.path.basename(track_path)
 
         refresh = playlist_advisor.new_playlist()
@@ -226,6 +225,8 @@ def play_playlist(playlist_path):
         elif refresh == 2:
             return_pending = True
             if not procman.anything_playing(): continue
+
+        for module in simple_modules: module.on_new_track(song_i, track_path, to_fade_in, to_fade_out, official)
 
         logger.info(f"Now playing: {track_name}")
         if extend:
@@ -251,22 +252,22 @@ def main():
             module_name = filename[:-3]
             module_path = MODULES_DIR / filename
             full_module_name = f"{MODULES_PACKAGE}.{module_name}"
-            
+
             spec = importlib.util.spec_from_file_location(full_module_name, module_path)
             if not spec: continue
             module = importlib.util.module_from_spec(spec)
-            
+
             sys.modules[full_module_name] = module
-            
+
             if MODULES_PACKAGE not in sys.modules:
                 import types
                 parent = types.ModuleType(MODULES_PACKAGE)
                 parent.__path__ = [str(MODULES_DIR)]
                 parent.__package__ = MODULES_PACKAGE
                 sys.modules[MODULES_PACKAGE] = parent
-            
+
             module.__package__ = MODULES_PACKAGE
-            
+
             if not spec.loader: continue
             spec.loader.exec_module(module)
 
