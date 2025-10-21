@@ -50,7 +50,9 @@ class Module(ActiveModifier):
 
             if not self.originals or self.originals[-1] != track: self.originals.append(track)
 
-            with open("/tmp/radioPlayer_toplay", "w") as f: f.write('\n'.join(songs))
+            with open("/tmp/radioPlayer_toplay", "w") as f: 
+                f.write('\n'.join(songs))
+                f.write("\n") # extra
 
             logger.info(f"Playing {song} instead, as instructed by toplay")
 
