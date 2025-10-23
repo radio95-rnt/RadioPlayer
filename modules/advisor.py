@@ -98,16 +98,15 @@ class Module(PlaylistAdvisor):
             self.last_mod_time = Time.get_playlist_modification_time(night_playlist)
             self.last_playlist = night_playlist
             return night_playlist
-    def new_playlist(self) -> int:
-        if self.custom_playlist: return 0
-        if not self.last_playlist: return 1
-        time_change = check_if_playlist_modifed(self.last_playlist)
-        if time_change:  return 2
+    def new_playlist(self) -> bool:
+        if self.custom_playlist: return False
+        if not self.last_playlist: return True
+        if check_if_playlist_modifed(self.last_playlist): return True
         mod_time = Time.get_playlist_modification_time(self.last_playlist)
         if mod_time > self.last_mod_time:
             logger.info("Playlist changed on disc, reloading...")
-            return 1
-        return 0
+            return True
+        return False
     def imc(self, imc: InterModuleCommunication):
         self.class_imc = imc
         imc.register(self, "advisor")

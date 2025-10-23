@@ -37,11 +37,11 @@ class PlaylistAdvisor:
         Arguments are the arguments passed to the program on startup
         """
         return "/path/to/playlist.txt"
-    def new_playlist(self) -> int:
+    def new_playlist(self) -> bool:
         """
-        Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
+        Whether to play a new playlist, if this is True, then the player will refresh and fetch a new playlist, calling advise
         """
-        return 0
+        return False
     def imc(self, imc: 'InterModuleCommunication'):
         """
         Receive an IMC object

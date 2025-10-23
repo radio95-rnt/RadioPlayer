@@ -217,13 +217,10 @@ def play_playlist(playlist_path):
 
         refresh = playlist_advisor.new_playlist()
 
-        if refresh == 1:
+        if refresh == True:
             logger.info("Reloading now...")
             return_pending = True
             continue
-        elif refresh == 2:
-            return_pending = True
-            if not procman.anything_playing(): continue
 
         for module in simple_modules: module.on_new_track(song_i, track_path, to_fade_in, to_fade_out, official)
 
