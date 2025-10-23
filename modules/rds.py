@@ -47,7 +47,7 @@ def update_rds(track_name: str):
         title = name
         if not has_name: logger.warning(f"File does not have a alias in the name table ({track_name})")
     
-    title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
+#    title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
     
     prt = rds_base.format(artist, title)
     rtp = [4] # type 1
