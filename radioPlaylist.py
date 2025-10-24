@@ -15,7 +15,7 @@ from dataclasses import dataclass
 # Configuration
 FILES_DIR = "/home/user/mixes/"
 PLAYLISTS_DIR = "/home/user/playlists/"
-FORMATS = ('.mp3', '.m4a', '.flac', '.wav')
+FORMATS = ('.mp3', '.m4a', '.flac', '.wav', '.opus')
 POLISH_INDICATORS = ("Polskie", "Dzem")
 
 @dataclass
