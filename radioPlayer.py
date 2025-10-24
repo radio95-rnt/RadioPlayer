@@ -199,6 +199,11 @@ def play_playlist(playlist_path):
             logger.info("Return reached, next song will reload the playlist.")
             procman.wait_all()
             return
+        
+        if playlist_advisor.new_playlist():
+            logger.info("Reloading now...")
+            return_pending = True
+            continue
 
         old_track_tuple = playlist[song_i % len(playlist)]
         if active_modifier:
@@ -214,13 +219,6 @@ def play_playlist(playlist_path):
 
         track_path = os.path.abspath(os.path.expanduser(track))
         track_name = os.path.basename(track_path)
-
-        refresh = playlist_advisor.new_playlist()
-
-        if refresh == True:
-            logger.info("Reloading now...")
-            return_pending = True
-            continue
 
         for module in simple_modules: module.on_new_track(song_i, track_path, to_fade_in, to_fade_out, official)
 
