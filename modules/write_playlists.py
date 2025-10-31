@@ -1,17 +1,17 @@
-from . import PlayerModule, log95
+from . import PlayerModule, log95, Track
 
 logger = log95.log95("PlayView")
 
 class Module(PlayerModule):
     def __init__(self) -> None:
         self.playlist = []
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict]]):
-        self.playlist = [t[0] for t in playlist]
-    def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool):
-        if track != self.playlist[index]:
+    def on_new_playlist(self, playlist: list[Track]):
+        self.playlist = [t.path for t in playlist]
+    def on_new_track(self, index: int, track: Track):
+        if track.path != self.playlist[index]:
             # discrepancy, which means that the playing file was modified by the active modifier
             # we are playing a file that was not determined in the playlist, that means it was chosen by the active modifier and made up on the fly
-            lines = self.playlist[:index] + [f"> ({track})"] + [self.playlist[index]] + self.playlist[index+1:]
+            lines = self.playlist[:index] + [f"> ({track.path})"] + [self.playlist[index]] + self.playlist[index+1:]
             logger.info("Next up:", self.playlist[index])
         else: 
             lines = self.playlist[:index] + [f"> {self.playlist[index]}"] + self.playlist[index+1:]

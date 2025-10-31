@@ -7,62 +7,111 @@ First of all, ther are in total only 4 modules:
 - Active modifier (ActiveModifier), this module is optional, but there can still be only one. This module can replace the track while playing, allowing you to skip tracks or play tracks on demand, it can also extend the playlist
 
 ```python
+@dataclass
+class Track:
+    path: str
+    fade_out: bool
+    fade_in: bool
+    official: bool
+    args: dict[str, str] | None
+
 class PlayerModule:
     """
     Simple passive observer, this allows you to send the current track the your RDS encoder, or to your website
     """
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]):
-        """Tuple consists of the track path, to fade out, fade in, official, and args
-        This is called every new playlist"""
+    def on_new_playlist(self, playlist: list[Track]):
+        """This is called every new playlist"""
         pass
-    def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool): 
+    def on_new_track(self, index: int, track: Track):
         """
         Called on every track including the ones added by the active modifier, you can check for that comparing the playlists[index] and the track
         """
+        pass
+    def imc(self, imc: 'InterModuleCommunication'):
+        """
+        Receive an IMC object
+        """
+        pass
+    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object) -> object:
         pass
 class PlaylistModifierModule:
     """
     Playlist modifier, this type of module allows you to shuffle, or put jingles into your playlist
     """
-    def modify(self, global_args: dict, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): 
+    def modify(self, global_args: dict, playlist: list[Track]):
         """
         global_args are playlist global args (see radioPlayer_playlist_file.txt)
         """
         return playlist
+    # No IMC, as we only run on new playlists
 class PlaylistAdvisor:
     """
     Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
     """
-    def advise(self, arguments: str | None) -> str: 
+    def advise(self, arguments: str | None) -> str:
         """
         Arguments are the arguments passed to the program on startup
         """
         return "/path/to/playlist.txt"
-    def new_playlist(self) -> int:
+    def new_playlist(self) -> bool:
         """
-        Whether to play a new playlist, if this is 1, then the player will refresh, if this is two then the player will refresh quietly
+        Whether to play a new playlist, if this is True, then the player will refresh and fetch a new playlist, calling advise
         """
-        return 0
+        return False
+    def imc(self, imc: 'InterModuleCommunication'):
+        """
+        Receive an IMC object
+        """
+        pass
+    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object) -> object:
+        pass
 class ActiveModifier:
     """
     This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
     """
-    def arguments(self, arguments: str | None): 
+    def arguments(self, arguments: str | None):
         """
         Called at start up with the program arguments
         """
         pass
-    def play(self, index:int, track: tuple[str, bool, bool, bool, dict[str, str]]) -> tuple[tuple[str, bool, bool, bool, dict[str, str]], bool] | tuple[None, None]: 
+    def play(self, index:int, track: Track) -> tuple[Track, bool] | tuple[None, None]:
         """
         Returns a tuple, in the first case where a is the track and b is a bool, b corresponds to whether to extend the playlist, set to true when adding content instead of replacing it
         When None, None is returned then that is treated as a skip, meaning the core will skip this song
         """
         return track, False
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]): 
+    def on_new_playlist(self, playlist: list[Track]):
         """
         Same behaviour as the basic module function
         """
         pass
+    def imc(self, imc: 'InterModuleCommunication'):
+        """
+        Receive an IMC object
+        """
+        pass
+    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object) -> object:
+        pass
+class InterModuleCommunication:
+    def __init__(self, advisor: PlaylistAdvisor, active_modifier: ActiveModifier | None, simple_modules: list[PlayerModule]) -> None:
+        self.advisor = advisor
+        self.active_modifier = active_modifier
+        self.simple_modules = simple_modules
+        self.names_modules: dict[str, PlaylistAdvisor | ActiveModifier | PlayerModule] = {}
+    def broadcast(self, source: PlaylistAdvisor | ActiveModifier | PlayerModule, data: object) -> None:
+        """
+        Send data to all modules
+        """
+        self.advisor.imc_data(source, data)
+        if self.active_modifier: self.active_modifier.imc_data(source, data)
+        for module in self.simple_modules: module.imc_data(source, data)
+    def register(self, module: PlaylistAdvisor | ActiveModifier | PlayerModule, name: str):
+        if name in self.names_modules.keys(): return False
+        self.names_modules[name] = module
+        return True
+    def send(self, source: PlaylistAdvisor | ActiveModifier | PlayerModule, name: str, data: object) -> object:
+        if not name in self.names_modules.keys(): raise Exception
+        return self.names_modules[name].imc_data(source, data)
 ```
 
 Each module shall have a python script in the modules directory. Each of the modules need to define one or more global variables in order to be seen by the core:

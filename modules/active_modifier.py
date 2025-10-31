@@ -1,5 +1,5 @@
 from modules import InterModuleCommunication
-from . import ActiveModifier, log95
+from . import ActiveModifier, log95, Track
 import os
 import subprocess
 import datetime
@@ -20,31 +20,30 @@ class Module(ActiveModifier):
         self.last_track = None
         self.limit_tracks = True
         self.imc_class = None
-    def on_new_playlist(self, playlist: list[tuple[str, bool, bool, bool, dict[str, str]]]):
+    def on_new_playlist(self, playlist: list[Track]):
         self.playlist = playlist
 
         if not self.imc_class: return
         self.limit_tracks = bool(self.imc_class.send(self, "advisor", None))
-    def play(self, index: int, track: tuple[str, bool, bool, bool, dict[str, str]]):
+    def play(self, index: int, track: Track):
         if not self.playlist: return track
         if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
-        with open("/tmp/radioPlayer_toplay", "r") as f:
-            songs = [s.strip() for s in f.readlines() if s.strip()]
+        with open("/tmp/radioPlayer_toplay", "r") as f: songs = [s.strip() for s in f.readlines() if s.strip()]
         if len(songs):
             song = songs.pop(0)
 
             if self.last_track:
-                _, last_track_to_fade_out, _, _, _ = self.last_track
+                last_track_to_fade_out = self.last_track.fade_out
             else:
                 if (index - 1) >= 0:
-                    _, last_track_to_fade_out, _, _, _ = self.playlist[index - 1]
+                    last_track_to_fade_out = self.playlist[index - 1].fade_out
                 else: last_track_to_fade_out = False
             
             if len(songs) != 0:
                 next_track_to_fade_in = True
             else:
                 if index + 1 < len(self.playlist):
-                    _, _, next_track_to_fade_in, _, _ = self.playlist[index + 1]
+                    next_track_to_fade_in = self.playlist[index + 1].fade_in
                 else:
                     next_track_to_fade_in = True
 
@@ -56,13 +55,13 @@ class Module(ActiveModifier):
 
             logger.info(f"Playing {song} instead, as instructed by toplay")
 
-            self.last_track = (song, next_track_to_fade_in, last_track_to_fade_out, True, {})
+            self.last_track = Track(song, next_track_to_fade_in, last_track_to_fade_out, True, {})
             return self.last_track, True
         elif len(self.originals): self.last_track = self.originals.pop(0)
         else: self.last_track = track
 
         if self.limit_tracks:
-            last_track_duration = get_audio_duration(self.last_track[0])
+            last_track_duration = get_audio_duration(self.last_track.path)
             if last_track_duration and last_track_duration > 5*60:
                 now = datetime.datetime.now()
                 timestamp = now.timestamp() + last_track_duration

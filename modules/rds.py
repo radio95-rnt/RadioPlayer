@@ -1,4 +1,4 @@
-from . import PlayerModule, log95
+from . import PlayerModule, log95, Track
 import socket, re, os
 
 DEBUG = False
@@ -72,9 +72,9 @@ def update_rds(track_name: str):
     return prt, ','.join(list(map(str, rtp)))
 
 class Module(PlayerModule):
-    def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool):
-        if official:
-            rds_rt, rds_rtp = update_rds(os.path.basename(track))
+    def on_new_track(self, index: int, track: Track):
+        if track.official:
+            rds_rt, rds_rtp = update_rds(os.path.basename(track.path))
             logger.info(f"RT set to '{rds_rt}'")
             logger.debug(f"{rds_rtp=}")
 
