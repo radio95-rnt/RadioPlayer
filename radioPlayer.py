@@ -5,7 +5,7 @@ import os, subprocess, importlib.util, types
 import sys, signal, threading, glob
 import unidecode
 from dataclasses import dataclass
-import log95
+import log95, libcache
 from pathlib import Path
 from modules import *
 
@@ -56,9 +56,16 @@ class ProcessManager:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.processes: list[Process] = []
+        self.duration_cache = libcache.Cache()
     def _get_audio_duration(self, file_path):
+        if result := self.duration_cache.getElement(file_path, False):
+            return result
+        
         result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path], capture_output=True, text=True)
-        if result.returncode == 0: return float(result.stdout.strip())
+        if result.returncode == 0: 
+            result = float(result.stdout.strip())
+            self.duration_cache.saveElement(file_path, result, (60*60))
+            return result
         return None
     def play(self, track_path: str, fade_in: bool=False, fade_out: bool=False, fade_time: int = 5) -> Process:
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
