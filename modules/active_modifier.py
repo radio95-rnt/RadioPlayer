@@ -1,6 +1,6 @@
 from modules import InterModuleCommunication
-from . import ActiveModifier
-import os, log95
+from . import ActiveModifier, log95
+import os
 import subprocess
 import datetime
 

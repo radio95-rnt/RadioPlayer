@@ -1,13 +1,13 @@
 from modules import ActiveModifier, InterModuleCommunication, PlayerModule
-from . import PlaylistAdvisor
-import os, datetime, log95
+from . import PlaylistAdvisor, log95
+import os, datetime
 
 logger = log95.log95("ADVISOR")
 
 MORNING_START = 5
-MORNING_END = 11
-DAY_START = 11
-DAY_END = 19
+MORNING_END = 10
+DAY_START = 10
+DAY_END = 18
 LATE_NIGHT_START = 0
 LATE_NIGHT_END = 5
 

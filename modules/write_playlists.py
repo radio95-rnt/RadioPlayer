@@ -1,4 +1,6 @@
-from . import PlayerModule
+from . import PlayerModule, log95
+
+logger = log95.log95("PlayView")
 
 class Module(PlayerModule):
     def __init__(self) -> None:
@@ -10,7 +12,10 @@ class Module(PlayerModule):
             # discrepancy, which means that the playing file was modified by the active modifier
             # we are playing a file that was not determined in the playlist, that means it was chosen by the active modifier and made up on the fly
             lines = self.playlist[:index] + [f"> ({track})"] + [self.playlist[index]] + self.playlist[index+1:]
-        else: lines = self.playlist[:index] + [f"> {self.playlist[index]}"] + self.playlist[index+1:]
+            logger.info("Next up:", self.playlist[index])
+        else: 
+            lines = self.playlist[:index] + [f"> {self.playlist[index]}"] + self.playlist[index+1:]
+            if index + 1 < len(self.playlist): logger.info("Next up:", self.playlist[index+1])
         with open("/tmp/radioPlayer_playlist", "w") as f:
             for line in lines: 
                 try: f.write(line + "\n")

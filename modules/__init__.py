@@ -1,3 +1,5 @@
+import log95
+
 class PlayerModule:
     """
     Simple passive observer, this allows you to send the current track the your RDS encoder, or to your website

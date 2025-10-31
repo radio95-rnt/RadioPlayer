@@ -1,5 +1,7 @@
-from . import PlayerModule
-import socket, re, log95, os
+from . import PlayerModule, log95
+import socket, re, os
+
+DEBUG = False
 
 name_table_path = "/home/user/mixes/name_table.txt"
 
@@ -9,7 +11,8 @@ rds_default_name = "Program Godzinny"
 
 udp_host = ("127.0.0.1", 5000)
 
-logger = log95.log95("RDS-MODULE")
+logger_level = log95.log95Levels.DEBUG if DEBUG else log95.log95Levels.CRITICAL_ERROR
+logger = log95.log95("RDS-MODULE", logger_level)
 
 def load_dict_from_custom_format(file_path: str) -> dict[str, str]:
     try:
@@ -60,7 +63,9 @@ def update_rds(track_name: str):
     try:        
         f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         f.settimeout(1.0)
-        f.sendto(f"TEXT={prt}\r\nRTP={rtp}\r\n".encode(), udp_host)
+        data = f"TEXT={prt}\r\nRTP={rtp}\r\n".encode()
+        f.sendto(data, udp_host)
+        logger.debug("Sending", str(data))
         f.close()
     except Exception as e: logger.error(f"Error updating RDS: {e}")
 
@@ -70,6 +75,7 @@ class Module(PlayerModule):
     def on_new_track(self, index: int, track: str, to_fade_in: bool, to_fade_out: bool, official: bool):
         if official:
             rds_rt, rds_rtp = update_rds(os.path.basename(track))
-            logger.info(f"RT set to '{rds_rt}' (RTP: {rds_rtp})")
+            logger.info(f"RT set to '{rds_rt}'")
+            logger.debug(f"{rds_rtp=}")
 
 module = Module()

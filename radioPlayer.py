@@ -223,10 +223,6 @@ def play_playlist(playlist_path):
         for module in simple_modules: module.on_new_track(song_i, track_path, to_fade_in, to_fade_out, official)
 
         logger.info(f"Now playing: {track_name}")
-        if extend:
-            logger.info(f"Next up: {os.path.basename(playlist[song_i][0])}")
-        else:
-            if (song_i + 1) < len(playlist): logger.info(f"Next up: {os.path.basename(playlist[song_i+1][0])}")
 
         pr = procman.play(track_path, to_fade_in, to_fade_out, cross_fade)
 
@@ -296,7 +292,9 @@ def main():
         arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None
         if active_modifier: active_modifier.arguments(arg)
         while True:
-            play_playlist(playlist_advisor.advise(arg))
+            playlist = playlist_advisor.advise(arg)
+            logger.info(f"Advisor picked '{playlist}' to play")
+            play_playlist(playlist)
             if exit_pending: exit()
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
