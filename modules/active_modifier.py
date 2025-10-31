@@ -1,8 +1,6 @@
 from modules import InterModuleCommunication
 from . import ActiveModifier, log95, Track
-import os
-import subprocess
-import datetime
+import os, subprocess, glob, datetime
 
 from .advisor import MORNING_START, DAY_END
 
@@ -29,6 +27,9 @@ class Module(ActiveModifier):
         if not self.playlist: return track
         if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
         with open("/tmp/radioPlayer_toplay", "r") as f: songs = [s.strip() for s in f.readlines() if s.strip()]
+
+        songs[:] = [f for s in songs for f in glob.glob(s) if os.path.isfile(f)] # expand glob
+
         if len(songs):
             song = songs.pop(0)
 

@@ -3,9 +3,7 @@ DEBUG = False
 import time
 import os, subprocess, importlib.util, types
 import sys, signal, threading, glob
-import unidecode
-from dataclasses import dataclass
-import log95, libcache
+import libcache
 from pathlib import Path
 from modules import *
 
@@ -115,13 +113,13 @@ def handle_sigint(signum, frame):
         else:
             logger.warning("Force-Quit pending")
             procman.stop_all()
-            exit(0)
+            raise SystemExit
 
 signal.signal(signal.SIGINT, handle_sigint)
 
 def load_filelines(path):
     try:
-        with open(path, 'r') as f: return [unidecode.unidecode(line.strip()) for line in f.readlines() if unidecode.unidecode(line.strip())]
+        with open(path, 'r') as f: return [line.strip() for line in f.readlines() if line.strip()]
     except FileNotFoundError:
         logger.error(f"Playlist not found: {path}")
         return []
@@ -259,7 +257,10 @@ def main():
             module.__package__ = MODULES_PACKAGE
 
             if not spec.loader: continue
-            spec.loader.exec_module(module)
+            try: spec.loader.exec_module(module)
+            except Exception as e:
+                logger.error(f"Failed loading {module_name} due to {e}")
+                continue
 
             if md := getattr(module, "module", None):
                 if isinstance(md, list): simple_modules.extend(md)
