@@ -44,6 +44,7 @@ logger = log95.log95("radioPlayer", logger_level)
 
 exit_pending = False
 intr_time = 0
+exit_lock = threading.Lock()
 
 @dataclass
 class Process:
@@ -105,15 +106,16 @@ procman = ProcessManager()
 
 def handle_sigint(signum, frame):
     global exit_pending, intr_time
-    logger.info("Received SIGINT")
-    if (time.time() - intr_time) > 5:
-        intr_time = time.time()
-        logger.info("Will quit on song end.")
-        exit_pending = True
-    else:
-        logger.warning("Force-Quit pending")
-        procman.stop_all()
-        exit(0)
+    with exit_lock:
+        logger.info("Received SIGINT")
+        if (time.time() - intr_time) > 5:
+            intr_time = time.time()
+            logger.info("Will quit on song end.")
+            exit_pending = True
+        else:
+            logger.warning("Force-Quit pending")
+            procman.stop_all()
+            exit(0)
 
 signal.signal(signal.SIGINT, handle_sigint)
 
