@@ -16,7 +16,7 @@ MODULES_PACKAGE = "modules"
 MODULES_DIR = (Path(__file__).resolve().parent / MODULES_PACKAGE).resolve()
 
 logger_level = log95.log95Levels.DEBUG if DEBUG else log95.log95Levels.CRITICAL_ERROR
-logger = log95.log95("radioPlayer", logger_level)
+logger = log95.log95("CORE", logger_level)
 
 exit_pending = False
 intr_time = 0
