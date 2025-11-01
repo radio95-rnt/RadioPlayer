@@ -35,8 +35,7 @@ class ProcessManager:
         self.processes: list[Process] = []
         self.duration_cache = libcache.Cache()
     def _get_audio_duration(self, file_path):
-        if result := self.duration_cache.getElement(file_path, False):
-            return result
+        if result := self.duration_cache.getElement(file_path, False): return result
         
         result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path], capture_output=True, text=True)
         if result.returncode == 0: 
@@ -44,20 +43,22 @@ class ProcessManager:
             self.duration_cache.saveElement(file_path, result, (60*60))
             return result
         return None
-    def play(self, track_path: str, fade_in: bool=False, fade_out: bool=False, fade_time: int = 5) -> Process:
+    def play(self, track_path: str, fade_in: bool=False, fade_out: bool=False, fade_time: int=5, offset: float=0.0) -> Process:
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
+
         duration = self._get_audio_duration(track_path)
         if not duration: raise Exception("Failed to get file duration, does it actually exist?", track_path)
+        if offset >= duration: offset = max(duration - 0.1, 0)
+        if offset > 0: cmd.extend(['-ss', str(offset)])
 
         filters = []
         if fade_in: filters.append(f"afade=t=in:st=0:d={fade_time}")
-        if fade_out: filters.append(f"afade=t=out:st={duration-fade_time}:d={fade_time}")
+        if fade_out: filters.append(f"afade=t=out:st={duration - fade_time - offset}:d={fade_time}")
         if filters: cmd.extend(['-af', ",".join(filters)])
-
         cmd.append(track_path)
 
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        pr = Process(proc, track_path, time.time(), duration)
+        pr = Process(proc, track_path, time.time(), duration - offset)
         with self.lock: self.processes.append(pr)
         return pr
     def anything_playing(self) -> bool:
@@ -106,18 +107,19 @@ def parse_playlistfile(playlist_path: str) -> tuple[dict[str, str], list[tuple[l
     parser_log = log95.log95("PARSER", logger_level)
 
     parser_log.debug("Reading", playlist_path)
-    lines = load_filelines(playlist_path)
+    lines = load_filelines(os.path.abspath(playlist_path))
     def check_for_imports(lines: list[str], seen=None) -> list[str]:
         nonlocal parser_log
         if seen is None: seen = set()
         out = []
         for line in lines:
+            line = line.strip()
             if line.startswith("@"):
                 target = line.removeprefix("@")
                 if target not in seen:
                     parser_log.debug("Importing", target)
                     seen.add(target)
-                    sub_lines = load_filelines(target)
+                    sub_lines = load_filelines(os.path.abspath(target))
                     out.extend(check_for_imports(sub_lines, seen))
             else: out.append(line)
         return out
@@ -127,7 +129,8 @@ def parse_playlistfile(playlist_path: str) -> tuple[dict[str, str], list[tuple[l
     global_arguments = {}
     for line in lines:
         arguments = {}
-        if line.startswith(";") or not line.strip(): continue
+        line = line.strip()
+        if not line or line.startswith(";") or line.startswith("#"): continue
         if "|" in line:
             if line.startswith("|"): # No file name, we're defining global arguments
                 args = line.removeprefix("|").split(";")
@@ -148,14 +151,14 @@ def play_playlist(playlist_path):
     if not playlist_advisor: raise Exception("No playlist advisor")
 
     try: global_args, parsed = parse_playlistfile(playlist_path)
-    except Exception:
-        logger.info(f"Exception while parsing playlist, retrying in 15 seconds...")
+    except Exception as e:
+        logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...")
         time.sleep(15)
         return
 
     playlist: list[Track] = []
     for (lns, args) in parsed:
-        for line in lns: playlist.append(Track(line, True, True, True, args)) # simple entry, just to convert to a format taken by the modules
+        playlist.extend([Track(line, True, True, True, args) for line in lns])
 
     for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist)
     for module in simple_modules: module.on_new_playlist(playlist)
@@ -201,7 +204,7 @@ def play_playlist(playlist_path):
 
         for module in simple_modules: module.on_new_track(song_i, track)
 
-        pr = procman.play(track_path, track.fade_in, track.fade_out, cross_fade)
+        pr = procman.play(track_path, track.fade_in, track.fade_out, cross_fade, track.offset)
 
         ttw = pr.duration
         if track.fade_out: ttw -= cross_fade
@@ -209,18 +212,11 @@ def play_playlist(playlist_path):
         end_time = time.time() + ttw
         loop_start = time.time()  # Outside the loop
 
-        def format_time(seconds):
-            hours = int(seconds // 3600)
-            minutes = int((seconds % 3600) // 60)
-            secs = int(seconds % 60)
-            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
-
         while end_time >= time.time():
             start = time.time()
-            # do some module callback
-
+            
             total_uptime = time.time() - loop_start
-            if track.official: print(f"{track_name}: {format_time(total_uptime)} / {format_time(pr.duration)}", end="\r", flush=True)
+            for module in simple_modules: module.progess(song_i, track, total_uptime, pr.duration)
 
             elapsed = time.time() - start
             remaining_until_end = end_time - time.time()
@@ -233,6 +229,7 @@ def play_playlist(playlist_path):
         if not extend: song_i += 1
 
 def main():
+    logger.info("Core is starting, loading modules")
     global playlist_advisor, active_modifier
     for filename in os.listdir(MODULES_DIR):
         if filename.endswith(".py") and filename != "__init__.py":
@@ -280,11 +277,15 @@ def main():
     if not playlist_advisor:
         logger.critical_error("Playlist advisor was not found")
         exit(1)
+    
+    logger.info("Modules initialized, starting the IMC")
 
     imc = InterModuleCommunication(playlist_advisor, active_modifier, simple_modules)
     playlist_advisor.imc(imc)
     if active_modifier: active_modifier.imc(imc)
     for module in simple_modules: module.imc(imc)
+
+    logger.info("Starting playback.")
 
     try:
         arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None

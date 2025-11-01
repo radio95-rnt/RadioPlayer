@@ -8,6 +8,7 @@ class Track:
     fade_in: bool
     official: bool
     args: dict[str, str] | None
+    offset: float = 0.0
 
 class PlayerModule:
     """
@@ -27,6 +28,8 @@ class PlayerModule:
         """
         pass
     def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object, broadcast: bool) -> object:
+        return None
+    def progess(self, index: int, track: Track, elapsed: float, total: float):
         pass
 class PlaylistModifierModule:
     """
@@ -58,7 +61,7 @@ class PlaylistAdvisor:
         """
         pass
     def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object, broadcast: bool) -> object:
-        pass
+        return None
 class ActiveModifier:
     """
     This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist
@@ -85,7 +88,7 @@ class ActiveModifier:
         """
         pass
     def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object, broadcast: bool) -> object:
-        pass
+        return None
 class InterModuleCommunication:
     def __init__(self, advisor: PlaylistAdvisor, active_modifier: ActiveModifier | None, simple_modules: list[PlayerModule]) -> None:
         self.advisor = advisor
