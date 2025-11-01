@@ -220,7 +220,7 @@ def play_playlist(playlist_path):
             # do some module callback
 
             total_uptime = time.time() - loop_start
-            if track.official: print(f"{track_name}: {format_time(total_uptime)} / {format_time(pr.duration)}")
+            if track.official: print(f"{track_name}: {format_time(total_uptime)} / {format_time(pr.duration)}", end="\r", flush=True)
 
             elapsed = time.time() - start
             remaining_until_end = end_time - time.time()
