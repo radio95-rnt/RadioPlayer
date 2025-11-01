@@ -26,7 +26,7 @@ class PlayerModule:
         Receive an IMC object
         """
         pass
-    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object) -> object:
+    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object, broadcast: bool) -> object:
         pass
 class PlaylistModifierModule:
     """
@@ -57,7 +57,7 @@ class PlaylistAdvisor:
         Receive an IMC object
         """
         pass
-    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object) -> object:
+    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object, broadcast: bool) -> object:
         pass
 class ActiveModifier:
     """
@@ -84,7 +84,7 @@ class ActiveModifier:
         Receive an IMC object
         """
         pass
-    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object) -> object:
+    def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object, broadcast: bool) -> object:
         pass
 class InterModuleCommunication:
     def __init__(self, advisor: PlaylistAdvisor, active_modifier: ActiveModifier | None, simple_modules: list[PlayerModule]) -> None:
@@ -94,15 +94,15 @@ class InterModuleCommunication:
         self.names_modules: dict[str, PlaylistAdvisor | ActiveModifier | PlayerModule] = {}
     def broadcast(self, source: PlaylistAdvisor | ActiveModifier | PlayerModule, data: object) -> None:
         """
-        Send data to all modules
+        Send data to all modules, other than ourself
         """
-        self.advisor.imc_data(source, data)
-        if self.active_modifier: self.active_modifier.imc_data(source, data)
-        for module in self.simple_modules: module.imc_data(source, data)
+        if source is not self.advisor: self.advisor.imc_data(source, data, True)
+        if self.active_modifier and source is not self.active_modifier: self.active_modifier.imc_data(source, data, True)
+        for module in [f for f in self.simple_modules if f is not source]: module.imc_data(source, data, True)
     def register(self, module: PlaylistAdvisor | ActiveModifier | PlayerModule, name: str):
         if name in self.names_modules.keys(): return False
         self.names_modules[name] = module
         return True
     def send(self, source: PlaylistAdvisor | ActiveModifier | PlayerModule, name: str, data: object) -> object:
         if not name in self.names_modules.keys(): raise Exception
-        return self.names_modules[name].imc_data(source, data)
+        return self.names_modules[name].imc_data(source, data, False)

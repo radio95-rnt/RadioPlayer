@@ -15,28 +15,6 @@ active_modifier: ActiveModifier | None = None
 MODULES_PACKAGE = "modules"
 MODULES_DIR = (Path(__file__).resolve().parent / MODULES_PACKAGE).resolve()
 
-def print_wait(ttw: float, frequency: float, duration: float=-1, prefix: str="", bias: float = 0):
-    interval = 1.0 / frequency
-    elapsed = 0.0
-    if duration == -1: duration = ttw
-
-    def format_time(seconds):
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
-        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
-
-    try:
-        while elapsed < ttw:
-            print(f"{prefix}{format_time(elapsed+bias)} / {format_time(duration)}", end="\r", flush=True)
-            time.sleep(interval)
-            elapsed += interval
-    except Exception:
-        print()
-        raise
-
-    print(f"{prefix}{format_time(ttw+bias)} / {format_time(duration)}")
-
 logger_level = log95.log95Levels.DEBUG if DEBUG else log95.log95Levels.CRITICAL_ERROR
 logger = log95.log95("radioPlayer", logger_level)
 
@@ -228,8 +206,28 @@ def play_playlist(playlist_path):
         ttw = pr.duration
         if track.fade_out: ttw -= cross_fade
 
-        if track.official: print_wait(ttw, 1, pr.duration, f"{track_name}: ")
-        else: time.sleep(ttw)
+        end_time = time.time() + ttw
+        loop_start = time.time()  # Outside the loop
+
+        def format_time(seconds):
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = int(seconds % 60)
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+        while end_time >= time.time():
+            start = time.time()
+            # do some module callback
+
+            elapsed = time.time() - start
+            remaining_until_end = end_time - time.time()
+            total_uptime = time.time() - loop_start
+
+            if track.official: print(f"{track_name}: {format_time(total_uptime)} / {format_time(pr.duration)}")
+            
+            if elapsed < 1 and remaining_until_end > 0:
+                sleep_duration = min(1 - elapsed, remaining_until_end)
+                time.sleep(sleep_duration)
 
         i += 1
         if not extend: song_i += 1
