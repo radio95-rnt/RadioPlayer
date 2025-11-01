@@ -29,7 +29,10 @@ class PlayerModule:
         pass
     def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object, broadcast: bool) -> object:
         return None
-    def progress(self, index: int, track: Track, elapsed: float, total: float):
+    def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float):
+        """
+        Real total and total differ in that, total is how much the track lasts, but real_total will be for how long we will play it for
+        """
         pass
 class PlaylistModifierModule:
     """
@@ -45,7 +48,7 @@ class PlaylistAdvisor:
     """
     Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
     """
-    def advise(self, arguments: str | None) -> str:
+    def advise(self, arguments: str | None) -> str | None:
         """
         Arguments are the arguments passed to the program on startup
         """

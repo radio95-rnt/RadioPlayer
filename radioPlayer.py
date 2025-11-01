@@ -33,14 +33,14 @@ class ProcessManager:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.processes: list[Process] = []
-        self.duration_cache = libcache.Cache()
+        self.duration_cache = libcache.Cache([])
     def _get_audio_duration(self, file_path):
         if result := self.duration_cache.getElement(file_path, False): return result
-        
+
         result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path], capture_output=True, text=True)
-        if result.returncode == 0: 
+        if result.returncode == 0:
             result = float(result.stdout.strip())
-            self.duration_cache.saveElement(file_path, result, (60*60))
+            self.duration_cache.saveElement(file_path, result, (60*60), False, True)
             return result
         return None
     def play(self, track_path: str, fade_in: bool=False, fade_out: bool=False, fade_time: int=5, offset: float=0.0) -> Process:
@@ -55,10 +55,11 @@ class ProcessManager:
         if fade_in: filters.append(f"afade=t=in:st=0:d={fade_time}")
         if fade_out: filters.append(f"afade=t=out:st={duration - fade_time - offset}:d={fade_time}")
         if filters: cmd.extend(['-af', ",".join(filters)])
+
         cmd.append(track_path)
 
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        pr = Process(proc, track_path, time.time(), duration - offset)
+        pr = Process(proc, track_path, time.monotonic(), duration - offset)
         with self.lock: self.processes.append(pr)
         return pr
     def anything_playing(self) -> bool:
@@ -85,8 +86,8 @@ def handle_sigint(signum, frame):
     global exit_pending, intr_time
     with exit_lock:
         logger.info("Received SIGINT")
-        if (time.time() - intr_time) > 5:
-            intr_time = time.time()
+        if (time.monotonic() - intr_time) > 5:
+            intr_time = time.monotonic()
             logger.info("Will quit on song end.")
             exit_pending = True
         else:
@@ -209,18 +210,17 @@ def play_playlist(playlist_path):
         ttw = pr.duration
         if track.fade_out: ttw -= cross_fade
 
-        end_time = time.time() + ttw
-        loop_start = time.time()  # Outside the loop
+        loop_start = time.monotonic()
+        end_time = loop_start + ttw
 
-        while end_time >= time.time():
-            start = time.time()
-            
-            total_uptime = time.time() - loop_start
-            for module in simple_modules: module.progress(song_i, track, total_uptime, pr.duration)
+        while end_time >= time.monotonic():
+            start = time.monotonic()
 
-            elapsed = time.time() - start
-            remaining_until_end = end_time - time.time()
-            
+            for module in simple_modules: module.progress(song_i, track, time.monotonic() - loop_start, pr.duration, ttw)
+
+            elapsed = time.monotonic() - start
+            remaining_until_end = end_time - time.monotonic()
+
             if elapsed < 1 and remaining_until_end > 0:
                 sleep_duration = min(1 - elapsed, remaining_until_end)
                 time.sleep(sleep_duration)
@@ -277,7 +277,7 @@ def main():
     if not playlist_advisor:
         logger.critical_error("Playlist advisor was not found")
         exit(1)
-    
+
     logger.info("Modules initialized, starting the IMC")
 
     imc = InterModuleCommunication(playlist_advisor, active_modifier, simple_modules)
@@ -296,7 +296,6 @@ def main():
                 play_playlist(playlist)
             if exit_pending: exit()
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        procman.stop_all()
+        logger.critical_error(f"Unexpected error: {e}")
         raise
     finally: procman.stop_all()
