@@ -219,15 +219,15 @@ def play_playlist(playlist_path):
             start = time.time()
             # do some module callback
 
+            total_uptime = time.time() - loop_start
+            if track.official: print(f"{track_name}: {format_time(total_uptime)} / {format_time(pr.duration)}")
+
             elapsed = time.time() - start
             remaining_until_end = end_time - time.time()
             
             if elapsed < 1 and remaining_until_end > 0:
                 sleep_duration = min(1 - elapsed, remaining_until_end)
                 time.sleep(sleep_duration)
-
-            total_uptime = time.time() - loop_start
-            if track.official: print(f"{track_name}: {format_time(total_uptime)} / {format_time(pr.duration)}")
 
         i += 1
         if not extend: song_i += 1
