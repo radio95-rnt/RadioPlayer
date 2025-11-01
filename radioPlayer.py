@@ -216,7 +216,7 @@ def play_playlist(playlist_path):
             start = time.time()
             
             total_uptime = time.time() - loop_start
-            for module in simple_modules: module.progess(song_i, track, total_uptime, pr.duration)
+            for module in simple_modules: module.progress(song_i, track, total_uptime, pr.duration)
 
             elapsed = time.time() - start
             remaining_until_end = end_time - time.time()

@@ -29,7 +29,7 @@ class PlayerModule:
         pass
     def imc_data(self, source: 'PlayerModule | ActiveModifier | PlaylistAdvisor', data: object, broadcast: bool) -> object:
         return None
-    def progess(self, index: int, track: Track, elapsed: float, total: float):
+    def progress(self, index: int, track: Track, elapsed: float, total: float):
         pass
 class PlaylistModifierModule:
     """
