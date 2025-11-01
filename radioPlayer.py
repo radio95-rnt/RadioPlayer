@@ -148,7 +148,7 @@ def parse_playlistfile(playlist_path: str) -> tuple[dict[str, str], list[tuple[l
         out.append(([f for f in glob.glob(line) if os.path.isfile(f)], arguments))
     return global_arguments, out
 
-def play_playlist(playlist_path):
+def play_playlist(playlist_path, starting_index: int = 0):
     if not playlist_advisor: raise Exception("No playlist advisor")
 
     try: global_args, parsed = parse_playlistfile(playlist_path)
@@ -170,7 +170,7 @@ def play_playlist(playlist_path):
     cross_fade = int(global_args.get("crossfade", 5))
 
     max_iterator = len(playlist)
-    song_i = i = 0
+    song_i = i = starting_index
 
     while i < max_iterator:
         if exit_pending:
