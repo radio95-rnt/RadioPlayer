@@ -207,13 +207,12 @@ def play_playlist(playlist_path, starting_index: int = 0):
         ttw = pr.duration
         if track.fade_out: ttw -= cross_fade
 
-        loop_start = time.monotonic()
-        end_time = loop_start + ttw
+        end_time = pr.started_at + ttw
 
         while end_time >= time.monotonic():
             start = time.monotonic()
 
-            for module in simple_modules: module.progress(song_i, track, time.monotonic() - loop_start, pr.duration, ttw)
+            for module in simple_modules: module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, ttw)
 
             elapsed = time.monotonic() - start
             remaining_until_end = end_time - time.monotonic()
