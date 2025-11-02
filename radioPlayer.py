@@ -272,8 +272,6 @@ def main():
         logger.critical_error("Playlist advisor was not found")
         raise SystemExit(1)
 
-    logger.info("Modules initialized, starting the IMC")
-
     InterModuleCommunication(playlist_advisor, active_modifier, simple_modules)
 
     logger.info("Starting playback.")
