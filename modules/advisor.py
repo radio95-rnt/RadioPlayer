@@ -15,11 +15,11 @@ playlist_dir = "/home/user/playlists"
 
 class Time:
     @staticmethod
-    def get_playlist_modification_time(playlist_path):
+    def get_playlist_modification_time(playlist_path) -> float:
         try: return os.path.getmtime(playlist_path)
         except OSError: return 0
 
-def check_if_playlist_modifed(playlist_path: str):
+def check_if_playlist_modifed(playlist_path: str) -> bool:
     current_day, current_hour = datetime.datetime.now().strftime('%A').lower(), datetime.datetime.now().hour
     morning_playlist_path = os.path.join(playlist_dir, current_day, 'morning')
     day_playlist_path = os.path.join(playlist_dir, current_day, 'day')
@@ -107,7 +107,7 @@ class Module(PlaylistAdvisor):
             logger.info("Playlist changed on disc, reloading...")
             return True
         return False
-    def imc(self, imc: InterModuleCommunication):
+    def imc(self, imc: InterModuleCommunication) -> None:
         self.class_imc = imc
         imc.register(self, "advisor")
     def imc_data(self, source: PlayerModule | ActiveModifier | PlaylistAdvisor, source_name: str | None, data: object, broadcast: bool):

@@ -94,7 +94,6 @@ def handle_sigint(signum, frame):
             logger.warning("Force-Quit pending")
             procman.stop_all()
             raise SystemExit
-
 signal.signal(signal.SIGINT, handle_sigint)
 
 def load_filelines(path):
@@ -149,7 +148,7 @@ def parse_playlistfile(playlist_path: str) -> tuple[dict[str, str], list[tuple[l
     return global_arguments, out
 
 def play_playlist(playlist_path, starting_index: int = 0):
-    if not playlist_advisor: raise Exception("No playlist advisor")
+    if not playlist_advisor: raise Exception("No playlist advisor") # not sure how we would get this, but it makes pylance shut its fucking mouth
 
     try: global_args, parsed = parse_playlistfile(playlist_path)
     except Exception as e:
@@ -158,12 +157,11 @@ def play_playlist(playlist_path, starting_index: int = 0):
         return
 
     playlist: list[Track] = []
-    for (lns, args) in parsed:
-        playlist.extend([Track(line, True, True, True, args) for line in lns])
+    [playlist.extend(Track(line, True, True, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
 
     for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist) or playlist
-    for module in simple_modules: module.on_new_playlist(playlist)
-    if active_modifier: active_modifier.on_new_playlist(playlist)
+
+    [mod.on_new_playlist(playlist) for mod in simple_modules + [active_modifier] if mod] # one liner'd everything
 
     return_pending = False
 
@@ -176,7 +174,7 @@ def play_playlist(playlist_path, starting_index: int = 0):
         if exit_pending:
             logger.info("Quit received, waiting for song end.")
             procman.wait_all()
-            exit()
+            raise SystemExit()
         elif return_pending:
             logger.info("Return reached, next song will reload the playlist.")
             procman.wait_all()
@@ -199,9 +197,8 @@ def play_playlist(playlist_path, starting_index: int = 0):
             track = old_track
 
         track_path = os.path.abspath(os.path.expanduser(track.path))
-        track_name = os.path.basename(track_path)
 
-        logger.info(f"Now playing: {track_name}")
+        logger.info(f"Now playing: {os.path.basename(track_path)}")
 
         for module in simple_modules: module.on_new_track(song_i, track)
 
@@ -220,10 +217,7 @@ def play_playlist(playlist_path, starting_index: int = 0):
 
             elapsed = time.monotonic() - start
             remaining_until_end = end_time - time.monotonic()
-
-            if elapsed < 1 and remaining_until_end > 0:
-                sleep_duration = min(1 - elapsed, remaining_until_end)
-                time.sleep(sleep_duration)
+            if elapsed < 1 and remaining_until_end > 0: time.sleep(min(1 - elapsed, remaining_until_end))
 
         i += 1
         if not extend: song_i += 1
@@ -276,14 +270,11 @@ def main():
 
     if not playlist_advisor:
         logger.critical_error("Playlist advisor was not found")
-        exit(1)
+        raise SystemExit(1)
 
     logger.info("Modules initialized, starting the IMC")
 
-    imc = InterModuleCommunication(playlist_advisor, active_modifier, simple_modules)
-    playlist_advisor.imc(imc)
-    if active_modifier: active_modifier.imc(imc)
-    for module in simple_modules: module.imc(imc)
+    InterModuleCommunication(playlist_advisor, active_modifier, simple_modules)
 
     logger.info("Starting playback.")
 
@@ -294,7 +285,7 @@ def main():
             if playlist := playlist_advisor.advise(arg):
                 logger.info(f"Advisor picked '{playlist}' to play")
                 play_playlist(playlist)
-            if exit_pending: exit()
+            if exit_pending: raise SystemExit
     except Exception as e:
         logger.critical_error(f"Unexpected error: {e}")
         raise

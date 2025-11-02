@@ -40,6 +40,8 @@ class PlayerModule(BaseIMCModule):
     def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float) -> None:
         """
         Real total and total differ in that, total is how much the track lasts, but real_total will be for how long we will play it for
+        Runs at a frequency around 1 Hz
+        Please don't put any blocking or code that takes time
         """
         pass
 class PlaylistModifierModule:
@@ -92,6 +94,8 @@ class InterModuleCommunication:
         self.active_modifier = active_modifier
         self.simple_modules = simple_modules
         self.names_modules: dict[str, BaseIMCModule] = {}
+        for module in simple_modules + [active_modifier, advisor]: 
+            if module: module.imc(self)
     def broadcast(self, source: BaseIMCModule, data: object) -> None:
         """
         Send data to all modules, other than ourself

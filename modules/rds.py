@@ -7,7 +7,6 @@ name_table_path = "/home/user/mixes/name_table.txt"
 
 rds_base = "Gramy: {} - {}"
 rds_default_artist = "radio95"
-rds_default_name = "Program Godzinny"
 
 udp_host = ("127.0.0.1", 5000)
 

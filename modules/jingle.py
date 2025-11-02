@@ -13,8 +13,8 @@ from . import PlaylistModifierModule, Track
 class Module(PlaylistModifierModule):
     def __init__(self, file: str) -> None:
         self.file = file
-    def modify(self, global_args: dict, playlist: list[Track]):
-        if int(global_args.get("no_jingle", 0)): return playlist
+    def modify(self, global_args: dict, playlist: list[Track]) -> list[Track] | None:
+        if int(global_args.get("no_jingle", 0)): return None
         out: list[Track] = []
         last_jingiel = True
         for track in playlist:
@@ -22,9 +22,9 @@ class Module(PlaylistModifierModule):
                 out.append(Track(track.path, True, False, True, track.args))
                 out.append(Track(self.file, False, False, False, {}))
                 last_jingiel = True
-            else:
-                out.append(Track(track.path, True, True, True, track.args))
-                last_jingiel = False
+                continue
+            out.append(Track(track.path, True, True, True, track.args))
+            last_jingiel = False
         del last_jingiel
         return out
 
