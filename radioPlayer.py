@@ -161,7 +161,7 @@ def play_playlist(playlist_path, starting_index: int = 0):
     for (lns, args) in parsed:
         playlist.extend([Track(line, True, True, True, args) for line in lns])
 
-    for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist)
+    for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist) or playlist
     for module in simple_modules: module.on_new_playlist(playlist)
     if active_modifier: active_modifier.on_new_playlist(playlist)
 

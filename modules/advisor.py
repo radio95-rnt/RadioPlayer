@@ -110,7 +110,7 @@ class Module(PlaylistAdvisor):
     def imc(self, imc: InterModuleCommunication):
         self.class_imc = imc
         imc.register(self, "advisor")
-    def imc_data(self, source: PlayerModule | ActiveModifier | PlaylistAdvisor, data: object, broadcast: bool):
+    def imc_data(self, source: PlayerModule | ActiveModifier | PlaylistAdvisor, source_name: str | None, data: object, broadcast: bool):
         return self.custom_playlist
 
 advisor = Module()
