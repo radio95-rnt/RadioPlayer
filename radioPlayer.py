@@ -36,23 +36,23 @@ class ProcessManager(Skeleton_ProcessManager):
             self.duration_cache.saveElement(file_path, result, (60*60), False, True)
             return result
         return None
-    def play(self, track_path: str, fade_in: bool=False, fade_out: bool=False, fade_time: int=5, offset: float=0.0) -> Process:
+    def play(self, track: Track, fade_time: int=5) -> Process:
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
 
-        duration = self._get_audio_duration(track_path)
-        if not duration: raise Exception("Failed to get file duration, does it actually exist?", track_path)
-        if offset >= duration: offset = max(duration - 0.1, 0)
-        if offset > 0: cmd.extend(['-ss', str(offset)])
+        duration = self._get_audio_duration(track.path)
+        if not duration: raise Exception("Failed to get file duration, does it actually exist?", track.path)
+        if track.offset >= duration: track.offset = max(duration - 0.1, 0)
+        if track.offset > 0: cmd.extend(['-ss', str(track.offset)])
 
         filters = []
-        if fade_in: filters.append(f"afade=t=in:st=0:d={fade_time}")
-        if fade_out: filters.append(f"afade=t=out:st={duration - fade_time - offset}:d={fade_time}")
+        if track.fade_in: filters.append(f"afade=t=in:st=0:d={fade_time}")
+        if track.fade_out: filters.append(f"afade=t=out:st={duration - fade_time - track.offset}:d={fade_time}")
         if filters: cmd.extend(['-af', ",".join(filters)])
 
-        cmd.append(track_path)
+        cmd.append(track.path)
 
         proc = Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        pr = Process(proc, track_path, time.monotonic(), duration - offset)
+        pr = Process(proc, track.path, time.monotonic(), duration - track.offset)
         with self.lock: self.processes.append(pr)
         return pr
     def anything_playing(self) -> bool:
@@ -195,7 +195,7 @@ def play_playlist(playlist_path, starting_index: int = 0):
 
         for module in simple_modules: module.on_new_track(song_i, track)
 
-        pr = procman.play(track_path, track.fade_in, track.fade_out, cross_fade, track.offset)
+        pr = procman.play(track, cross_fade)
 
         ttw = pr.duration
         if track.fade_out: ttw -= cross_fade
