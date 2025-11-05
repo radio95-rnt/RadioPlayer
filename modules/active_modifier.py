@@ -11,12 +11,11 @@ class Module(ActiveModifier):
         self.originals = []
         self.last_track = None
         self.limit_tracks = True
-        self.imc_class = None
     def on_new_playlist(self, playlist: list[Track]):
         self.playlist = playlist
 
-        if not self.imc_class: return
-        self.limit_tracks = bool(self.imc_class.send(self, "advisor", None))
+        if not self._imc: return
+        self.limit_tracks = bool(self._imc.send(self, "advisor", None))
     def play(self, index: int, track: Track):
         if not self.playlist: return track
         if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
@@ -46,7 +45,7 @@ class Module(ActiveModifier):
 
             with open("/tmp/radioPlayer_toplay", "w") as f: 
                 f.write('\n'.join(songs))
-                f.write("\n") # extra
+                f.write("\n")
 
             logger.info(f"Playing {song} instead, as instructed by toplay")
 
@@ -59,12 +58,10 @@ class Module(ActiveModifier):
             last_track_duration = self._imc.send(self, "procman", {"op": 1, "arg": self.last_track.path})
             assert isinstance(last_track_duration, dict)
             last_track_duration = last_track_duration.get("arg")
-            if not last_track_duration: return self.last_track, False
 
             if last_track_duration and last_track_duration > 5*60:
                 now = datetime.datetime.now()
-                timestamp = now.timestamp() + last_track_duration
-                future = datetime.datetime.fromtimestamp(timestamp)
+                future = datetime.datetime.fromtimestamp(now.timestamp() + last_track_duration)
                 if now.hour < MORNING_START and future.hour > MORNING_START:
                     logger.warning("Skipping track as it bleeds into the morning")
                     return None, None
@@ -76,8 +73,5 @@ class Module(ActiveModifier):
                     return None, None
 
         return self.last_track, False
-    
-    def imc(self, imc: InterModuleCommunication):
-        self.imc_class = imc
 
 activemod = Module()
