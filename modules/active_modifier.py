@@ -25,21 +25,20 @@ class Module(ActiveModifier):
 
         if len(songs):
             song = songs.pop(0)
+            official = True
+            if song.startswith("!"):
+                song = song[1:]
+                official = False # NOT FLOATINGPOINTERROR
 
-            if self.last_track:
-                last_track_to_fade_out = self.last_track.fade_out
+            if self.last_track: last_track_to_fade_out = self.last_track.fade_out
             else:
-                if (index - 1) >= 0:
-                    last_track_to_fade_out = self.playlist[index - 1].fade_out
+                if (index - 1) >= 0: last_track_to_fade_out = self.playlist[index - 1].fade_out
                 else: last_track_to_fade_out = False
             
-            if len(songs) != 0:
-                next_track_to_fade_in = True
+            if len(songs) != 0: next_track_to_fade_in = True
             else:
-                if index + 1 < len(self.playlist):
-                    next_track_to_fade_in = self.playlist[index + 1].fade_in
-                else:
-                    next_track_to_fade_in = True
+                if index + 1 < len(self.playlist): next_track_to_fade_in = self.playlist[index + 1].fade_in
+                else: next_track_to_fade_in = True
 
             if not self.originals or self.originals[-1] != track: self.originals.append(track)
 
@@ -49,7 +48,7 @@ class Module(ActiveModifier):
 
             logger.info(f"Playing {song} instead, as instructed by toplay")
 
-            self.last_track = Track(song, next_track_to_fade_in, last_track_to_fade_out, True, {})
+            self.last_track = Track(song, next_track_to_fade_in, last_track_to_fade_out, official, {})
             return self.last_track, True
         elif len(self.originals): self.last_track = self.originals.pop(0)
         else: self.last_track = track
