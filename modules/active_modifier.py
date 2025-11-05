@@ -1,13 +1,7 @@
-from modules import InterModuleCommunication
-from . import ActiveModifier, log95, Track
-import os, subprocess, glob, datetime
+from . import ActiveModifier, log95, Track, InterModuleCommunication
+import os, glob, datetime
 
 from .advisor import MORNING_START, DAY_END
-
-def get_audio_duration(file_path):
-    result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path], capture_output=True, text=True)
-    if result.returncode == 0: return float(result.stdout.strip())
-    return None
 
 logger = log95.log95("AC-MOD")
 
@@ -62,7 +56,11 @@ class Module(ActiveModifier):
         else: self.last_track = track
 
         if self.limit_tracks:
-            last_track_duration = get_audio_duration(self.last_track.path)
+            last_track_duration = self._imc.send(self, "procman", {"op": 1, "arg": self.last_track.path})
+            assert isinstance(last_track_duration, dict)
+            last_track_duration = last_track_duration.get("arg")
+            if not last_track_duration: return self.last_track, False
+
             if last_track_duration and last_track_duration > 5*60:
                 now = datetime.datetime.now()
                 timestamp = now.timestamp() + last_track_duration

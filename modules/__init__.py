@@ -1,4 +1,6 @@
 import log95
+from collections.abc import Sequence
+from subprocess import Popen
 from dataclasses import dataclass
 
 @dataclass
@@ -10,6 +12,20 @@ class Track:
     args: dict[str, str] | None
     offset: float = 0.0
 
+@dataclass
+class Process:
+    process: Popen
+    track: str
+    started_at: float
+    duration: float
+
+class Skeleton_ProcessManager:
+    processes: list[Process]
+    def _get_audio_duration(self, file_path): ...
+    def play(self, track_path: str, fade_in: bool=False, fade_out: bool=False, fade_time: int=5, offset: float=0.0) -> Process: ...
+    def anything_playing(self) -> bool: ...
+    def stop_all(self, timeout: float | None = None) -> None: ...
+    def wait_all(self, timeout: float | None = None) -> None: ...
 class BaseIMCModule:
     """
     This is not a module to be used but rather a placeholder IMC api to be used in other modules
@@ -18,12 +34,35 @@ class BaseIMCModule:
         """
         Receive an IMC object
         """
-        pass
+        self._imc = imc
     def imc_data(self, source: 'BaseIMCModule', source_name: str | None, data: object, broadcast: bool) -> object:
         """
         React to IMC data
         """
         return None
+
+class ProcmanCommunicator(BaseIMCModule):
+    def __init__(self, procman: Skeleton_ProcessManager) -> None:
+        self.procman = procman
+    def imc(self, imc: 'InterModuleCommunication') -> None:
+        super().imc(imc)
+        self._imc.register(self, "procman")
+    def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
+        if broadcast: return
+        if isinstance(data, str) and data.lower().strip() == "raw": return self.procman
+        elif isinstance(data, dict):
+            op = data.get("op")
+            if not op: return
+            if int(op) == 0: return {"op": 0, "arg": "pong"}
+            elif int(op) == 1:
+                if arg := data.get("arg"):
+                    return {"op": 1, "arg": self.procman._get_audio_duration(arg)}
+                else: return
+            elif int(op) == 2:
+                self.procman.stop_all(data.get("timeout", None))
+                return {"op": 2}
+            elif int(op) == 3:
+                return {"op": 3, "arg": self.procman.processes}
 
 class PlayerModule(BaseIMCModule):
     """
@@ -89,21 +128,18 @@ class ActiveModifier(BaseIMCModule):
         """
         pass
 class InterModuleCommunication:
-    def __init__(self, advisor: PlaylistAdvisor, active_modifier: ActiveModifier | None, simple_modules: list[PlayerModule]) -> None:
-        self.advisor = advisor
-        self.active_modifier = active_modifier
-        self.simple_modules = simple_modules
+    def __init__(self, modules: Sequence[BaseIMCModule | None]) -> None:
+        self.modules = modules
         self.names_modules: dict[str, BaseIMCModule] = {}
-        for module in simple_modules + [active_modifier, advisor]: 
+        for module in modules: 
             if module: module.imc(self)
     def broadcast(self, source: BaseIMCModule, data: object) -> None:
         """
         Send data to all modules, other than ourself
         """
         source_name = next((k for k, v in self.names_modules.items() if v is source), None)
-        if source is not self.advisor: self.advisor.imc_data(source, source_name, data, True)
-        if self.active_modifier and source is not self.active_modifier: self.active_modifier.imc_data(source, source_name, data, True)
-        for module in [f for f in self.simple_modules if f is not source]: module.imc_data(source, source_name, data, True)
+        for module in [f for f in self.modules if f is not source]: 
+            if module: module.imc_data(source, source_name, data, True)
     def register(self, module: BaseIMCModule, name: str) -> bool:
         """
         Register our module with a name, so we can be sent data via the send function

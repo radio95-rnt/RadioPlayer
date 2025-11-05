@@ -22,14 +22,7 @@ exit_pending = False
 intr_time = 0
 exit_lock = threading.Lock()
 
-@dataclass
-class Process:
-    process: subprocess.Popen
-    track: str
-    started_at: float
-    duration: float
-
-class ProcessManager:
+class ProcessManager(Skeleton_ProcessManager):
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.processes: list[Process] = []
@@ -58,7 +51,7 @@ class ProcessManager:
 
         cmd.append(track_path)
 
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        proc = Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         pr = Process(proc, track_path, time.monotonic(), duration - offset)
         with self.lock: self.processes.append(pr)
         return pr
@@ -209,7 +202,7 @@ def play_playlist(playlist_path, starting_index: int = 0):
 
         end_time = pr.started_at + ttw
 
-        while end_time >= time.monotonic():
+        while end_time >= time.monotonic() and pr.process.poll() is None:
             start = time.monotonic()
 
             for module in simple_modules: module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, ttw)
@@ -271,7 +264,7 @@ def main():
         logger.critical_error("Playlist advisor was not found")
         raise SystemExit(1)
 
-    InterModuleCommunication(playlist_advisor, active_modifier, simple_modules)
+    InterModuleCommunication(simple_modules + [playlist_advisor, ProcmanCommunicator(procman), active_modifier])
 
     logger.info("Starting playback.")
 
