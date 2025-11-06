@@ -34,20 +34,23 @@ class ProcessManager(Skeleton_ProcessManager):
             return result
         return None
     def play(self, track: Track, fade_time: int=5) -> Process:
-        cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
+        cmd = ['ffmpeg', '-hide_banner', '-loglevel', 'quiet']
         assert track.path.exists()
 
         duration = self._get_audio_duration(track.path.absolute())
         if not duration: raise Exception("Failed to get file duration for", track.path)
         if track.offset >= duration: track.offset = max(duration - 0.1, 0)
-        if track.offset > 0: cmd.extend(['-ss', str(track.offset)])
+
+        if track.offset > 0:
+            cmd.extend(['-ss', str(track.offset)])
+        cmd.extend(['-i', str(track.path.absolute())])
 
         filters = []
         if track.fade_in: filters.append(f"afade=t=in:st=0:d={fade_time}")
         if track.fade_out: filters.append(f"afade=t=out:st={duration - fade_time - track.offset}:d={fade_time}")
         if filters: cmd.extend(['-af', ",".join(filters)])
 
-        cmd.append(str(track.path.absolute()))
+        cmd.extend(['-f', 'pulse', 'default'])
 
         pr = Process(Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True), track.path.name, time.monotonic(), duration - track.offset)
         with self.lock: self.processes.append(pr)
