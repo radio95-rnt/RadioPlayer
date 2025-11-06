@@ -8,7 +8,7 @@ class Module(PlayerModule):
     def on_new_playlist(self, playlist: list[Track]):
         self.playlist = [str(t.path) for t in playlist]
     def on_new_track(self, index: int, track: Track):
-        if track.path.name != self.playlist[index]:
+        if str(track.path) != self.playlist[index]:
             # discrepancy, which means that the playing file was modified by the active modifier
             # we are playing a file that was not determined in the playlist, that means it was chosen by the active modifier and made up on the fly
             lines = self.playlist[:index] + [f"> ({track.path})"] + [self.playlist[index]] + self.playlist[index+1:]
