@@ -12,7 +12,7 @@ class Module(PlayerModule):
             # discrepancy, which means that the playing file was modified by the active modifier
             # we are playing a file that was not determined in the playlist, that means it was chosen by the active modifier and made up on the fly
             lines = self.playlist[:index] + [f"> ({track.path})"] + [self.playlist[index]] + self.playlist[index+1:]
-            logger.info("Next up:", self.playlist[index]) # core no longer does this
+            logger.info("Next up :", self.playlist[index]) # core no longer does this
         else: 
             lines = self.playlist[:index] + [f"> {self.playlist[index]}"] + self.playlist[index+1:]
             if index + 1 < len(self.playlist): logger.info("Next up:", self.playlist[index+1])
