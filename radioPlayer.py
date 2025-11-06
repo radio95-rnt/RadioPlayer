@@ -5,6 +5,14 @@ import sys, signal, threading, glob
 import libcache
 from modules import *
 
+def prefetch(path):
+    if os.name == "nt": return
+    with open(path, "rb") as f:
+        fd = f.fileno()
+        os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_SEQUENTIAL)
+        os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_NOREUSE)
+        os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_WILLNEED)
+
 simple_modules: list[PlayerModule] = []
 playlist_modifier_modules: list[PlaylistModifierModule] = []
 playlist_advisor: PlaylistAdvisor | None = None
@@ -148,6 +156,8 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
 
     for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist) or playlist
 
+    prefetch(playlist[0])
+
     [mod.on_new_playlist(playlist) for mod in simple_modules + [active_modifier] if mod] # one liner'd everything
 
     return_pending = False
@@ -203,6 +213,7 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
 
         i += 1
         if not extend: song_i += 1
+        prefetch(playlist[song_i % len(playlist)])
 
 def main():
     logger.info("Core is starting, loading modules")
