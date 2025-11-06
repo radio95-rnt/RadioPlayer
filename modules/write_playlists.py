@@ -6,7 +6,7 @@ class Module(PlayerModule):
     def __init__(self) -> None:
         self.playlist = []
     def on_new_playlist(self, playlist: list[Track]):
-        self.playlist = [t.path for t in playlist]
+        self.playlist = [str(t.path) for t in playlist]
     def on_new_track(self, index: int, track: Track):
         if track.path != self.playlist[index]:
             # discrepancy, which means that the playing file was modified by the active modifier

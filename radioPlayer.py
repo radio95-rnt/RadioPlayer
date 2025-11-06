@@ -134,7 +134,7 @@ def parse_playlistfile(playlist_path: Path) -> tuple[dict[str, str], list[tuple[
         out.append(([f for f in glob.glob(line) if os.path.isfile(f)], arguments))
     return global_arguments, out
 
-def play_playlist(playlist_path, starting_index: int = 0):
+def play_playlist(playlist_path: Path, starting_index: int = 0):
     assert playlist_advisor
 
     try: global_args, parsed = parse_playlistfile(playlist_path)

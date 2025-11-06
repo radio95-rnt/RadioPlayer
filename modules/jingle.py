@@ -8,11 +8,12 @@ Reacts to the 'no_jingle' argument, for global usage it does not add jingles to 
 
 import random
 
-from . import PlaylistModifierModule, Track
+from . import PlaylistModifierModule, Track, Path
 
 class Module(PlaylistModifierModule):
-    def __init__(self, file: str) -> None:
+    def __init__(self, file: Path) -> None:
         self.file = file
+        assert file.exists()
     def modify(self, global_args: dict, playlist: list[Track]) -> list[Track] | None:
         if int(global_args.get("no_jingle", 0)): return None
         out: list[Track] = []
@@ -28,4 +29,4 @@ class Module(PlaylistModifierModule):
         del last_jingiel
         return out
 
-playlistmod = (Module("/home/user/Jingiel.mp3"), 1)
+playlistmod = (Module(Path("/home/user/Jingiel.mp3")), 1)

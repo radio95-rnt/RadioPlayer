@@ -1,4 +1,4 @@
-from . import ActiveModifier, log95, Track, InterModuleCommunication
+from . import ActiveModifier, log95, Track, Path
 import os, glob, datetime
 
 from .advisor import MORNING_START, DAY_END
@@ -29,6 +29,8 @@ class Module(ActiveModifier):
             if song.startswith("!"):
                 song = song[1:]
                 official = False # NOT FLOATINGPOINTERROR
+            
+            song = Path(song).absolute()
 
             if self.last_track: last_track_to_fade_out = self.last_track.fade_out
             else:
@@ -46,7 +48,7 @@ class Module(ActiveModifier):
                 f.write('\n'.join(songs))
                 f.write("\n")
 
-            logger.info(f"Playing {song} instead, as instructed by toplay")
+            logger.info(f"Playing {song.name} instead, as instructed by toplay")
 
             self.last_track = Track(song, next_track_to_fade_in, last_track_to_fade_out, official, {})
             return self.last_track, True
