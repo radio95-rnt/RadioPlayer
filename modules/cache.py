@@ -13,14 +13,14 @@ class Module(PlayerModule):
             next = self.playlist[index]
         else: 
             next = self.playlist[index+1]
+        def prefetch(path):
+            with open(path, "rb") as f:
+                fd = f.fileno()
+                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_SEQUENTIAL)
+                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_NOREUSE)
+                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_WILLNEED)
 
-        with open(track.path.absolute(), "rb") as f:
-            os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_SEQUENTIAL)
-            os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_NOREUSE)
-            os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_WILLNEED)
-        with open(next, "rb") as f:
-            os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_SEQUENTIAL)
-            os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_NOREUSE)
-            os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_WILLNEED)
+        prefetch(track.path.absolute())
+        prefetch(next)
 
 module = Module()
