@@ -156,7 +156,7 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
 
     for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist) or playlist
 
-    prefetch(playlist[0])
+    prefetch(playlist[0].path)
 
     [mod.on_new_playlist(playlist) for mod in simple_modules + [active_modifier] if mod] # one liner'd everything
 
