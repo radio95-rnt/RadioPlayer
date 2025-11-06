@@ -2,10 +2,11 @@ import log95
 from collections.abc import Sequence
 from subprocess import Popen
 from dataclasses import dataclass
+from pathlib import Path
 
 @dataclass
 class Track:
-    path: str
+    path: Path
     fade_out: bool
     fade_in: bool
     official: bool
@@ -63,6 +64,8 @@ class ProcmanCommunicator(BaseIMCModule):
                 return {"op": 2}
             elif int(op) == 3:
                 return {"op": 3, "arg": self.procman.processes}
+            elif int(op) == 4:
+                return {"op": 4, "arg": self.procman.anything_playing()}
 
 class PlayerModule(BaseIMCModule):
     """
@@ -97,11 +100,11 @@ class PlaylistAdvisor(BaseIMCModule):
     """
     Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file
     """
-    def advise(self, arguments: str | None) -> str | None:
+    def advise(self, arguments: str | None) -> Path | None:
         """
         Arguments are the arguments passed to the program on startup
         """
-        return "/path/to/playlist.txt"
+        return Path("/path/to/playlist.txt")
     def new_playlist(self) -> bool:
         """
         Whether to play a new playlist, if this is True, then the player will refresh and fetch a new playlist, calling advise
