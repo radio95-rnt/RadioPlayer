@@ -213,7 +213,7 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
 
         i += 1
         if not extend: song_i += 1
-        prefetch(playlist[song_i % len(playlist)])
+        prefetch(playlist[song_i % len(playlist)].path)
 
 def main():
     logger.info("Core is starting, loading modules")
