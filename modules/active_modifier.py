@@ -65,11 +65,11 @@ class Module(ActiveModifier):
                 next_track = Track(new_song, new_official if len(songs) else next_track_to_fade_in, new_official, new_official, {})
             else:
                 self.last_track = Track(song, next_track_to_fade_in, last_track_to_fade_out, official, {})
+                next_track = track
             return (self.last_track, next_track), True
         elif len(self.originals): 
             self.last_track = self.originals.pop(0)
             if len(self.originals): next_track = self.originals[0]
-            else: next_track = track
         else: self.last_track = track
 
         if self.limit_tracks:
