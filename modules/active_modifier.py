@@ -16,21 +16,27 @@ class Module(ActiveModifier):
 
         if not self._imc: return
         self.limit_tracks = bool(self._imc.send(self, "advisor", None))
-    def play(self, index: int, track: Track):
-        if not self.playlist: return track
+    def play(self, index: int, track: Track, next_track: Track | None):
+        if not self.playlist: return (track, next_track), False
         if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
         with open("/tmp/radioPlayer_toplay", "r") as f: songs = [s.strip() for s in f.readlines() if s.strip()]
 
         songs[:] = [f for s in songs for f in glob.glob(s) if os.path.isfile(f)] # expand glob
 
-        if len(songs):
-            song = songs.pop(0)
+        def get_song(pop: bool = True):
+            nonlocal songs
+            if pop: song = songs.pop(0)
+            else: song = songs[0]
             official = True
             if song.startswith("!"):
                 song = song[1:]
                 official = False # NOT FLOATINGPOINTERROR
             
             song = Path(song).absolute()
+            return song, official
+
+        if len(songs):
+            song, official = get_song()
 
             if self.last_track: last_track_to_fade_out = self.last_track.fade_out
             else:
@@ -39,7 +45,8 @@ class Module(ActiveModifier):
             
             if len(songs) != 0: next_track_to_fade_in = True
             else:
-                if index + 1 < len(self.playlist): next_track_to_fade_in = self.playlist[index + 1].fade_in
+                if index + 1 < len(self.playlist) and next_track: next_track_to_fade_in = next_track.fade_in
+                elif not next_track: next_track_to_fade_in = False
                 else: next_track_to_fade_in = True
 
             if not self.originals or self.originals[-1] != track: self.originals.append(track)
@@ -50,9 +57,18 @@ class Module(ActiveModifier):
 
             logger.info(f"Playing {song.name} instead, as instructed by toplay")
 
-            self.last_track = Track(song, next_track_to_fade_in, last_track_to_fade_out, official, {})
-            return self.last_track, True
-        elif len(self.originals): self.last_track = self.originals.pop(0)
+
+            if len(songs):
+                # There are more tracks on the temp list
+                new_song, new_official = get_song(False)
+                self.last_track = Track(song, new_official, last_track_to_fade_out, official, {})
+                next_track = Track(new_song, new_official if len(songs) else next_track_to_fade_in, new_official, new_official, {})
+            else:
+                self.last_track = Track(song, next_track_to_fade_in, last_track_to_fade_out, official, {})
+            return (self.last_track, next_track), True
+        elif len(self.originals): 
+            self.last_track = self.originals.pop(0)
+            next_track = self.originals[0]
         else: self.last_track = track
 
         if self.limit_tracks:
@@ -65,14 +81,14 @@ class Module(ActiveModifier):
                 future = datetime.datetime.fromtimestamp(now.timestamp() + last_track_duration)
                 if now.hour < MORNING_START and future.hour > MORNING_START:
                     logger.warning("Skipping track as it bleeds into the morning")
-                    return None, None
+                    return (None, None), None
                 elif now.hour < DAY_END and future.hour > DAY_END:
                     logger.warning("Skipping track as it bleeds into the night")
-                    return None, None
+                    return (None, None), None
                 elif future.day > now.day: # late night goes mid day, as it starts at midnight
                     logger.warning("Skipping track as it the next day")
-                    return None, None
+                    return (None, None), None
 
-        return self.last_track, False
+        return (self.last_track, next_track), False
 
 activemod = Module()

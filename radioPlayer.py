@@ -182,8 +182,9 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
             continue
 
         track = playlist[song_i % len(playlist)]
+        next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
         if active_modifier:
-            track, extend = active_modifier.play(song_i, track)
+            (track, next_track), extend = active_modifier.play(song_i, track, next_track)
             if track is None:
                 song_i += 1
                 continue
@@ -192,7 +193,7 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
 
         logger.info(f"Now playing: {track.path.name}")
 
-        for module in simple_modules: module.on_new_track(song_i, track)
+        for module in simple_modules: module.on_new_track(song_i, track, next_track)
 
         pr = procman.play(track, cross_fade)
 
@@ -210,9 +211,10 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
             remaining_until_end = end_time - time.monotonic()
             if elapsed < 1 and remaining_until_end > 0: time.sleep(min(1 - elapsed, remaining_until_end))
 
+        if next_track: prefetch(next_track.path)
+    
         i += 1
         if not extend: song_i += 1
-        prefetch(playlist[song_i % len(playlist)].path)
 
 def main():
     logger.info("Core is starting, loading modules")

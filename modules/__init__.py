@@ -74,7 +74,7 @@ class PlayerModule(BaseIMCModule):
     def on_new_playlist(self, playlist: list[Track]) -> None:
         """This is called every new playlist"""
         pass
-    def on_new_track(self, index: int, track: Track) -> None:
+    def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:
         """
         Called on every track including the ones added by the active modifier, you can check for that comparing the playlists[index] and the track
         """
@@ -119,12 +119,13 @@ class ActiveModifier(BaseIMCModule):
         Called at start up with the program arguments
         """
         pass
-    def play(self, index:int, track: Track) -> tuple[Track, bool] | tuple[None, None]:
+    def play(self, index: int, track: Track, next_track: Track | None) -> tuple[tuple[Track, None] | tuple[Track, Track], bool] | tuple[tuple[None, None], None]:
         """
         Returns a tuple, in the first case where a is the track and b is a bool, b corresponds to whether to extend the playlist, set to true when adding content instead of replacing it
         When None, None is returned then that is treated as a skip, meaning the core will skip this song
+        The second track object is the next track, which is optional which is also only used for metadata and will not be taken in as data to play
         """
-        return track, False
+        return (track, None), False
     def on_new_playlist(self, playlist: list[Track]) -> None:
         """
         Same behaviour as the basic module function

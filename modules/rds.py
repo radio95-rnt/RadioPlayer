@@ -71,7 +71,7 @@ def update_rds(track_name: str):
     return prt, ','.join(list(map(str, rtp)))
 
 class Module(PlayerModule):
-    def on_new_track(self, index: int, track: Track):
+    def on_new_track(self, index: int, track: Track, next_track: Track | None):
         if track.official:
             rds_rt, rds_rtp = update_rds(track.path.name)
             logger.info(f"RT set to '{rds_rt}'")
