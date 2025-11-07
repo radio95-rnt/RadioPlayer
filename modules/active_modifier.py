@@ -68,7 +68,8 @@ class Module(ActiveModifier):
             return (self.last_track, next_track), True
         elif len(self.originals): 
             self.last_track = self.originals.pop(0)
-            next_track = self.originals[0]
+            if len(self.originals): next_track = self.originals[0]
+            else: next_track = track
         else: self.last_track = track
 
         if self.limit_tracks:
