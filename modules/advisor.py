@@ -50,12 +50,12 @@ class Module(PlaylistAdvisor):
         self.last_playlist = None
         self.class_imc = None
         self.custom_playlist = None
+        self.custom_playlist_path = Path("/tmp/radioPlayer_list")
     def advise(self, arguments: str | None) -> Path:
         if self.custom_playlist: return self.custom_playlist
 
-        custom_playlist = Path("/tmp/radioPlayer_list")
-        if custom_playlist.exists():
-            self.last_playlist = custom_playlist
+        if self.custom_playlist_path.exists():
+            self.last_playlist = self.custom_playlist_path
             self.custom_playlist = self.last_playlist
             return self.custom_playlist
         elif self.custom_playlist: self.custom_playlist = None
@@ -103,7 +103,7 @@ class Module(PlaylistAdvisor):
             self.last_playlist = night_playlist
             return night_playlist
     def new_playlist(self) -> bool:
-        if self.custom_playlist: return False
+        if self.custom_playlist and self.custom_playlist_path.exists(): return False
         if not self.last_playlist: return True
         if check_if_playlist_modifed(self.last_playlist): return True
         mod_time = Time.get_playlist_modification_time(self.last_playlist)
