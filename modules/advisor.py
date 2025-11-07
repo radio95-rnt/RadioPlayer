@@ -11,7 +11,7 @@ DAY_END = 18
 LATE_NIGHT_START = 0
 LATE_NIGHT_END = 5
 
-playlist_dir = "/home/user/playlists"
+playlist_dir = Path("/home/user/playlists")
 
 class Time:
     @staticmethod
@@ -19,12 +19,12 @@ class Time:
         try: return os.path.getmtime(playlist_path)
         except OSError: return 0
 
-def check_if_playlist_modifed(playlist_path: str) -> bool:
+def check_if_playlist_modifed(playlist_path: Path) -> bool:
     current_day, current_hour = datetime.datetime.now().strftime('%A').lower(), datetime.datetime.now().hour
-    morning_playlist_path = os.path.join(playlist_dir, current_day, 'morning')
-    day_playlist_path = os.path.join(playlist_dir, current_day, 'day')
-    night_playlist_path = os.path.join(playlist_dir, current_day, 'night')
-    late_night_playlist_path = os.path.join(playlist_dir, current_day, 'late_night')
+    morning_playlist_path = Path(playlist_dir, current_day, "morning").absolute()
+    day_playlist_path = Path(playlist_dir, current_day, "day").absolute()
+    night_playlist_path = Path(playlist_dir, current_day, "night").absolute()
+    late_night_playlist_path = Path(playlist_dir, current_day, "late_night").absolute()
 
     if DAY_START <= current_hour < DAY_END:
         if playlist_path != day_playlist_path:
@@ -48,57 +48,60 @@ class Module(PlaylistAdvisor):
     def __init__(self) -> None:
         self.last_mod_time = 0
         self.last_playlist = None
-        self.custom_playlist = None
         self.class_imc = None
+        self.custom_playlist = None
     def advise(self, arguments: str | None) -> Path:
         if self.custom_playlist: return self.custom_playlist
-        if arguments and arguments.startswith("list:"):
-            self.custom_playlist = Path(arguments.removeprefix("list:"))
-            assert self.custom_playlist.exists()
-            logger.info(f"The list {arguments.split(';')[0]} will be played instead of the daily section lists.")
+
+        custom_playlist = Path("/tmp/radioPlayer_list")
+        if custom_playlist.exists():
+            self.last_playlist = custom_playlist
+            self.custom_playlist = self.last_playlist
             return self.custom_playlist
+        elif self.custom_playlist: self.custom_playlist = None
+        
         current_day, current_hour = datetime.datetime.now().strftime('%A').lower(), datetime.datetime.now().hour
 
-        morning_playlist = os.path.join(playlist_dir, current_day, 'morning')
-        day_playlist = os.path.join(playlist_dir, current_day, 'day')
-        night_playlist = os.path.join(playlist_dir, current_day, 'night')
-        late_night_playlist = os.path.join(playlist_dir, current_day, 'late_night')
+        morning_playlist = Path(playlist_dir, current_day, "morning").absolute()
+        day_playlist = Path(playlist_dir, current_day, "day").absolute()
+        night_playlist = Path(playlist_dir, current_day, "night").absolute()
+        late_night_playlist = Path(playlist_dir, current_day, "late_night").absolute()
 
-        morning_dir = os.path.dirname(morning_playlist)
-        day_dir = os.path.dirname(day_playlist)
-        night_dir = os.path.dirname(night_playlist)
-        late_night_dir = os.path.dirname(late_night_playlist)
+        morning_dir = morning_playlist.parent
+        day_dir = day_playlist.parent
+        night_dir = night_playlist.parent
+        late_night_dir = late_night_playlist.parent
 
         for dir_path in [morning_dir, day_dir, night_dir, late_night_dir]:
-            if not os.path.exists(dir_path):
+            if not dir_path.exists():
                 logger.info(f"Creating directory: {dir_path}")
-                os.makedirs(dir_path, exist_ok=True)
+                dir_path.mkdir(exist_ok=True)
 
         for playlist_path in [morning_playlist, day_playlist, night_playlist, late_night_playlist]:
-            if not os.path.exists(playlist_path):
+            if not playlist_path.exists():
                 logger.info(f"Creating empty playlist: {playlist_path}")
-                with open(playlist_path, 'w'): pass
+                playlist_path.touch()
 
         if DAY_START <= current_hour < DAY_END:
             logger.info(f"Playing {current_day} day playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(day_playlist)
             self.last_playlist = day_playlist
-            return Path(day_playlist)
+            return day_playlist
         elif MORNING_START <= current_hour < MORNING_END:
             logger.info(f"Playing {current_day} morning playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(morning_playlist)
             self.last_playlist = morning_playlist
-            return Path(morning_playlist)
+            return morning_playlist
         elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
             logger.info(f"Playing {current_day} late_night playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(late_night_playlist)
             self.last_playlist = late_night_playlist
-            return Path(late_night_playlist)
+            return late_night_playlist
         else:
             logger.info(f"Playing {current_day} night playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(night_playlist)
             self.last_playlist = night_playlist
-            return Path(night_playlist)
+            return night_playlist
     def new_playlist(self) -> bool:
         if self.custom_playlist: return False
         if not self.last_playlist: return True

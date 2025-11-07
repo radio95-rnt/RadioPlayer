@@ -6,7 +6,7 @@ import libcache
 from modules import *
 
 def prefetch(path):
-    if os.name == "nt": return
+    if os.name != "posix": return
     with open(path, "rb") as f:
         fd = f.fileno()
         os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_SEQUENTIAL)
