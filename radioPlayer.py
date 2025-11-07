@@ -102,7 +102,7 @@ def load_filelines(path: Path):
         return []
 
 def parse_playlistfile(playlist_path: Path) -> tuple[dict[str, str], list[tuple[list[str], dict[str, str]]]]:
-    lines = load_filelines(playlist_path.absolute())
+    lines = load_filelines(playlist_path)
     def check_for_imports(lines: list[str], seen=None) -> list[str]:
         if seen is None: seen = set()
         out = []
@@ -115,8 +115,7 @@ def parse_playlistfile(playlist_path: Path) -> tuple[dict[str, str], list[tuple[
                         logger.error(f"Target {target.name} of {playlist_path.name} does not exist")
                         continue
                     seen.add(target)
-                    sub_lines = load_filelines(target)
-                    out.extend(check_for_imports(sub_lines, seen))
+                    out.extend(check_for_imports(load_filelines(target), seen))
             else: out.append(line)
         return out
     lines = check_for_imports(lines) # First, import everything
@@ -154,7 +153,7 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
     playlist: list[Track] = []
     [playlist.extend(Track(Path(line).absolute(), True, True, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
 
-    for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist) or playlist
+    for module in playlist_modifier_modules: playlist = module.modify(global_args, playlist) or playlist # id one liner this but the assignement is stopping me
 
     prefetch(playlist[0].path)
 
