@@ -1,3 +1,10 @@
+MORNING_START = 5
+MORNING_END = 10
+DAY_START = 10
+DAY_END = 18
+LATE_NIGHT_START = 0
+LATE_NIGHT_END = 5
+
 from modules import BaseIMCModule, InterModuleCommunication
 from . import PlaylistAdvisor, log95, Path
 import os, datetime
@@ -7,13 +14,6 @@ _log_file: TextIO
 
 assert _log_file # pyright: ignore[reportUnboundVariable]
 logger = log95.log95("ADVISOR", output=_log_file)
-
-MORNING_START = 5
-MORNING_END = 10
-DAY_START = 10
-DAY_END = 18
-LATE_NIGHT_START = 0
-LATE_NIGHT_END = 5
 
 playlist_dir = Path("/home/user/playlists")
 
