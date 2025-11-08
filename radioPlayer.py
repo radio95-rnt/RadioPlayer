@@ -22,6 +22,7 @@ MODULES_PACKAGE = "modules"
 MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
 
 log_file_path = Path("/tmp/radioPlayer_log")
+if log_file_path.exists(): log_file_path.unlink()
 log_file_path.touch()
 log_file = open(log_file_path, "w")
 logger = log95.log95("CORE", output=log_file)
