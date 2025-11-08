@@ -1,4 +1,5 @@
-from . import PlayerModule, log95, Track, Path
+from . import PlayerModule, log95, Track
+import os
 
 logger = log95.log95("PlayView")
 
@@ -8,6 +9,9 @@ class Module(PlayerModule):
     def on_new_playlist(self, playlist: list[Track]):
         self.playlist = [str(t.path.absolute()) for t in playlist]
     def on_new_track(self, index: int, track: Track, next_track: Track | None):
+        if os.path.exists("/tmp/radioPlayer_skip"):
+            self._imc.send(self, "procman", {"op": 2})
+            os.remove("/tmp/radioPlayer_skip")
         if next_track: logger.info("Next up:", next_track.path.name)
         if str(track.path) != self.playlist[index]:
             # discrepancy, which means that the playing file was modified by the active modifier

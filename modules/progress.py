@@ -1,5 +1,4 @@
-from . import PlayerModule, Track
-import os
+from . import PlayerModule, Track, Path
 
 def format_time(seconds) -> str:
     hours = int(seconds // 3600)
@@ -10,9 +9,8 @@ def format_time(seconds) -> str:
 class Module(PlayerModule):
     def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float) -> None:
         if track.official: 
-            print(f"{track.path.name}: {format_time(elapsed)} / {format_time(total)}", end="\r", flush=True)
-        if os.path.exists("/tmp/radioPlayer_skip"):
-            self._imc.send(self, "procman", {"op": 2})
-            os.remove("/tmp/radioPlayer_skip")
+            data = f"{track.path.name}: {format_time(elapsed)} / {format_time(total)}"
+            # print(data, end="\r", flush=True)
+            Path("/tmp/radioPlayer_progress").write_text(data)
 
 module = Module()
