@@ -243,6 +243,7 @@ def main():
             module.__package__ = MODULES_PACKAGE
 
             module._log_file = log_file # type: ignore
+            module.__dict__['_log_file'] = log_file
 
             if not spec.loader: continue
             try: spec.loader.exec_module(module)
