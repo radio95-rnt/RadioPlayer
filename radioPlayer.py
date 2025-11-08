@@ -21,7 +21,8 @@ active_modifier: ActiveModifier | None = None
 MODULES_PACKAGE = "modules"
 MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
 
-logger = log95.log95("CORE")
+log_file = open(Path("/tmp/radioPlayer_log"))
+logger = log95.log95("CORE", output=log_file)
 
 exit_pending = False
 exit_status_code = 0
