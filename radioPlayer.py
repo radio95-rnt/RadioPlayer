@@ -24,6 +24,7 @@ MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
 logger = log95.log95("CORE")
 
 exit_pending = False
+exit_status_code = 0
 intr_time = 0
 exit_lock = threading.Lock()
 
@@ -81,17 +82,18 @@ class ProcessManager(Skeleton_ProcessManager):
 procman = ProcessManager()
 
 def handle_sigint(signum, frame):
-    global exit_pending, intr_time
+    global exit_pending, intr_time, exit_status_code
     with exit_lock:
         logger.info("Received SIGINT")
         if (time.monotonic() - intr_time) > 5:
             intr_time = time.monotonic()
             logger.info("Will quit on song end.")
             exit_pending = True
+            exit_status_code = 130
         else:
             logger.warning("Force-Quit pending")
             procman.stop_all()
-            raise SystemExit
+            raise SystemExit(130)
 signal.signal(signal.SIGINT, handle_sigint)
 
 def load_filelines(path: Path):
@@ -170,7 +172,7 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
         if exit_pending:
             logger.info("Quit received, waiting for song end.")
             procman.wait_all()
-            raise SystemExit
+            raise SystemExit(exit_status_code)
         elif return_pending:
             logger.info("Return reached, next song will reload the playlist.")
             procman.wait_all()
@@ -275,7 +277,7 @@ def main():
             if playlist := playlist_advisor.advise(arg):
                 logger.info(f"Advisor picked '{playlist}' to play")
                 play_playlist(playlist)
-            if exit_pending: raise SystemExit
+            if exit_pending: raise SystemExit(exit_status_code)
     except Exception as e:
         logger.critical_error(f"Unexpected error: {e}")
         raise
