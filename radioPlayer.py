@@ -21,7 +21,9 @@ active_modifier: ActiveModifier | None = None
 MODULES_PACKAGE = "modules"
 MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
 
-log_file = open(Path("/tmp/radioPlayer_log"))
+log_file_path = Path("/tmp/radioPlayer_log")
+log_file_path.touch()
+log_file = open(log_file_path, "w")
 logger = log95.log95("CORE", output=log_file)
 
 exit_pending = False
@@ -282,4 +284,6 @@ def main():
     except Exception as e:
         logger.critical_error(f"Unexpected error: {e}")
         raise
-    finally: procman.stop_all()
+    finally: 
+        procman.stop_all()
+        log_file.close()
