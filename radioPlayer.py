@@ -225,6 +225,7 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
 def main():
     logger.info("Core is starting, loading modules")
     global playlist_advisor, active_modifier
+    modules: list[tuple] = []
     for file in MODULES_DIR.glob("*"):
         if file.name.endswith(".py") and file.name != "__init__.py":
             module_name = file.name[:-3]
@@ -245,7 +246,9 @@ def main():
 
             module._log_file = log_file # type: ignore
             module.__dict__['_log_file'] = log_file
-
+            modules.append((spec, module, module_name))
+    
+        for (spec, module, module_name) in modules:
             if not spec.loader: continue
             try: spec.loader.exec_module(module)
             except Exception as e:
