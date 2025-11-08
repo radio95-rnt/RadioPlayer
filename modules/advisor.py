@@ -1,4 +1,4 @@
-from modules import ActiveModifier, InterModuleCommunication, PlayerModule
+from modules import BaseIMCModule, InterModuleCommunication
 from . import PlaylistAdvisor, log95, Path
 import os, datetime
 
@@ -118,7 +118,7 @@ class Module(PlaylistAdvisor):
     def imc(self, imc: InterModuleCommunication) -> None:
         self.class_imc = imc
         imc.register(self, "advisor")
-    def imc_data(self, source: PlayerModule | ActiveModifier | PlaylistAdvisor, source_name: str | None, data: object, broadcast: bool):
+    def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool):
         return self.custom_playlist
 
 advisor = Module()
