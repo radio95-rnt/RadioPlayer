@@ -2,7 +2,11 @@ from modules import ActiveModifier, InterModuleCommunication, PlayerModule
 from . import PlaylistAdvisor, log95, Path
 import os, datetime
 
-logger = log95.log95("ADVISOR")
+from typing import TextIO
+_log_file: TextIO
+
+assert _log_file # pyright: ignore[reportUnboundVariable]
+logger = log95.log95("ADVISOR", output=_log_file)
 
 MORNING_START = 5
 MORNING_END = 10

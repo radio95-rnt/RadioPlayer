@@ -1,7 +1,11 @@
 from . import PlayerModule, log95, Track
 import os
 
-logger = log95.log95("PlayView")
+from typing import TextIO
+_log_file: TextIO
+
+assert _log_file # pyright: ignore[reportUnboundVariable]
+logger = log95.log95("PlayView", output=_log_file)
 
 class Module(PlayerModule):
     def __init__(self) -> None:

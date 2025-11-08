@@ -242,6 +242,8 @@ def main():
                 sys.modules[MODULES_PACKAGE] = parent
             module.__package__ = MODULES_PACKAGE
 
+            module._log_file = log_file # type: ignore
+
             if not spec.loader: continue
             try: spec.loader.exec_module(module)
             except Exception as e:

@@ -1,9 +1,13 @@
 from . import ActiveModifier, log95, Track, Path
 import os, glob, datetime
 
+from typing import TextIO
+_log_file: TextIO
+
 from .advisor import MORNING_START, DAY_END
 
-logger = log95.log95("AC-MOD")
+assert _log_file # pyright: ignore[reportUnboundVariable]
+logger = log95.log95("AC-MOD", output=_log_file)
 
 class Module(ActiveModifier):
     def __init__(self) -> None:
