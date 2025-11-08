@@ -2,7 +2,7 @@
 import time
 import os, subprocess, importlib.util, types
 import sys, signal, threading, glob
-import libcache
+import libcache, traceback
 from modules import *
 
 def prefetch(path):
@@ -249,6 +249,7 @@ def main():
             if not spec.loader: continue
             try: spec.loader.exec_module(module)
             except Exception as e:
+                traceback.print_exc()
                 logger.error(f"Failed loading {module_name} due to {e}")
                 continue
 
