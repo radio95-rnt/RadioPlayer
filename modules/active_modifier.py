@@ -4,8 +4,6 @@ import os, glob, datetime
 from typing import TextIO
 _log_file: TextIO
 
-from .advisor import MORNING_START, DAY_END
-
 assert _log_file # pyright: ignore[reportUnboundVariable]
 logger = log95.log95("AC-MOD", output=_log_file)
 
@@ -14,12 +12,14 @@ class Module(ActiveModifier):
         self.playlist = None
         self.originals = []
         self.last_track = None
-        self.limit_tracks = True
+        self.limit_tracks = False
+        self.morning_start = self.day_end = 0
     def on_new_playlist(self, playlist: list[Track]):
         self.playlist = playlist
 
         if not self._imc: return
-        self.limit_tracks = bool(self._imc.send(self, "advisor", None))
+        self.limit_tracks, self.morning_start, self.day_end = self._imc.send(self, "advisor", None) # pyright: ignore[reportGeneralTypeIssues]
+        self.limit_tracks = bool(self.limit_tracks)
     def play(self, index: int, track: Track, next_track: Track | None):
         if not self.playlist: return (track, next_track), False
         if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
@@ -84,10 +84,10 @@ class Module(ActiveModifier):
             if last_track_duration and last_track_duration > 5*60:
                 now = datetime.datetime.now()
                 future = datetime.datetime.fromtimestamp(now.timestamp() + last_track_duration)
-                if now.hour < MORNING_START and future.hour > MORNING_START:
+                if now.hour < self.morning_start and future.hour > self.morning_start:
                     logger.warning("Skipping track as it bleeds into the morning")
                     return (None, None), None
-                elif now.hour < DAY_END and future.hour > DAY_END:
+                elif now.hour < self.day_end and future.hour > self.day_end:
                     logger.warning("Skipping track as it bleeds into the night")
                     return (None, None), None
                 elif future.day > now.day: # late night goes mid day, as it starts at midnight
