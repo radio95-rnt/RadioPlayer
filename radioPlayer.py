@@ -197,6 +197,8 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
             if extend: max_iterator += 1
         else: extend = False
 
+        prefetch(track.path)
+
         logger.info(f"Now playing: {track.path.name}")
 
         for module in simple_modules: module.on_new_track(song_i, track, next_track)
@@ -207,6 +209,8 @@ def play_playlist(playlist_path: Path, starting_index: int = 0):
         if track.fade_out: ttw -= cross_fade
 
         end_time = pr.started_at + ttw
+
+        if next_track: prefetch(next_track.path)
 
         while end_time >= time.monotonic() and pr.process.poll() is None:
             start = time.monotonic()
