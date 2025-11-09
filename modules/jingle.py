@@ -12,21 +12,20 @@ from . import PlaylistModifierModule, Track, Path
 
 class Module(PlaylistModifierModule):
     def __init__(self, file: Path) -> None:
-        self.file = file
+        self.file = file.absolute()
         assert file.exists()
     def modify(self, global_args: dict, playlist: list[Track]) -> list[Track] | None:
-        if int(global_args.get("no_jingle", 0)): return None
+        if int(global_args.get("no_jingle", 0)) != 0: return None
         out: list[Track] = []
         last_jingiel = True
         for track in playlist:
-            if not last_jingiel and random.choice([False, True, False, False]) and self.file and (track.args and int(track.args.get("no_jingle", 0)) == 0):
+            if not last_jingiel and (random.randint(1,4) == 1) and self.file and (track.args and int(track.args.get("no_jingle", 0)) != 0):
                 out.append(Track(track.path, True, False, True, track.args))
                 out.append(Track(self.file, False, False, False, {}))
                 last_jingiel = True
                 continue
             out.append(Track(track.path, True, True, True, track.args))
             last_jingiel = False
-        del last_jingiel
         return out
 
 playlistmod = (Module(Path("/home/user/Jingiel.mp3")), 1)
