@@ -55,12 +55,14 @@ class Module(PlaylistAdvisor):
         self.class_imc = None
         self.custom_playlist = None
         self.custom_playlist_path = Path("/tmp/radioPlayer_list")
+        self.custom_playlist_last_mod = 0
     def advise(self, arguments: str | None) -> Path:
         if self.custom_playlist: return self.custom_playlist
 
         if self.custom_playlist_path.exists():
             self.last_playlist = self.custom_playlist_path
             self.custom_playlist = self.last_playlist
+            self.custom_playlist_last_mod = Time.get_playlist_modification_time(self.custom_playlist)
             return self.custom_playlist
         elif self.custom_playlist: self.custom_playlist = None
         
@@ -107,7 +109,14 @@ class Module(PlaylistAdvisor):
             self.last_playlist = night_playlist
             return night_playlist
     def new_playlist(self) -> bool:
-        if self.custom_playlist and self.custom_playlist_path.exists(): return False
+        if self.custom_playlist and self.custom_playlist_path.exists(): 
+            mod_time = Time.get_playlist_modification_time(self.custom_playlist)
+            if mod_time > self.custom_playlist_last_mod:
+                logger.info("Custom playlist changed on disc, reloading...")
+                self.custom_playlist = None
+                return True
+            return False
+        elif self.custom_playlist_path.exists(): return True
         if not self.last_playlist: return True
         if check_if_playlist_modifed(self.last_playlist): return True
         mod_time = Time.get_playlist_modification_time(self.last_playlist)
