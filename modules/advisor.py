@@ -10,10 +10,10 @@ from . import PlaylistAdvisor, log95, Path
 import os, datetime
 
 from typing import TextIO
-_log_file: TextIO
+_log_out: TextIO
 
-assert _log_file # pyright: ignore[reportUnboundVariable]
-logger = log95.log95("ADVISOR", output=_log_file)
+assert _log_out # pyright: ignore[reportUnboundVariable]
+logger = log95.log95("ADVISOR", output=_log_out)
 
 playlist_dir = Path("/home/user/playlists")
 

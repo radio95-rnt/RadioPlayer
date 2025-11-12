@@ -11,11 +11,11 @@ rds_default_artist = "radio95"
 udp_host = ("127.0.0.1", 5000)
 
 from typing import TextIO
-_log_file: TextIO
+_log_out: TextIO
 
 logger_level = log95.log95Levels.DEBUG if DEBUG else log95.log95Levels.CRITICAL_ERROR
-assert _log_file # pyright: ignore[reportUnboundVariable]
-logger = log95.log95("RDS-MODULE", logger_level, output=_log_file)
+assert _log_out # pyright: ignore[reportUnboundVariable]
+logger = log95.log95("RDS-MODULE", logger_level, output=_log_out)
 
 def load_dict_from_custom_format(file_path: str) -> dict[str, str]:
     try:
