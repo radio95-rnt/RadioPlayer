@@ -34,10 +34,9 @@ class Module(ActiveModifier):
             official = True
             if song.startswith("!"):
                 song = song[1:]
-                official = False # NOT FLOATINGPOINTERROR
+                official = False
             
-            song = Path(song).absolute()
-            return song, official
+            return Path(song).absolute(), official
 
         if len(songs):
             song, official = get_song()
@@ -60,7 +59,6 @@ class Module(ActiveModifier):
                 f.write("\n")
 
             logger.info(f"Playing {song.name} instead, as instructed by toplay")
-
 
             if len(songs):
                 # There are more tracks on the temp list
@@ -93,7 +91,6 @@ class Module(ActiveModifier):
                 elif future.day > now.day: # late night goes mid day, as it starts at midnight
                     logger.warning("Skipping track as it the next day")
                     return (None, None), None
-
         return (self.last_track, next_track), False
 
 activemod = Module()

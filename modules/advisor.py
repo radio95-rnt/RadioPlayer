@@ -5,8 +5,7 @@ DAY_END = 18
 LATE_NIGHT_START = 0
 LATE_NIGHT_END = 5
 
-from modules import BaseIMCModule, InterModuleCommunication
-from . import PlaylistAdvisor, log95, Path
+from . import BaseIMCModule, InterModuleCommunication, PlaylistAdvisor, log95, Path
 import os, datetime
 
 from typing import TextIO
@@ -24,25 +23,25 @@ class Time:
         except OSError: return 0
 
 def check_if_playlist_modifed(playlist_path: Path) -> bool:
-    current_day, current_hour = datetime.datetime.now().strftime('%A').lower(), datetime.datetime.now().hour
-    morning_playlist_path = Path(playlist_dir, current_day, "morning").absolute()
-    day_playlist_path = Path(playlist_dir, current_day, "day").absolute()
-    night_playlist_path = Path(playlist_dir, current_day, "night").absolute()
-    late_night_playlist_path = Path(playlist_dir, current_day, "late_night").absolute()
+    current_day, current_hour = (time := datetime.datetime.now()).strftime('%A').lower(), time.hour
 
     if DAY_START <= current_hour < DAY_END:
+        day_playlist_path = Path(playlist_dir, current_day, "day").absolute()
         if playlist_path != day_playlist_path:
             logger.info("Time changed to day hours, switching playlist...")
             return True
     elif MORNING_START <= current_hour < MORNING_END:
+        morning_playlist_path = Path(playlist_dir, current_day, "morning").absolute()
         if playlist_path != morning_playlist_path:
             logger.info("Time changed to morning hours, switching playlist...")
             return True
     elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
+        late_night_playlist_path = Path(playlist_dir, current_day, "late_night").absolute()
         if playlist_path != late_night_playlist_path:
             logger.info("Time changed to late night hours, switching playlist...")
             return True
     else:
+        night_playlist_path = Path(playlist_dir, current_day, "night").absolute()
         if playlist_path != night_playlist_path:
             logger.info("Time changed to night hours, switching playlist...")
             return True
@@ -53,6 +52,7 @@ class Module(PlaylistAdvisor):
         self.last_mod_time = 0
         self.last_playlist = None
         self.class_imc = None
+
         self.custom_playlist = None
         self.custom_playlist_path = Path("/tmp/radioPlayer_list")
         self.custom_playlist_last_mod = 0
@@ -66,7 +66,7 @@ class Module(PlaylistAdvisor):
             return self.custom_playlist
         elif self.custom_playlist: self.custom_playlist = None
         
-        current_day, current_hour = datetime.datetime.now().strftime('%A').lower(), datetime.datetime.now().hour
+        current_day, current_hour = (time := datetime.datetime.now()).strftime('%A').lower(), time.hour
 
         morning_playlist = Path(playlist_dir, current_day, "morning").absolute()
         day_playlist = Path(playlist_dir, current_day, "day").absolute()
@@ -92,35 +92,32 @@ class Module(PlaylistAdvisor):
             logger.info(f"Playing {current_day} day playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(day_playlist)
             self.last_playlist = day_playlist
-            return day_playlist
         elif MORNING_START <= current_hour < MORNING_END:
             logger.info(f"Playing {current_day} morning playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(morning_playlist)
             self.last_playlist = morning_playlist
-            return morning_playlist
         elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
-            logger.info(f"Playing {current_day} late_night playlist...")
+            logger.info(f"Playing {current_day} late night playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(late_night_playlist)
             self.last_playlist = late_night_playlist
-            return late_night_playlist
         else:
             logger.info(f"Playing {current_day} night playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(night_playlist)
             self.last_playlist = night_playlist
-            return night_playlist
+        return self.last_playlist
     def new_playlist(self) -> bool:
         if self.custom_playlist and self.custom_playlist_path.exists(): 
-            mod_time = Time.get_playlist_modification_time(self.custom_playlist)
-            if mod_time > self.custom_playlist_last_mod:
+            if Time.get_playlist_modification_time(self.custom_playlist) > self.custom_playlist_last_mod:
                 logger.info("Custom playlist changed on disc, reloading...")
                 self.custom_playlist = None
                 return True
             return False
         elif self.custom_playlist_path.exists(): return True
+
         if not self.last_playlist: return True
+
         if check_if_playlist_modifed(self.last_playlist): return True
-        mod_time = Time.get_playlist_modification_time(self.last_playlist)
-        if mod_time > self.last_mod_time:
+        if Time.get_playlist_modification_time(self.last_playlist) > self.last_mod_time:
             logger.info("Playlist changed on disc, reloading...")
             return True
         return False

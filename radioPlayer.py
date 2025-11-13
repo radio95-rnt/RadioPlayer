@@ -170,10 +170,9 @@ class RadioPlayer:
         for (spec, module, module_name) in self.modules:
             assert spec.loader
             try:
-                start = time.monotonic()
-                time.perf_counter()
+                start = time.perf_counter()
                 spec.loader.exec_module(module)
-                time_took = time.monotonic() - start
+                time_took = time.perf_counter() - start
                 if time_took > 0.2: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
             except Exception as e:
                 traceback.print_exc(file=self.logger.output)
@@ -215,7 +214,8 @@ class RadioPlayer:
         playlist: list[Track] = []
         [playlist.extend(Track(Path(line).absolute(), True, True, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
 
-        for module in self.playlist_modifier_modules: playlist = module.modify(global_args, playlist) or playlist # id one liner this but the assignement is stopping me
+        [(playlist := module.modify(global_args, playlist) or playlist) for module in self.playlist_modifier_modules if module] # yep
+    
         prefetch(playlist[0].path)
         [mod.on_new_playlist(playlist) for mod in self.simple_modules + [self.active_modifier] if mod] # one liner'd everything
 
