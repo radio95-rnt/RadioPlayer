@@ -208,6 +208,7 @@ class RadioPlayer:
         try: global_args, parsed = self.parser.parse(playlist_path)
         except Exception as e:
             self.logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...")
+            traceback.print_exc(file=self.logger.output)
             time.sleep(15)
             return
 
