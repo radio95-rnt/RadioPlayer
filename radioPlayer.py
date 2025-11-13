@@ -112,7 +112,7 @@ class PlaylistParser:
                     for arg in args:
                         key, val = arg.split("=", 1)
                         arguments[key] = val
-            out.append(([f for f in Path().glob(line) if Path(f).is_file()], arguments))
+            out.append(([f for f in glob.glob(line) if Path(f).is_file()], arguments))
         return global_arguments, out
 
 class RadioPlayer:
