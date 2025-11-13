@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-import time
-import os, subprocess, importlib.util, types
-import sys, signal, threading, glob
+import time, types
+import os, subprocess, importlib.util
+import sys, signal, glob
 import libcache, traceback, atexit
 from modules import *
+from threading import Lock
 
 def prefetch(path):
     if os.name != "posix": return
@@ -19,18 +20,16 @@ MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
 
 class ProcessManager(Skeleton_ProcessManager):
     def __init__(self) -> None:
-        self.lock = threading.Lock()
+        self.lock = Lock()
         self.processes: list[Process] = []
         self.duration_cache = libcache.Cache([])
     def _get_audio_duration(self, file_path: Path):
         if result := self.duration_cache.getElement(file_path.as_posix(), False): return result
-
         result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', str(file_path)], capture_output=True, text=True)
         if result.returncode == 0:
             result = float(result.stdout.strip())
             self.duration_cache.saveElement(file_path.as_posix(), result, (60*60), False, True)
             return result
-        return None
     def play(self, track: Track, fade_time: int=5) -> Process:
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
         assert track.path.exists()
@@ -69,17 +68,16 @@ class ProcessManager(Skeleton_ProcessManager):
             self.processes.clear()
 
 class PlaylistParser:
-    def __init__(self, output: log95.TextIO) -> types.NoneType: self.logger = log95.log95("PARSER", output=output)
-    def load_filelines(self, path: Path):
-        try:
-            return [line.strip() for line in path.read_text().splitlines() if line.strip()]
-        except FileNotFoundError:
-            self.logger.error(f"Playlist not found: {path.name}")
-            return []
-    
+    def __init__(self, output: log95.TextIO): self.logger = log95.log95("PARSER", output=output)
+
     def _check_for_imports(self, path: Path, seen=None) -> list[str]:
         if seen is None: seen = set()
-        lines = self.load_filelines(path)
+
+        if not path.exists():
+            self.logger.error(f"Playlist not found: {path.name}")
+            return []
+        lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
+
         out = []
         for line in lines:
             if line.startswith("@"):
@@ -93,8 +91,9 @@ class PlaylistParser:
             else: out.append(line)
         return out
 
-    def parse_playlistfile(self, playlist_path: Path) -> tuple[dict[str, str], list[tuple[list[str], dict[str, str]]]]:
-        lines = self._check_for_imports(playlist_path) # First, import everything
+    def parse(self, playlist_path: Path) -> tuple[dict[str, str], list[tuple[list[str], dict[str, str]]]]:
+        lines = self._check_for_imports(playlist_path)
+
         out = []
         global_arguments = {}
         for line in lines:
@@ -113,7 +112,7 @@ class PlaylistParser:
                     for arg in args:
                         key, val = arg.split("=", 1)
                         arguments[key] = val
-            out.append(([f for f in glob.glob(line) if os.path.isfile(f)], arguments))
+            out.append(([f for f in Path().glob(line) if Path(f).is_file()], arguments))
         return global_arguments, out
 
 class RadioPlayer:
@@ -126,11 +125,14 @@ class RadioPlayer:
         self.exit_pending = False
         self.exit_status_code = 0
         self.intr_time = 0
-        self.exit_lock = threading.Lock()
+        self.exit_lock = Lock()
         self.procman = ProcessManager()
         self.modules: list[tuple] = []
         self.parser = PlaylistParser(output)
-    def shutdown(self): self.procman.stop_all()
+
+    def shutdown(self): 
+        self.procman.stop_all()
+
     def handle_sigint(self, signum, frame):
         with self.exit_lock:
             self.logger.info("Received CTRL+C (SIGINT)")
@@ -172,7 +174,7 @@ class RadioPlayer:
                 time.perf_counter()
                 spec.loader.exec_module(module)
                 time_took = time.monotonic() - start
-                if time_took > 0.2: self.logger.warning(f"{module_name} took {time_took:.2f}s to start")
+                if time_took > 0.2: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
             except Exception as e:
                 traceback.print_exc(file=self.logger.output)
                 self.logger.error(f"Failed loading {module_name} due to {e}, continuing")
@@ -204,9 +206,7 @@ class RadioPlayer:
             raise SystemExit(1)
 
     def play_playlist(self, playlist_path: Path, starting_index: int = 0):
-        assert self.playlist_advisor
-
-        try: global_args, parsed = self.parser.parse_playlistfile(playlist_path)
+        try: global_args, parsed = self.parser.parse(playlist_path)
         except Exception as e:
             self.logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...")
             time.sleep(15)
@@ -235,7 +235,7 @@ class RadioPlayer:
                 self.logger.info("Return reached, next song will reload the playlist.")
                 self.procman.wait_all()
                 return
-            if self.playlist_advisor.new_playlist():
+            if self.playlist_advisor and self.playlist_advisor.new_playlist():
                 self.logger.info("Reloading now...")
                 return_pending = True
                 continue
@@ -253,18 +253,15 @@ class RadioPlayer:
             prefetch(track.path)
             self.logger.info(f"Now playing: {track.path.name}")
 
-            for module in self.simple_modules: module.on_new_track(song_i, track, next_track)
+            [module.on_new_track(song_i, track, next_track) for module in self.simple_modules if module]
 
             pr = self.procman.play(track, cross_fade)
-            ttw = pr.duration
-            if track.fade_out: ttw -= cross_fade
-            end_time = pr.started_at + ttw
-
-            if next_track: prefetch(next_track.path)
+            end_time = pr.started_at + pr.duration
+            if track.fade_out: end_time -= cross_fade
 
             while end_time >= time.monotonic() and pr.process.poll() is None:
                 start = time.monotonic()
-                [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, ttw) for module in self.simple_modules if module]
+                [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, end_time - pr.started_at) for module in self.simple_modules if module]
                 elapsed = time.monotonic() - start
                 remaining_until_end = end_time - time.monotonic()
                 if elapsed < 1 and remaining_until_end > 0: time.sleep(min(1 - elapsed, remaining_until_end))
