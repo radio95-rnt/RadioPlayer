@@ -605,6 +605,8 @@ class Application:
         self.playlists = {}
         self.days_of_week = []
 
+        self.redraw = False
+
     def setup_signal_handler(self):
         """Setup signal handler for graceful exit."""
         def signal_handler(sig, frame):
@@ -752,6 +754,8 @@ class Application:
                 self.playlists[current_day][period].update(file_item.all_files)
 
             self.playlist_manager.update_playlist_file(current_day, period, file_item, not is_in_playlist)
+        
+        self.redraw = True
 
     def handle_search_input(self, key: str):
         """Handle search input."""
@@ -799,7 +803,8 @@ class Application:
                     self.state.last_current_day_idx != self.current_day_idx or
                     self.state.last_scroll_offset != self.scroll_offset or
                     self.flash_message != self.state.last_message or
-                    self.state.last_search != self.search_term
+                    self.state.last_search != self.search_term or
+                    self.redraw
                 )
 
                 if needs_redraw:
@@ -807,6 +812,7 @@ class Application:
                     self.state.last_selected_idx = self.selected_idx
                     self.state.last_current_day_idx = self.current_day_idx
                     self.state.last_scroll_offset = self.scroll_offset
+                    if self.redraw: self.redraw = False
 
                 # Handle flash message timer
                 if self.flash_message:
