@@ -15,7 +15,6 @@ from dataclasses import dataclass
 # Configuration
 FILES_DIR = "/home/user/mixes/"
 PLAYLISTS_DIR = "/home/user/playlists/"
-FORMATS = ('.mp3', '.m4a', '.flac', '.wav', '.opus')
 POLISH_INDICATORS = ("Polskie", "Dzem")
 
 @dataclass
@@ -61,7 +60,7 @@ class FileManager:
         audio_files = []
         try:
             for file in os.listdir(directory):
-                if file.lower().endswith(FORMATS): audio_files.append(file)
+                audio_files.append(file)
             return sorted(audio_files)
         except FileNotFoundError:
             print(f"Error: Directory '{directory}' not found.")
@@ -80,7 +79,7 @@ class FileManager:
             for entry in entries:
                 full_path = os.path.join(directory, entry)
                 
-                if os.path.isfile(full_path) and entry.lower().endswith(FORMATS):
+                if os.path.isfile(full_path):
                     # Single audio file
                     items.append(FileItem(name=entry, is_folder=False, files=[entry]))
                 
@@ -89,14 +88,12 @@ class FileManager:
                     audio_files = []
                     try:
                         for file in os.listdir(full_path):
-                            if file.lower().endswith(FORMATS): audio_files.append(file)
+                            audio_files.append(file)
                     except (PermissionError, FileNotFoundError): continue
-                    
-                    fake_files = [f"*{i}" for i in FORMATS]
-                    
+                                        
                     if audio_files:
                         # Folder contains audio files
-                        items.append(FileItem(name=entry, is_folder=True, files=fake_files))
+                        items.append(FileItem(name=entry, is_folder=True, files=["*"]))
             
             return items
         except FileNotFoundError:
