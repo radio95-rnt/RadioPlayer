@@ -11,7 +11,8 @@ import random
 from . import PlaylistModifierModule, Track, Path
 
 class Module(PlaylistModifierModule):
-    def __init__(self, primary: Path, secondary: list[Path] = []) -> None:
+    def __init__(self, primary: Path, secondary: list[Path] | None = None) -> None:
+        if secondary is None: secondary = []
         self.primary = primary.absolute()
         assert primary.exists()
         self.secondary = [f.absolute() for f in secondary if f.exists()]
@@ -23,7 +24,7 @@ class Module(PlaylistModifierModule):
             if not last_jingiel and (random.randint(1,3) == 1) and (track.args is None or int(track.args.get("no_jingle", 0)) == 0):
                 out.append(Track(track.path, True, False, True, track.args))
                 jingle = self.primary
-                if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary) or self.primary
+                if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary)
                 out.append(Track(jingle, False, False, False, {}))
                 last_jingiel = True
                 continue
