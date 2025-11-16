@@ -116,7 +116,7 @@ class PlaylistParser:
         return global_arguments, out
 
 class RadioPlayer:
-    def __init__(self, output: log95.TextIO):
+    def __init__(self, arg: str | None, output: log95.TextIO):
         self.simple_modules: list[PlayerModule] = []
         self.playlist_modifier_modules: list[PlaylistModifierModule] = []
         self.playlist_advisor: PlaylistAdvisor | None = None
@@ -129,6 +129,7 @@ class RadioPlayer:
         self.procman = ProcessManager()
         self.modules: list[tuple] = []
         self.parser = PlaylistParser(output)
+        self.arg = arg
 
     def shutdown(self): 
         self.procman.stop_all()
@@ -196,6 +197,7 @@ class RadioPlayer:
                 if self.active_modifier: raise Exception("Multiple active modifiers")
                 self.active_modifier = md
         InterModuleCommunication(self.simple_modules + [self.playlist_advisor, ProcmanCommunicator(self.procman), self.active_modifier])
+        if self.active_modifier: self.active_modifier.arguments(self.arg)
 
     def start(self):
         self.logger.info("Core starting, loading modules")
@@ -204,7 +206,8 @@ class RadioPlayer:
             self.logger.critical_error("Playlist advisor was not found")
             raise SystemExit(1)
 
-    def play_playlist(self, playlist_path: Path, starting_index: int = 0):
+    def play_once(self):
+        if not self.playlist_advisor or not (playlist_path := self.playlist_advisor.advise(self.arg)): return
         try: global_args, parsed = self.parser.parse(playlist_path)
         except Exception as e:
             self.logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...")
@@ -225,7 +228,7 @@ class RadioPlayer:
         cross_fade = int(global_args.get("crossfade", 5))
 
         max_iterator = len(playlist)
-        song_i = i = starting_index
+        song_i = i = 0
 
         while i < max_iterator:
             if self.exit_pending:
@@ -272,13 +275,10 @@ class RadioPlayer:
             if not extend: song_i += 1
 
     def loop(self):
-        assert self.playlist_advisor
         self.logger.info("Starting playback.")
         try:
-            arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None
-            if self.active_modifier: self.active_modifier.arguments(arg)
             while True:
-                if playlist := self.playlist_advisor.advise(arg): self.play_playlist(playlist)
+                self.play_once()
                 if self.exit_pending: raise SystemExit(self.exit_status_code)
         except Exception as e:
             self.logger.critical_error(f"Unexpected error: {e}")
@@ -289,7 +289,7 @@ def main():
     log_file_path.touch()
     log_file = open(log_file_path, "w")
 
-    core = RadioPlayer(log_file)
+    core = RadioPlayer((" ".join(sys.argv[1:]) if len(sys.argv) > 1 else None), log_file)
     atexit.register(core.shutdown)
     core.start()
     signal.signal(signal.SIGINT, core.handle_sigint)
