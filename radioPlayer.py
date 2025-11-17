@@ -229,10 +229,25 @@ class RadioPlayer:
 
         max_iterator = len(playlist)
         song_i = i = 0
-
         track = None
-        next_track = None
-        extend = None
+
+        def get_track():
+            nonlocal song_i, playlist, max_iterator
+            track = None
+            while track is None:
+                playlist_track = playlist[song_i % len(playlist)]
+                playlist_next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
+                if self.active_modifier:
+                    (track, next_track), extend = self.active_modifier.play(song_i, playlist_track, playlist_next_track)
+                    if track is None:
+                        song_i += 1
+                        continue
+                    if extend: max_iterator += 1
+                else: 
+                    track = playlist_track
+                    next_track = playlist_next_track
+                    extend = False
+            return track, next_track, extend
 
         while i < max_iterator:
             if self.exit_pending:
@@ -248,16 +263,7 @@ class RadioPlayer:
                 return_pending = True
                 continue
 
-            if not track:
-                track = playlist[song_i % len(playlist)]
-                next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
-                if self.active_modifier:
-                    (track, next_track), extend = self.active_modifier.play(song_i, track, next_track)
-                    if track is None:
-                        song_i += 1
-                        continue
-                    if extend: max_iterator += 1
-                else: extend = False
+            if not track: track, next_track, extend = get_track()
 
             prefetch(track.path)
             self.logger.info(f"Now playing: {track.path.name}")
@@ -278,16 +284,8 @@ class RadioPlayer:
             i += 1
             if not extend: song_i += 1
 
-            track = playlist[song_i % len(playlist)]
-            next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
-            if self.active_modifier:
-                (track, next_track), extend = self.active_modifier.play(song_i, track, next_track)
-                if track is None:
-                    song_i += 1
-                    continue
-                if extend: max_iterator += 1
-            else: extend = False
-            if track: prefetch(track.path)
+            track, next_track, extend = get_track()
+            prefetch(track.path)
 
     def loop(self):
         self.logger.info("Starting playback.")
