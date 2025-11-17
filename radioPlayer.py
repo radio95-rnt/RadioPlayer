@@ -249,7 +249,8 @@ class RadioPlayer:
                     extend = False
             return track, next_track, extend
 
-        while i < max_iterator:
+        def check_conditions():
+            nonlocal return_pending
             if self.exit_pending:
                 self.logger.info("Quit received, waiting for song end.")
                 self.procman.wait_all()
@@ -257,11 +258,14 @@ class RadioPlayer:
             elif return_pending:
                 self.logger.info("Return reached, next song will reload the playlist.")
                 self.procman.wait_all()
-                return
+                return True
             if self.playlist_advisor and self.playlist_advisor.new_playlist():
                 self.logger.info("Reloading now...")
-                return_pending = True
-                continue
+                return True
+            return False
+
+        while i < max_iterator:
+            if check_conditions(): return
 
             if not track: track, next_track, extend = get_track()
 
@@ -284,6 +288,7 @@ class RadioPlayer:
             i += 1
             if not extend: song_i += 1
 
+            if check_conditions(): return
             track, next_track, extend = get_track()
             prefetch(track.path)
 
