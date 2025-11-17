@@ -230,6 +230,10 @@ class RadioPlayer:
         max_iterator = len(playlist)
         song_i = i = 0
 
+        track = None
+        next_track = None
+        extend = None
+
         while i < max_iterator:
             if self.exit_pending:
                 self.logger.info("Quit received, waiting for song end.")
@@ -244,15 +248,16 @@ class RadioPlayer:
                 return_pending = True
                 continue
 
-            track = playlist[song_i % len(playlist)]
-            next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
-            if self.active_modifier:
-                (track, next_track), extend = self.active_modifier.play(song_i, track, next_track)
-                if track is None:
-                    song_i += 1
-                    continue
-                if extend: max_iterator += 1
-            else: extend = False
+            if not track:
+                track = playlist[song_i % len(playlist)]
+                next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
+                if self.active_modifier:
+                    (track, next_track), extend = self.active_modifier.play(song_i, track, next_track)
+                    if track is None:
+                        song_i += 1
+                        continue
+                    if extend: max_iterator += 1
+                else: extend = False
 
             prefetch(track.path)
             self.logger.info(f"Now playing: {track.path.name}")
@@ -270,9 +275,19 @@ class RadioPlayer:
                 remaining_until_end = end_time - time.monotonic()
                 if elapsed < 1 and remaining_until_end > 0: time.sleep(min(1 - elapsed, remaining_until_end))
 
-            if next_track: prefetch(next_track.path)
             i += 1
             if not extend: song_i += 1
+
+            track = playlist[song_i % len(playlist)]
+            next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
+            if self.active_modifier:
+                (track, next_track), extend = self.active_modifier.play(song_i, track, next_track)
+                if track is None:
+                    song_i += 1
+                    continue
+                if extend: max_iterator += 1
+            else: extend = False
+            if track: prefetch(track.path)
 
     def loop(self):
         self.logger.info("Starting playback.")
