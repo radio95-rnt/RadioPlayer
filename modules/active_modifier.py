@@ -19,7 +19,7 @@ class Module(ActiveModifier):
 
         if not self._imc: return
         self.limit_tracks, self.morning_start, self.day_end = self._imc.send(self, "advisor", None) # pyright: ignore[reportGeneralTypeIssues]
-        self.limit_tracks = bool(self.limit_tracks)
+        self.limit_tracks = not bool(self.limit_tracks)
     def play(self, index: int, track: Track, next_track: Track | None):
         if not self.playlist: return (track, next_track), False
         if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
@@ -91,6 +91,7 @@ class Module(ActiveModifier):
                 elif future.day > now.day: # late night goes mid day, as it starts at midnight
                     logger.warning("Skipping track as it the next day")
                     return (None, None), None
+                logger.info("Track ends at", repr(future))
         return (self.last_track, next_track), False
 
 activemod = Module()
