@@ -20,6 +20,7 @@ class Module(ActiveModifier):
         if not self._imc: return
         self.limit_tracks, self.morning_start, self.day_end = self._imc.send(self, "advisor", None) # pyright: ignore[reportGeneralTypeIssues]
         self.limit_tracks = not bool(self.limit_tracks)
+        if self.limit_tracks: logger.info("Skipping tracks if they bleed into other times.")
     def play(self, index: int, track: Track, next_track: Track | None):
         if not self.playlist: return (track, next_track), False
         if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
