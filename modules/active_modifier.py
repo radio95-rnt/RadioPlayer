@@ -83,10 +83,10 @@ class Module(ActiveModifier):
             last_track_duration = self._imc.send(self, "procman", {"op": 1, "arg": self.last_track.path})
             assert isinstance(last_track_duration, dict)
             last_track_duration = last_track_duration.get("arg")
-
-            if last_track_duration and last_track_duration > 5*60:
+            if last_track_duration:
                 now = datetime.datetime.now()
                 future = datetime.datetime.fromtimestamp(now.timestamp() + last_track_duration)
+            if last_track_duration and last_track_duration > 5*60:
                 if now.hour < self.morning_start and future.hour >= self.morning_start:
                     logger.warning("Skipping track as it bleeds into the morning")
                     return (None, None), None
@@ -96,7 +96,7 @@ class Module(ActiveModifier):
                 elif future.day != now.day: # late night goes mid day, as it starts at midnight
                     logger.warning("Skipping track as it the next day")
                     return (None, None), None
-            if last_track_duration: logger.info("Track ends at", repr(future))
+                if last_track_duration: logger.info("Track ends at", repr(future))
         return (self.last_track, next_track), False
 
 activemod = Module()
