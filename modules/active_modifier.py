@@ -13,6 +13,7 @@ class Module(ActiveModifier):
         self.originals = []
         self.last_track = None
         self.limit_tracks = False
+        self.can_limit_tracks = False
         self.morning_start = self.day_end = 0
     def on_new_playlist(self, playlist: list[Track]):
         self.playlist = playlist
@@ -21,6 +22,7 @@ class Module(ActiveModifier):
         self.limit_tracks, self.morning_start, self.day_end = self._imc.send(self, "advisor", None) # pyright: ignore[reportGeneralTypeIssues]
         self.limit_tracks = not bool(self.limit_tracks)
         if self.limit_tracks: logger.info("Skipping tracks if they bleed into other times.")
+        self.can_limit_tracks = self.limit_tracks
     def play(self, index: int, track: Track, next_track: Track | None):
         if not self.playlist: return (track, next_track), False
         if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
@@ -69,11 +71,13 @@ class Module(ActiveModifier):
             else:
                 self.last_track = Track(song, next_track_to_fade_in, last_track_to_fade_out, official, {})
                 next_track = track
+            self.limit_tracks = False
             return (self.last_track, next_track), True
         elif len(self.originals): 
             self.last_track = self.originals.pop(0)
             if len(self.originals): next_track = self.originals[0]
         else: self.last_track = track
+        self.limit_tracks = self.can_limit_tracks
 
         if self.limit_tracks:
             last_track_duration = self._imc.send(self, "procman", {"op": 1, "arg": self.last_track.path})
@@ -92,7 +96,7 @@ class Module(ActiveModifier):
                 elif future.day != now.day: # late night goes mid day, as it starts at midnight
                     logger.warning("Skipping track as it the next day")
                     return (None, None), None
-                logger.info("Track ends at", repr(future))
+            if last_track_duration: logger.info("Track ends at", repr(future))
         return (self.last_track, next_track), False
 
 activemod = Module()

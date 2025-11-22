@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import time, types
 import os, subprocess, importlib.util
 import sys, signal, glob
@@ -28,7 +27,7 @@ class ProcessManager(Skeleton_ProcessManager):
         result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', str(file_path)], capture_output=True, text=True)
         if result.returncode == 0:
             result = float(result.stdout.strip())
-            self.duration_cache.saveElement(file_path.as_posix(), result, (60*60), False, True)
+            self.duration_cache.saveElement(file_path.as_posix(), result, (60*60*2), False, True)
             return result
     def play(self, track: Track, fade_time: int=5) -> Process:
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
@@ -40,10 +39,9 @@ class ProcessManager(Skeleton_ProcessManager):
         if track.offset > 0: cmd.extend(['-ss', str(track.offset)])
 
         filters = []
-        if track.fade_in: filters.append(f"afade=t=in:st=0:d={fade_time}")
-        if track.fade_out: filters.append(f"afade=t=out:st={duration - fade_time - track.offset}:d={fade_time}")
+        if track.fade_in and fade_time != 0: filters.append(f"afade=t=in:st=0:d={fade_time}")
+        if track.fade_out and fade_time != 0: filters.append(f"afade=t=out:st={duration - fade_time - track.offset}:d={fade_time}")
         if filters: cmd.extend(['-af', ",".join(filters)])
-
         cmd.append(str(track.path.absolute()))
 
         pr = Process(Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True), track.path.name, time.monotonic(), duration - track.offset)
@@ -93,7 +91,6 @@ class PlaylistParser:
 
     def parse(self, playlist_path: Path) -> tuple[dict[str, str], list[tuple[list[str], dict[str, str]]]]:
         lines = self._check_for_imports(playlist_path)
-
         out = []
         global_arguments = {}
         for line in lines:
@@ -121,7 +118,6 @@ class RadioPlayer:
         self.playlist_modifier_modules: list[PlaylistModifierModule] = []
         self.playlist_advisor: PlaylistAdvisor | None = None
         self.active_modifier: ActiveModifier | None = None
-        self.logger = log95.log95("CORE", output=output)
         self.exit_pending = False
         self.exit_status_code = 0
         self.intr_time = 0
@@ -129,7 +125,9 @@ class RadioPlayer:
         self.procman = ProcessManager()
         self.modules: list[tuple] = []
         self.parser = PlaylistParser(output)
+
         self.arg = arg
+        self.logger = log95.log95("CORE", output=output)
 
     def shutdown(self): 
         self.procman.stop_all()
@@ -223,13 +221,12 @@ class RadioPlayer:
         prefetch(playlist[0].path)
         [mod.on_new_playlist(playlist) for mod in self.simple_modules + [self.active_modifier] if mod] # one liner'd everything
 
-        return_pending = False
+        return_pending = track = False
 
         cross_fade = int(global_args.get("crossfade", 5))
 
         max_iterator = len(playlist)
         song_i = i = 0
-        track = None
 
         def get_track():
             nonlocal song_i, playlist, max_iterator
@@ -239,10 +236,8 @@ class RadioPlayer:
                 playlist_next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
                 if self.active_modifier:
                     (track, next_track), extend = self.active_modifier.play(song_i, playlist_track, playlist_next_track)
-                    if track is None:
-                        song_i += 1
-                        continue
-                    if extend: max_iterator += 1
+                    if track is None: song_i += 1
+                    if extend and track: max_iterator += 1
                 else: 
                     track = playlist_track
                     next_track = playlist_next_track
@@ -266,7 +261,6 @@ class RadioPlayer:
 
         while i < max_iterator:
             if check_conditions(): return
-
             if not track: track, next_track, extend = get_track()
 
             prefetch(track.path)
@@ -299,7 +293,7 @@ class RadioPlayer:
                 self.play_once()
                 if self.exit_pending: raise SystemExit(self.exit_status_code)
         except Exception as e:
-            self.logger.critical_error(f"Unexpected error: {e}")
+            traceback.print_exc(file=self.logger.output)
             raise
 
 def main():
