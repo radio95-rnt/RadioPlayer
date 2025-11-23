@@ -131,6 +131,7 @@ class RadioPlayer:
 
     def shutdown(self): 
         self.procman.stop_all()
+        [module.shutdown() for module in self.simple_modules if module]
 
     def handle_sigint(self, signum, frame):
         with self.exit_lock:

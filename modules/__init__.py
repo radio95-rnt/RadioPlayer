@@ -86,6 +86,11 @@ class PlayerModule(BaseIMCModule):
         Please don't put any blocking or code that takes time
         """
         pass
+    def shutdown(self):
+        """
+        Ran while shutting down
+        """
+        pass
 class PlaylistModifierModule:
     """
     Playlist modifier, this type of module allows you to shuffle, or put jingles into your playlist

@@ -34,5 +34,7 @@ class Module(PlayerModule):
     def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:
         self.counts[track.path.as_posix()] = self.counts.get(track.path.as_posix(), 0) + 1
         if sum(self.counts.values()) % 3 == 0: self._save_counts()
+    def shutdown(self):
+        self._save_counts()
 
 module = Module()
