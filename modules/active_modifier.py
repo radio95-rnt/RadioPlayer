@@ -38,7 +38,6 @@ class Module(ActiveModifier):
             if song.startswith("!"):
                 song = song[1:]
                 official = False
-            
             return Path(song).absolute(), official
 
         if len(songs):
@@ -48,7 +47,7 @@ class Module(ActiveModifier):
             else:
                 if (index - 1) >= 0: last_track_to_fade_out = self.playlist[index - 1].fade_out
                 else: last_track_to_fade_out = False
-            
+
             if len(songs) != 0: next_track_to_fade_in = True
             else:
                 if index + 1 < len(self.playlist) and next_track: next_track_to_fade_in = next_track.fade_in
@@ -57,7 +56,7 @@ class Module(ActiveModifier):
 
             if not self.originals or self.originals[-1] != track: self.originals.append(track)
 
-            with open("/tmp/radioPlayer_toplay", "w") as f: 
+            with open("/tmp/radioPlayer_toplay", "w") as f:
                 f.write('\n'.join(songs))
                 f.write("\n")
 
@@ -73,14 +72,14 @@ class Module(ActiveModifier):
                 next_track = track
             self.limit_tracks = False
             return (self.last_track, next_track), True
-        elif len(self.originals): 
+        elif len(self.originals):
             self.last_track = self.originals.pop(0)
             if len(self.originals): next_track = self.originals[0]
         else: self.last_track = track
         self.limit_tracks = self.can_limit_tracks
 
         if self.limit_tracks:
-            last_track_duration = self._imc.send(self, "procman", {"op": 1, "arg": self.last_track.path})
+            last_track_duration = self._imc.send(self, "procman", {"op": 1, "arg": self.last_track.path}) # Ask procman for the duration of this file
             assert isinstance(last_track_duration, dict)
             last_track_duration = last_track_duration.get("arg")
             if last_track_duration:

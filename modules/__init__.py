@@ -140,14 +140,14 @@ class InterModuleCommunication:
     def __init__(self, modules: Sequence[BaseIMCModule | None]) -> None:
         self.modules = modules
         self.names_modules: dict[str, BaseIMCModule] = {}
-        for module in modules: 
+        for module in modules:
             if module: module.imc(self)
     def broadcast(self, source: BaseIMCModule, data: object) -> None:
         """
         Send data to all modules, other than ourself
         """
         source_name = next((k for k, v in self.names_modules.items() if v is source), None)
-        for module in [f for f in self.modules if f is not source]: 
+        for module in [f for f in self.modules if f is not source]:
             if module: module.imc_data(source, source_name, data, True)
     def register(self, module: BaseIMCModule, name: str) -> bool:
         """

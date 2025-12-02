@@ -8,7 +8,7 @@ def format_time(seconds) -> str:
 
 class Module(PlayerModule):
     def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float) -> None:
-        if track.official: 
+        if track.official:
             data = f"{track.path.name}: {format_time(elapsed)} / {format_time(total)}\n"
             Path("/tmp/radioPlayer_progress").write_text(data)
 

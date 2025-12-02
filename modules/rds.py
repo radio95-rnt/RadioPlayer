@@ -38,7 +38,7 @@ def update_rds(track_name: str):
     except KeyError:
         has_name = False
         name = track_name.rsplit(".", 1)[0]
-    
+
     name = re.sub(r'^\s*\d+\s*[-.]?\s*', '', name)
 
     if " - " in name:
@@ -52,9 +52,9 @@ def update_rds(track_name: str):
         artist = rds_default_artist
         title = name
         if not has_name: logger.warning(f"File does not have a alias in the name table ({track_name})")
-    
+
 #    title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
-    
+
     prt = rds_base.format(artist, title)
     rtp = [4] # type 1
     rtp.append(prt.find(artist)) # start 1
@@ -63,7 +63,7 @@ def update_rds(track_name: str):
     rtp.append(prt.find(title)) # start 2
     rtp.append(len(title) - 1) # len 2
 
-    try:        
+    try:
         f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         f.settimeout(1.0)
         data = f"TEXT={prt}\r\nRTP={rtp}\r\n".encode()

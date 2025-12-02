@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 import time, types
-import os, subprocess, importlib.util
+import os, subprocess, importlib.util, importlib.machinery
 import sys, signal, glob
 import libcache, traceback, atexit
 from modules import *
 from threading import Lock
 
 def prefetch(path):
-    if os.name != "posix": return
-    with open(path, "rb") as f:
-        fd = f.fileno()
-        os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_SEQUENTIAL)
-        os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_NOREUSE)
-        os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_WILLNEED)
+    if os.name == "posix":
+        with open(path, "rb") as f:
+            fd = f.fileno()
+            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_SEQUENTIAL)
+            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_NOREUSE)
+            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_WILLNEED)
 
 MODULES_PACKAGE = "modules"
 MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
@@ -30,8 +30,8 @@ class ProcessManager(Skeleton_ProcessManager):
             self.duration_cache.saveElement(file_path.as_posix(), result, (60*60*2), False, True)
             return result
     def play(self, track: Track, fade_time: int=5) -> Process:
-        cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
         assert track.path.exists()
+        cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
 
         duration = self._get_audio_duration(track.path.absolute())
         if not duration: raise Exception("Failed to get file duration for", track.path)
@@ -70,7 +70,6 @@ class PlaylistParser:
 
     def _check_for_imports(self, path: Path, seen=None) -> list[str]:
         if seen is None: seen = set()
-
         if not path.exists():
             self.logger.error(f"Playlist not found: {path.name}")
             return []
@@ -123,7 +122,7 @@ class RadioPlayer:
         self.intr_time = 0
         self.exit_lock = Lock()
         self.procman = ProcessManager()
-        self.modules: list[tuple] = []
+        self.modules: list[tuple[importlib.machinery.ModuleSpec, types.ModuleType, str]] = []
         self.parser = PlaylistParser(output)
 
         self.arg = arg
@@ -132,8 +131,9 @@ class RadioPlayer:
     def shutdown(self): 
         self.procman.stop_all()
         [module.shutdown() for module in self.simple_modules if module]
+        self.logger.output.close()
 
-    def handle_sigint(self, signum, frame):
+    def handle_sigint(self, signum: int, frame: types.FrameType | None):
         with self.exit_lock:
             self.logger.info("Received CTRL+C (SIGINT)")
             if (time.monotonic() - self.intr_time) > 5:
@@ -146,14 +146,15 @@ class RadioPlayer:
                 raise SystemExit(130)
 
     def load_modules(self):
+        """Loads the modules into memory"""
         for file in MODULES_DIR.glob("*"):
             if file.name.endswith(".py") and file.name != "__init__.py":
                 module_name = file.name[:-3]
                 full_module_name = f"{MODULES_PACKAGE}.{module_name}"
 
                 spec = importlib.util.spec_from_file_location(full_module_name, Path(MODULES_DIR, file))
-                assert spec
-                module = importlib.util.module_from_spec(spec)
+                module = importlib.util.module_from_spec(spec) if spec else None
+                assert spec and module
 
                 sys.modules[full_module_name] = module
                 if MODULES_PACKAGE not in sys.modules:
@@ -167,13 +168,14 @@ class RadioPlayer:
                 module.__dict__['_log_out'] = self.logger.output
                 self.modules.append((spec, module, module_name))
     def start_modules(self):
+        """Executes the module by the python interpreter"""
         for (spec, module, module_name) in self.modules:
             assert spec.loader
             try:
                 start = time.perf_counter()
                 spec.loader.exec_module(module)
                 time_took = time.perf_counter() - start
-                if time_took > 0.2: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
+                if time_took > 0.15: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
             except Exception as e:
                 traceback.print_exc(file=self.logger.output)
                 self.logger.error(f"Failed loading {module_name} due to {e}, continuing")
@@ -199,6 +201,7 @@ class RadioPlayer:
         if self.active_modifier: self.active_modifier.arguments(self.arg)
 
     def start(self):
+        """Single functon for starting the core, returns but might exit raising an SystemExit"""
         self.logger.info("Core starting, loading modules")
         self.load_modules();self.start_modules()
         if not self.playlist_advisor:
@@ -206,11 +209,11 @@ class RadioPlayer:
             raise SystemExit(1)
 
     def play_once(self):
+        """Plays a single playlist"""
         if not self.playlist_advisor or not (playlist_path := self.playlist_advisor.advise(self.arg)): return
         try: global_args, parsed = self.parser.parse(playlist_path)
         except Exception as e:
-            self.logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...")
-            traceback.print_exc(file=self.logger.output)
+            self.logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...");traceback.print_exc(file=self.logger.output)
             time.sleep(15)
             return
 
@@ -218,6 +221,7 @@ class RadioPlayer:
         [playlist.extend(Track(Path(line).absolute(), True, True, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
 
         [(playlist := module.modify(global_args, playlist) or playlist) for module in self.playlist_modifier_modules if module] # yep
+        assert len(playlist)
     
         prefetch(playlist[0].path)
         [mod.on_new_playlist(playlist) for mod in self.simple_modules + [self.active_modifier] if mod] # one liner'd everything
@@ -260,12 +264,12 @@ class RadioPlayer:
                 return True
             return False
 
+        track, next_track, extend = get_track()
         while i < max_iterator:
             if check_conditions(): return
-            if not track: track, next_track, extend = get_track()
 
-            prefetch(track.path)
             self.logger.info(f"Now playing: {track.path.name}")
+            prefetch(track.path)
 
             [module.on_new_track(song_i, track, next_track) for module in self.simple_modules if module]
 
@@ -288,23 +292,21 @@ class RadioPlayer:
             prefetch(track.path)
 
     def loop(self):
-        self.logger.info("Starting playback.")
+        """Main loop of the player. This does not return and may or not raise an SystemExit"""
         try:
             while True:
                 self.play_once()
                 if self.exit_pending: raise SystemExit(self.exit_status_code)
-        except Exception as e:
+        except Exception:
             traceback.print_exc(file=self.logger.output)
             raise
 
 def main():
     log_file_path = Path("/tmp/radioPlayer_log")
     log_file_path.touch()
-    log_file = open(log_file_path, "w")
 
-    core = RadioPlayer((" ".join(sys.argv[1:]) if len(sys.argv) > 1 else None), log_file)
+    core = RadioPlayer((" ".join(sys.argv[1:]) if len(sys.argv) > 1 else None), open(log_file_path, "w"))
     atexit.register(core.shutdown)
     core.start()
     signal.signal(signal.SIGINT, core.handle_sigint)
-    try: core.loop()
-    finally: log_file.close()
+    core.loop()

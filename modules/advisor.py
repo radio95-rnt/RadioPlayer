@@ -65,7 +65,7 @@ class Module(PlaylistAdvisor):
             self.custom_playlist_last_mod = Time.get_playlist_modification_time(self.custom_playlist)
             return self.custom_playlist
         elif self.custom_playlist: self.custom_playlist = None
-        
+
         current_day, current_hour = (time := datetime.datetime.now()).strftime('%A').lower(), time.hour
 
         morning_playlist = Path(playlist_dir, current_day, "morning").absolute()
@@ -106,7 +106,7 @@ class Module(PlaylistAdvisor):
             self.last_playlist = night_playlist
         return self.last_playlist
     def new_playlist(self) -> bool:
-        if self.custom_playlist and self.custom_playlist_path.exists(): 
+        if self.custom_playlist and self.custom_playlist_path.exists():
             if Time.get_playlist_modification_time(self.custom_playlist) > self.custom_playlist_last_mod:
                 logger.info("Custom playlist changed on disc, reloading...")
                 self.custom_playlist = None

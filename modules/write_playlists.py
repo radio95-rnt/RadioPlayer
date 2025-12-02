@@ -12,7 +12,7 @@ class Module(PlayerModule):
     def on_new_playlist(self, playlist: list[Track]): self.playlist = [str(t.path.absolute()) for t in playlist]
     def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float) -> None:
         if os.path.exists("/tmp/radioPlayer_skip"):
-            self._imc.send(self, "procman", {"op": 2})
+            self._imc.send(self, "procman", {"op": 2}) # Ask procman to kill every track playing (usually there is one, unless we are in the default 5 seconds of the crossfade)
             os.remove("/tmp/radioPlayer_skip")
     def on_new_track(self, index: int, track: Track, next_track: Track | None):
         if next_track: logger.info("Next up:", next_track.path.name)
@@ -22,7 +22,7 @@ class Module(PlayerModule):
             lines = self.playlist[:index] + [f"> ({track.path})"] + [self.playlist[index]] + self.playlist[index+1:]
         else: lines = self.playlist[:index] + [f"> {self.playlist[index]}"] + self.playlist[index+1:]
         with open("/tmp/radioPlayer_playlist", "w") as f:
-            for line in lines: 
+            for line in lines:
                 try: f.write(line + "\n")
                 except UnicodeEncodeError:
                     print(line.encode('utf-8', errors='ignore').decode('utf-8'))
