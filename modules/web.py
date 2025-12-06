@@ -13,7 +13,7 @@ app.logger.disabled = True
 @app.route("/")
 def home():
     global data, data_lock
-    with data_lock: return repr(data)
+    with data_lock: return repr(data["playlist"])
 
 def web():
     app.run("0.0.0.0", 3001)
