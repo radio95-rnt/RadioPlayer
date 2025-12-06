@@ -44,9 +44,9 @@ class APIHandler(BaseHTTPRequestHandler):
                 rdata = {"error": "Request to active module timed out"}
                 code = 504  # Gateway Timeout
         elif self.path == "/api/dirs":
-            return {"base": str(MAIN_PATH_DIR), "files": [i.name for i in list(MAIN_PATH_DIR.iterdir())]}
+            rdata = {"base": str(MAIN_PATH_DIR), "files": [i.name for i in list(MAIN_PATH_DIR.iterdir())]}
         elif self.path.startswith("/api/dir/"):
-            return [i.name for i in (MAIN_PATH_DIR / self.path.removeprefix("/api/dir/").removesuffix("/")).iterdir() if i.is_file()]
+            rdata = [i.name for i in (MAIN_PATH_DIR / self.path.removeprefix("/api/dir/").removesuffix("/")).iterdir() if i.is_file()]
         else: rdata = {"error": "not found"}
 
         self.send_response(code)
