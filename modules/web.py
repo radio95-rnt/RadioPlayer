@@ -22,6 +22,7 @@ class APIHandler(BaseHTTPRequestHandler):
 
         if self.path == "/api/playlist": rdata = json.loads(self.data.get("playlist", "[]"))
         elif self.path == "/api/track": rdata = json.loads(self.data.get("track", "{}"))
+        elif self.path == "/api/progress": rdata = json.loads(self.data.get("progress", "{}"))
         else: rdata = {"error": "not found"}
 
         self.wfile.write(json.dumps(rdata).encode('utf-8'))
@@ -75,6 +76,7 @@ class Module(PlayerModule):
 
         self.data["playlist"] = "[]"
         self.data["track"] = "{}"
+        self.data["progress"] = "{}"
 
         self.ipc_thread_running = True
         self.ipc_thread = threading.Thread(target=self._ipc_worker, daemon=True)
@@ -103,6 +105,10 @@ class Module(PlayerModule):
             next_track_data = {"path": str(next_track.path), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset}
         else: next_track_data = None
         self.data["track"] = json.dumps({"index": index, "track": track_data, "next_track": next_track_data})
+    
+    def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float) -> None:
+        track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset}
+        self.data["progress"] = json.dumps({"index": index, "track": track_data, "elapsed": elapsed, "total": total, "real_total": real_total})
 
     def shutdown(self):
         self.ipc_thread_running = False
