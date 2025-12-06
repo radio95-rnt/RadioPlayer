@@ -1,22 +1,24 @@
 import multiprocessing
 
 from . import PlayerModule, Track
-from flask import Flask
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 manager = multiprocessing.Manager()
 data = manager.dict()
 data_lock = manager.Lock()
 
-app = Flask(__name__)
-app.logger.disabled = True
-
-@app.route("/")
-def home():
-    global data, data_lock
-    with data_lock: return repr(data["playlist"])
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        global data
+        if self.path == "/":
+            rdata = repr(data["playlist"]).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(rdata)
 
 def web():
-    app.run("0.0.0.0", 3001)
+    HTTPServer(("0.0.0.0", 3001), Handler).serve_forever()
 p = multiprocessing.Process(target=web)
 
 class Module(PlayerModule):
