@@ -11,5 +11,7 @@ class Module(PlayerModule):
         if track.official:
             data = f"{track.path.name}: {format_time(elapsed)} / {format_time(total)}\n"
             Path("/tmp/radioPlayer_progress").write_text(data)
+    def shutdown(self):
+        Path("/tmp/radioPlayer_progress").write_text("")
 
 module = Module()
