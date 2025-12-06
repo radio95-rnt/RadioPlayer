@@ -40,7 +40,8 @@ class Module(PlayerModule):
     def shutdown(self):
         global p
         p.terminate()
-        p.join()
+        p.join(1)
+        p.kill()
 
 module = Module()
 p.start()
