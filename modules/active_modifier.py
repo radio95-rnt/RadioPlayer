@@ -112,8 +112,6 @@ class Module(ActiveModifier):
         if data.get("action") == "add_to_toplay":
             songs_to_add = data.get("songs")
             if isinstance(songs_to_add, list):
-                logger.info(f"Received request to add {len(songs_to_add)} items to toplay queue from '{source_name or 'unnamed'}'")
-
                 with self.file_lock:
                     with open("/tmp/radioPlayer_toplay", "a") as f:
                         for song_path in songs_to_add: f.write(f"{song_path}\n")
