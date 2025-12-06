@@ -1,62 +1,108 @@
-import multiprocessing, json
+import multiprocessing
+import json
+import threading
+from functools import partial
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+from . import Track, PlayerModule
 
-from . import PlayerModule, Track
-from http.server import HTTPServer, BaseHTTPRequestHandler
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    """Handle requests in a separate thread."""
 
-manager = multiprocessing.Manager()
-data = manager.dict()
-data_lock = manager.Lock()
-imc_q = manager.Queue()
+class APIHandler(BaseHTTPRequestHandler):
+    def __init__(self, data, imc_q, *args, **kwargs):
+        self.data = data
+        self.imc_q = imc_q
+        super().__init__(*args, **kwargs)
 
-class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        global data
-        if self.path == "/api/playlist":
-            rdata = str(data["playlist"]).encode()
-        elif self.path == "/api/track":
-            rdata = str(data["track"]).encode()
-        else: rdata = b"?"
         self.send_response(200)
-        self.send_header("Content-Length", str(len(rdata)))
-        self.end_headers()
-        self.wfile.write(rdata)
-    def send_response(self, code, message=None):
-        self.send_response_only(code, message)
-        self.send_header('Server', self.version_string())
-        self.send_header('Date', self.date_time_string())
-    def do_POST(self):
-        global imc_q
-        if self.path == "/api/skip": imc_q.put({"name": "procman", "data": {"op": 2}})
-        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
         self.end_headers()
 
-def web(): HTTPServer(("0.0.0.0", 3001), Handler).serve_forever()
-p = multiprocessing.Process(target=web)
+        if self.path == "/api/playlist":
+            rdata = json.loads(self.data.get("playlist", "[]"))
+        elif self.path == "/api/track":
+            rdata = json.loads(self.data.get("track", "{}"))
+        else:
+            rdata = {"error": "not found"}
+        
+        self.wfile.write(json.dumps(rdata).encode('utf-8'))
+
+    def do_POST(self):
+        if self.path == "/api/skip":
+            self.imc_q.put({"name": "procman", "data": {"op": 2}})
+            response = {"status": "ok", "action": "skip requested"}
+            code = 200
+        else:
+            response = {"error": "not found"}
+            code = 404
+
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(response).encode('utf-8'))
+
+def web_server_process(data, imc_q):
+    handler = partial(APIHandler, data, imc_q)
+    httpd = ThreadingHTTPServer(("0.0.0.0", 3001), handler)
+    httpd.serve_forever()
+
 
 class Module(PlayerModule):
+    def __init__(self):
+        self.manager = multiprocessing.Manager()
+        self.data = self.manager.dict()
+        self.imc_q = self.manager.Queue()
+
+        self.data["playlist"] = "[]"
+        self.data["track"] = "{}"
+
+        self.ipc_thread_running = True
+        self.ipc_thread = threading.Thread(target=self._ipc_worker, daemon=True)
+        self.ipc_thread.start()
+
+        self.web_process = multiprocessing.Process(target=web_server_process, args=(self.data, self.imc_q))
+        self.web_process.start()
+
+    def _ipc_worker(self):
+        while self.ipc_thread_running:
+            try:
+                message = self.imc_q.get()
+
+                if message is None:
+                    break
+                
+                self._imc.send(self, message["name"], message["data"])
+            except Exception as e:
+                pass
+
     def on_new_playlist(self, playlist: list[Track]) -> None:
-        global data, data_lock
-        with data_lock: 
-            api_data = []
-            for track in playlist: api_data.append({"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset})
-            data["playlist"] = json.dumps(api_data)
+        api_data = []
+        for track in playlist:
+            api_data.append({"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset})
+        self.data["playlist"] = json.dumps(api_data)
+
     def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:
-        global data, data_lock
-        with data_lock: 
-            track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset}
-            if next_track: next_track_data = {"path": str(next_track.path), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset}
-            else: next_track_data = None
-            data["track"] = json.dumps({"index": index, "track": track_data, "next_track": next_track_data})
-    def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float) -> None:
-        try: data = imc_q.get(False)
-        except Exception: return
+        track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset}
+        if next_track:
+            next_track_data = {"path": str(next_track.path), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset}
+        else:
+            next_track_data = None
+        self.data["track"] = json.dumps({"index": index, "track": track_data, "next_track": next_track_data})
 
-        self._imc.send(self, data["name"], data["data"])
     def shutdown(self):
-        global p
-        p.terminate()
-        p.join(1)
-        p.kill()
+        print("Shutting down Web API module...")
+        
+        self.ipc_thread_running = False
+        self.imc_q.put(None)
+        self.ipc_thread.join(timeout=2)
 
+        if self.web_process.is_alive():
+            self.web_process.terminate()
+            self.web_process.join(timeout=2)
+        
+        if self.web_process.is_alive():
+            self.web_process.kill()
+        
 module = Module()
-p.start()
