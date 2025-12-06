@@ -1,6 +1,6 @@
 import multiprocessing
 import json
-import threading
+import threading, uuid, time
 from functools import partial
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
@@ -16,15 +16,36 @@ class APIHandler(BaseHTTPRequestHandler):
         super().__init__(*args, **kwargs)
 
     def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
+        code = 200
 
         if self.path == "/api/playlist": rdata = json.loads(self.data.get("playlist", "[]"))
         elif self.path == "/api/track": rdata = json.loads(self.data.get("track", "{}"))
         elif self.path == "/api/progress": rdata = json.loads(self.data.get("progress", "{}"))
+        elif self.path == "/api/put": 
+            id = str(uuid.uuid4())
+            self.imc_q.put({"name": "activemod", "data": {"action": "get_toplay"}, "key": id})
+            start_time = time.monotonic()
+            response_json = None
+            while time.monotonic() - start_time < 2:
+                if id in self.data:
+                    response_json = self.data.pop(id) # Read and remove the entry
+                    break
+                time.sleep(0.05) # Wait briefly to avoid a busy loop
+            if response_json:
+                try:
+                    rdata = json.loads(response_json)
+                    if "error" in rdata: code = 500 # Server error if module reported one
+                except (json.JSONDecodeError, TypeError):
+                    rdata = {"error": "Invalid data format from module"}
+                    code = 500
+            else:
+                rdata = {"error": "Request to active module timed out"}
+                code = 504  # Gateway Timeout
         else: rdata = {"error": "not found"}
 
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
         self.wfile.write(json.dumps(rdata).encode('utf-8'))
 
     def do_POST(self):
@@ -88,9 +109,10 @@ class Module(PlayerModule):
     def _ipc_worker(self):
         while self.ipc_thread_running:
             try:
-                message = self.imc_q.get()
+                message: dict | None = self.imc_q.get()
                 if message is None: break
-                self._imc.send(self, message["name"], message["data"])
+                out = self._imc.send(self, message["name"], message["data"])
+                if key := message.get("key", None): self.data[f"res_{key}"] = out
             except Exception: pass
 
     def on_new_playlist(self, playlist: list[Track]) -> None:
