@@ -33,9 +33,9 @@ class APIHandler(BaseHTTPRequestHandler):
                 time.sleep(0.05) # Wait briefly to avoid a busy loop
             if response_json:
                 try:
-                    rdata = json.loads(response_json)
-                    if "error" in rdata: code = 500 # Server error if module reported one
-                except (json.JSONDecodeError, TypeError):
+                    rdata = response_json
+                    if "error" in repr(rdata): code = 500 # Server error if module reported one
+                except TypeError:
                     rdata = {"error": "Invalid data format from module"}
                     code = 500
             else:
