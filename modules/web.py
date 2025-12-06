@@ -1,5 +1,5 @@
 import multiprocessing
-import json
+import json, signal
 import threading, uuid, time
 from functools import partial
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -93,8 +93,9 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_header('Date', self.date_time_string())
 
 def web_server_process(data, imc_q):
-    try: ThreadingHTTPServer(("0.0.0.0", 3001), partial(APIHandler, data, imc_q)).serve_forever()
-    except KeyboardInterrupt: pass
+    def signal_handler(sig, frame): pass
+    signal.signal(signal.SIGINT, signal_handler)
+    ThreadingHTTPServer(("0.0.0.0", 3001), partial(APIHandler, data, imc_q)).serve_forever()
 
 class Module(PlayerModule):
     def __init__(self):
