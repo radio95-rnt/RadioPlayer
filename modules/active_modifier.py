@@ -121,6 +121,6 @@ class Module(ActiveModifier):
         elif data.get("action") == "get_toplay":
             with self.file_lock:
                 with open("/tmp/radioPlayer_toplay", "r") as f:
-                    return {"status": "ok", "data": f.readlines()}
+                    return {"status": "ok", "data": [i.strip() for i in f.readlines() if i.strip()]}
 
 activemod = Module()

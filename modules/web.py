@@ -28,13 +28,13 @@ class APIHandler(BaseHTTPRequestHandler):
             response_json = None
             while time.monotonic() - start_time < 2:
                 if id in self.data:
-                    response_json = self.data.pop(id) # Read and remove the entry
+                    response_json = self.data.pop(id)
                     break
-                time.sleep(0.05) # Wait briefly to avoid a busy loop
+                time.sleep(0.05)
             if response_json:
                 try:
                     rdata = response_json
-                    if "error" in repr(rdata): code = 500 # Server error if module reported one
+                    if "error" in repr(rdata): code = 500
                 except TypeError:
                     rdata = {"error": "Invalid data format from module"}
                     code = 500
