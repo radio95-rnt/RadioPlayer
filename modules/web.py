@@ -13,7 +13,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/":
             rdata = repr(data["playlist"]).encode()
             self.send_response(200)
-            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Length", str(len(data["playlist"])))
             self.end_headers()
             self.wfile.write(rdata)
 
