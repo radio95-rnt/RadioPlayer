@@ -4,7 +4,9 @@ import threading, uuid, time
 from functools import partial
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
-from . import Track, PlayerModule
+from . import Track, PlayerModule, Path
+
+MAIN_PATH_DIR = Path("/home/user/mixes")
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
@@ -41,6 +43,10 @@ class APIHandler(BaseHTTPRequestHandler):
             else:
                 rdata = {"error": "Request to active module timed out"}
                 code = 504  # Gateway Timeout
+        elif self.path == "/api/dirs":
+            return {"base": str(MAIN_PATH_DIR), "files": [i.name for i in list(MAIN_PATH_DIR.iterdir())]}
+        elif self.path.startswith("/api/dir/"):
+            return [i.name for i in (MAIN_PATH_DIR / self.path.removeprefix("/api/dir/").removesuffix("/")).iterdir() if i.is_file()]
         else: rdata = {"error": "not found"}
 
         self.send_response(code)
