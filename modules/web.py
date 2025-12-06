@@ -93,7 +93,8 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_header('Date', self.date_time_string())
 
 def web_server_process(data, imc_q):
-    ThreadingHTTPServer(("0.0.0.0", 3001), partial(APIHandler, data, imc_q)).serve_forever()
+    try: ThreadingHTTPServer(("0.0.0.0", 3001), partial(APIHandler, data, imc_q)).serve_forever()
+    except KeyboardInterrupt: pass
 
 class Module(PlayerModule):
     def __init__(self):
