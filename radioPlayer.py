@@ -305,7 +305,10 @@ def main():
     log_file_path.touch()
 
     core = RadioPlayer((" ".join(sys.argv[1:]) if len(sys.argv) > 1 else None), open(log_file_path, "w"))
-    atexit.register(core.shutdown)
-    core.start()
-    signal.signal(signal.SIGINT, core.handle_sigint)
-    core.loop()
+    try:
+        core.start()
+        signal.signal(signal.SIGINT, core.handle_sigint)
+        core.loop()
+    except SystemExit:
+        core.shutdown()
+        raise
