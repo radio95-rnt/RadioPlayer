@@ -11,9 +11,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         global data
         if self.path == "/api/playlist":
-            rdata = repr(data["playlist"]).encode()
+            rdata = str(data["playlist"]).encode()
         elif self.path == "/api/track":
-            rdata = repr(data["track"]).encode()
+            rdata = str(data["track"]).encode()
         else: rdata = b"?"
         self.send_response(200)
         self.send_header("Content-Length", str(len(rdata)))
@@ -34,7 +34,7 @@ class Module(PlayerModule):
         global data, data_lock
         with data_lock: 
             track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset}
-            if next_track: next_track_data = {"path": str(next_track), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset}
+            if next_track: next_track_data = {"path": str(next_track.path), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset}
             else: next_track_data = None
             data["track"] = json.dumps({"index": index, "track": track_data, "next_track": next_track_data})
     def shutdown(self):
