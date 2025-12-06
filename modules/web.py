@@ -112,7 +112,7 @@ class Module(PlayerModule):
                 message: dict | None = self.imc_q.get()
                 if message is None: break
                 out = self._imc.send(self, message["name"], message["data"])
-                if key := message.get("key", None): self.data[f"res_{key}"] = out
+                if key := message.get("key", None): self.data[key] = out
             except Exception: pass
 
     def on_new_playlist(self, playlist: list[Track]) -> None:
