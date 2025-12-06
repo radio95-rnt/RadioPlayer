@@ -20,34 +20,52 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
 
-        if self.path == "/api/playlist":
-            rdata = json.loads(self.data.get("playlist", "[]"))
-        elif self.path == "/api/track":
-            rdata = json.loads(self.data.get("track", "{}"))
-        else:
-            rdata = {"error": "not found"}
-        
+        if self.path == "/api/playlist": rdata = json.loads(self.data.get("playlist", "[]"))
+        elif self.path == "/api/track": rdata = json.loads(self.data.get("track", "{}"))
+        else: rdata = {"error": "not found"}
+
         self.wfile.write(json.dumps(rdata).encode('utf-8'))
 
     def do_POST(self):
+        response = {"error": "not found"}
+        code = 404
+
         if self.path == "/api/skip":
             self.imc_q.put({"name": "procman", "data": {"op": 2}})
             response = {"status": "ok", "action": "skip requested"}
             code = 200
-        else:
-            response = {"error": "not found"}
-            code = 404
+        elif self.path == "/api/put":
+            try:                
+                body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                
+                songs = body.get("songs")
+                if songs is None or not isinstance(songs, list): raise ValueError("Request body must be a JSON object with a 'songs' key containing a list of strings.")
+
+                self.imc_q.put({"name": "activemod", "data": {"action": "add_to_toplay", "songs": songs}})
+                
+                response = {"status": "ok", "message": f"{len(songs)} song(s) were added to the high-priority queue."}
+                code = 200
+            except json.JSONDecodeError:
+                response = {"error": "Invalid JSON in request body."}
+                code = 400
+            except (ValueError, KeyError, TypeError) as e:
+                response = {"error": f"Invalid request format: {e}"}
+                code = 400
+            except Exception as e:
+                response = {"error": f"An unexpected server error occurred: {e}"}
+                code = 500
 
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(response).encode('utf-8'))
+    def send_response(self, code, message=None):
+        self.send_response_only(code, message)
+        self.send_header('Server', self.version_string())
+        self.send_header('Date', self.date_time_string())
 
 def web_server_process(data, imc_q):
-    handler = partial(APIHandler, data, imc_q)
-    httpd = ThreadingHTTPServer(("0.0.0.0", 3001), handler)
-    httpd.serve_forever()
-
+    ThreadingHTTPServer(("0.0.0.0", 3001), partial(APIHandler, data, imc_q)).serve_forever()
 
 class Module(PlayerModule):
     def __init__(self):
@@ -69,13 +87,9 @@ class Module(PlayerModule):
         while self.ipc_thread_running:
             try:
                 message = self.imc_q.get()
-
-                if message is None:
-                    break
-                
+                if message is None: break
                 self._imc.send(self, message["name"], message["data"])
-            except Exception as e:
-                pass
+            except Exception: pass
 
     def on_new_playlist(self, playlist: list[Track]) -> None:
         api_data = []
@@ -87,13 +101,10 @@ class Module(PlayerModule):
         track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset}
         if next_track:
             next_track_data = {"path": str(next_track.path), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset}
-        else:
-            next_track_data = None
+        else: next_track_data = None
         self.data["track"] = json.dumps({"index": index, "track": track_data, "next_track": next_track_data})
 
     def shutdown(self):
-        print("Shutting down Web API module...")
-        
         self.ipc_thread_running = False
         self.imc_q.put(None)
         self.ipc_thread.join(timeout=2)
@@ -101,8 +112,7 @@ class Module(PlayerModule):
         if self.web_process.is_alive():
             self.web_process.terminate()
             self.web_process.join(timeout=2)
-        
-        if self.web_process.is_alive():
-            self.web_process.kill()
-        
+
+        if self.web_process.is_alive(): self.web_process.kill()
+
 module = Module()

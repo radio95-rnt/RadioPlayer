@@ -1,5 +1,7 @@
+from modules import BaseIMCModule, InterModuleCommunication
 from . import ActiveModifier, log95, Track, Path
 import os, glob, datetime
+from threading import Lock
 
 from typing import TextIO
 _log_out: TextIO
@@ -15,6 +17,7 @@ class Module(ActiveModifier):
         self.limit_tracks = False
         self.can_limit_tracks = False
         self.morning_start = self.day_end = 0
+        self.file_lock = Lock()
     def on_new_playlist(self, playlist: list[Track]):
         self.playlist = playlist
 
@@ -25,8 +28,10 @@ class Module(ActiveModifier):
         self.can_limit_tracks = self.limit_tracks
     def play(self, index: int, track: Track, next_track: Track | None):
         if not self.playlist: return (track, next_track), False
-        if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
-        with open("/tmp/radioPlayer_toplay", "r") as f: songs = [s.strip() for s in f.readlines() if s.strip()]
+
+        with self.file_lock:
+            if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
+            with open("/tmp/radioPlayer_toplay", "r") as f: songs = [s.strip() for s in f.readlines() if s.strip()]
 
         songs[:] = [f for s in songs for f in glob.glob(s) if os.path.isfile(f)] # expand glob
 
@@ -97,5 +102,25 @@ class Module(ActiveModifier):
                     return (None, None), None
                 if last_track_duration: logger.info("Track ends at", repr(future))
         return (self.last_track, next_track), False
+
+    def imc(self, imc: InterModuleCommunication) -> None:
+        super().imc(imc)
+        self._imc.register(self, "activemod")
+    def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
+        if not isinstance(data, dict) or broadcast: return
+
+        if data.get("action") == "add_to_toplay":
+            songs_to_add = data.get("songs")
+            if isinstance(songs_to_add, list):
+                logger.info(f"Received request to add {len(songs_to_add)} items to toplay queue from '{source_name or 'unnamed'}'")
+
+                with self.file_lock:
+                    with open("/tmp/radioPlayer_toplay", "a") as f:
+                        for song_path in songs_to_add: f.write(f"{song_path}\n")
+                return {"status": "ok", "message": f"{len(songs_to_add)} songs added."}
+        elif data.get("action") == "get_toplay":
+            with self.file_lock:
+                with open("/tmp/radioPlayer_toplay", "r") as f:
+                    return {"status": "ok", "data": f.readlines()}
 
 activemod = Module()
