@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-import time, types
-import os, subprocess, importlib.util, importlib.machinery
-import sys, signal, glob
-import libcache, traceback, atexit
+import os, subprocess, importlib.util, importlib.machinery, types
+import sys, signal, glob, time, traceback, atexit
+import libcache
 from modules import *
 from threading import Lock
 
@@ -44,7 +43,7 @@ class ProcessManager(Skeleton_ProcessManager):
         if filters: cmd.extend(['-af', ",".join(filters)])
         cmd.append(str(track.path.absolute()))
 
-        pr = Process(Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True), track.path.name, time.monotonic(), duration - track.offset)
+        pr = Process(Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True), track, time.monotonic(), duration - track.offset)
         with self.lock: self.processes.append(pr)
         return pr
     def anything_playing(self) -> bool:
@@ -271,9 +270,9 @@ class RadioPlayer:
             self.logger.info(f"Now playing: {track.path.name}")
             prefetch(track.path)
 
-            [module.on_new_track(song_i, track, next_track) for module in self.simple_modules if module]
-
             pr = self.procman.play(track, cross_fade)
+            [module.on_new_track(song_i, pr.track, next_track) for module in self.simple_modules if module]
+
             end_time = pr.started_at + pr.duration
             if track.fade_out: end_time -= cross_fade
 

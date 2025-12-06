@@ -16,7 +16,7 @@ class Track:
 @dataclass
 class Process:
     process: Popen
-    track: str
+    track: Track
     started_at: float
     duration: float
 
@@ -43,21 +43,19 @@ class BaseIMCModule:
         return None
 
 class ProcmanCommunicator(BaseIMCModule):
-    def __init__(self, procman: Skeleton_ProcessManager) -> None:
-        self.procman = procman
+    def __init__(self, procman: Skeleton_ProcessManager) -> None: self.procman = procman
     def imc(self, imc: 'InterModuleCommunication') -> None:
         super().imc(imc)
         self._imc.register(self, "procman")
     def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
         if broadcast: return
-        if isinstance(data, str) and data.lower().strip() == "raw": return self.procman
-        elif isinstance(data, dict):
-            op = data.get("op")
-            if not op: return
+        # if isinstance(data, str) and data.lower().strip() == "raw": return self.procman
+        if isinstance(data, dict):
+            if (op := data.get("op")) is None: return
+
             if int(op) == 0: return {"op": 0, "arg": "pong"}
             elif int(op) == 1:
-                if arg := data.get("arg"):
-                    return {"op": 1, "arg": self.procman._get_audio_duration(arg)}
+                if arg := data.get("arg"): return {"op": 1, "arg": self.procman._get_audio_duration(arg)}
                 else: return
             elif int(op) == 2:
                 self.procman.stop_all(data.get("timeout", None))
@@ -66,6 +64,9 @@ class ProcmanCommunicator(BaseIMCModule):
                 return {"op": 3, "arg": self.procman.processes}
             elif int(op) == 4:
                 return {"op": 4, "arg": self.procman.anything_playing()}
+            elif int(op) == 5:
+                if arg := data.get("arg"): return {"op": 5, "arg": self.procman.play(arg, data.get("fade_time", 5))}
+                else: return
 
 class PlayerModule(BaseIMCModule):
     """
@@ -81,7 +82,7 @@ class PlayerModule(BaseIMCModule):
         pass
     def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float) -> None:
         """
-        Real total and total differ in that, total is how much the track lasts, but real_total will be for how long we will play it for
+        Real total and total differ in that, total is how much the track lasts, but real_total will be for how long we will focus on it (crossfade)
         Runs at a frequency around 1 Hz
         Please don't put any blocking or code that takes time
         """
@@ -140,15 +141,13 @@ class InterModuleCommunication:
     def __init__(self, modules: Sequence[BaseIMCModule | None]) -> None:
         self.modules = modules
         self.names_modules: dict[str, BaseIMCModule] = {}
-        for module in modules:
-            if module: module.imc(self)
+        [module.imc(self) for module in modules if module]
     def broadcast(self, source: BaseIMCModule, data: object) -> None:
         """
         Send data to all modules, other than ourself
         """
         source_name = next((k for k, v in self.names_modules.items() if v is source), None)
-        for module in [f for f in self.modules if f is not source]:
-            if module: module.imc_data(source, source_name, data, True)
+        for module in [f for f in self.modules if (f is not source) and f]: module.imc_data(source, source_name, data, True)
     def register(self, module: BaseIMCModule, name: str) -> bool:
         """
         Register our module with a name, so we can be sent data via the send function
@@ -160,5 +159,5 @@ class InterModuleCommunication:
         """
         Sends the data to a named module, and return its response
         """
-        if not name in self.names_modules.keys(): raise Exception
+        if not name in self.names_modules.keys(): raise Exception("No such module")
         return self.names_modules[name].imc_data(source, next((k for k, v in self.names_modules.items() if v is source), None), data, False)
