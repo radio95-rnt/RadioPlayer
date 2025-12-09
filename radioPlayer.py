@@ -129,7 +129,12 @@ class RadioPlayer:
 
     def shutdown(self): 
         self.procman.stop_all()
-        [module.shutdown() for module in self.simple_modules if module]
+        for module in self.simple_modules:
+            if module:
+                try: module.shutdown()
+                except Exception:
+                    traceback.print_last(file=self.logger.output)
+                    self.logger.error("Exception while shutting down module.")
         self.logger.output.close()
 
     def handle_sigint(self, signum: int, frame: types.FrameType | None):
