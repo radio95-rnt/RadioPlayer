@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Radio95 Track Monitor</title>
+        <style>
+            :root{
+                --bg:#0f1620; --panel:#11161c; --muted:#98a0a8; --accent:#3ea6ff; --card:#0b1014;
+                --success:#47d18b; --danger:#ff6b6b; --glass: rgba(255,255,255,0.03);
+                font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            }
+            html,body{height:100%; margin:0; background:linear-gradient(180deg,#071018,#0b1220 60%); color:#e6eef6}
+            .container{max-width:1400px; margin:18px auto; padding:18px; display:flex; flex-direction:column; gap:12px}
+            h1{margin:0; font-size:22px; font-weight:700}
+            .layout{display:flex; gap:14px; height:calc(100vh - 140px);}
+            .panel{background:var(--panel); border-radius:10px; padding:12px; box-shadow: 0 6px 18px rgba(2,8,16,0.6); display:flex; flex-direction:column; overflow:hidden}
+            .left{flex:1.2; min-width:420px}
+            .right{flex:1; display:grid; grid-template-columns:1fr 1fr; gap:12px}
+            .frame-title{font-size:16px; color:var(--muted); margin-bottom:8px}
+            .now, .next {margin-bottom:12px}
+            .now .track, .next .track {font-weight:600; font-size:14px; word-break:break-all}
+            .progress-wrap{display:flex; gap:10px; align-items:center}
+            .progress-bar{flex:1; height:12px; background:var(--glass); border-radius:8px; overflow:hidden; position:relative}
+            .progress-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent), #6cc7ff); transition:width 0.2s linear}
+            button, .btn{background:transparent;border:1px solid rgba(255,255,255,0.06); padding:8px 12px;border-radius:8px;color:inherit;cursor:pointer}
+            .btn.primary{background:linear-gradient(90deg,var(--accent), #6cc7ff); color:#001; border:none; font-weight:600}
+            .list{background:#07121a; border-radius:8px; padding:8px; overflow:auto; border:1px solid rgba(255,255,255,0.02)}
+            ul.playlist{list-style:none; padding:6px; margin:0; font-family: "Consolas",monospace; font-size:13px}
+            ul.playlist li{padding:6px 8px; border-radius:6px; display:flex; justify-content:space-between; gap:8px}
+            ul.playlist li:hover{background:rgba(255,255,255,0.02)}
+            ul.playlist li.current{background:rgba(62,166,255,0.08)}
+            ul.playlist li.selected{background:rgba(62, 165, 255, 0.305)}
+            .controls{display:flex; gap:8px; margin-top:8px}
+            .two-col{display:flex; gap:8px; align-items:flex-start; height:100%}
+            .box{display:flex; flex-direction:column; gap:8px}
+            .listbox{height:100%; min-height:220px; overflow:auto; border-radius:6px; background:var(--card); padding:8px; font-size:14px}
+            .listbox div.item{padding:6px; border-radius:6px}
+            .listbox div.item:hover{background:rgba(255,255,255,0.02); cursor:pointer}
+            .listbox div.item.selected{background:rgba(62,166,255,0.08)}
+            .small{font-size:12px; color:var(--muted)}
+            .row{display:flex; gap:8px; align-items:center}
+            .muted{color:var(--muted); font-size:13px}
+            .footer{display:flex; justify-content:space-between; gap:8px; align-items:center; margin-top:8px}
+            @media (max-width:900px){ .layout{flex-direction:column} .right{grid-template-columns:1fr} .left{min-width:auto} }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+            <h1>Radio95 Player Status</h1>
+            <div class="muted">WebSocket client</div>
+        </div>
+
+        <div class="layout">
+            <div class="panel left">
+            <div class="now">
+                <div class="frame-title">Now Playing</div>
+                <div class="track" id="now-track">Loading...</div>
+                <div class="progress-wrap" style="margin-top:8px">
+                <div class="progress-bar" title="progress"><div class="progress-fill" id="prog-fill"></div></div>
+                <div class="small" id="time-label">00:00:00 / 00:00:00</div>
+                </div>
+                <div class="controls" style="margin-top:10px">
+                <button id="skip-btn" class="btn">⏭ Skip Track</button>
+                <button id="readd-btn" class="btn">↺ Re-add Selected</button>
+                </div>
+            </div>
+
+            <div class="next" style="margin-top:12px">
+                <div class="frame-title">Next Track</div>
+                <div class="track" id="next-track">Loading...</div>
+            </div>
+
+            <div style="margin-top:12px" class="box" >
+                <div class="frame-title">Playlist Queue</div>
+                <div class="list listbox" id="playlist-box">
+                <ul class="playlist" id="playlist-ul"></ul>
+                </div>
+            </div>
+            </div>
+
+            <div class="panel right">
+            <div class="box" style="padding:8px">
+                <div class="frame-title">Directory Browser</div>
+                <div class="listbox" id="dirs-box"></div>
+                <div style="margin-top:8px" class="row">
+                <button id="add-file-btn" class="btn primary">Add File to PUT Queue</button>
+                </div>
+            </div>
+
+            <div class="box" style="padding:8px">
+                <div class="frame-title">Subdirectory Files</div>
+                <div class="listbox" id="subdir-box"></div>
+                <div style="margin-top:8px" class="row">
+                <button id="add-sub-file-btn" class="btn primary">Add File to PUT Queue</button>
+                <div class="small" id="current-subdir"></div>
+                </div>
+            </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="muted">Server: <span id="server-status">connecting...</span></div>
+            <div class="muted">Client: <span id="client-state">idle</span></div>
+        </div>
+        </div>
+
+        <script>
+            const HOST = "192.168.1.93";
+            const WS_URL = `ws://${HOST}:3001`;            // WebSocket endpoint
+
+            let ws = null;
+            let reconnectDelay = 1000;
+            let playlist = [];
+            let putQueue = []; // if available via HTTP
+            let currentTrackPath = "";
+            let selectedPlaylistIndex = null;
+            let selectedDir = null;
+            let selectedSubFile = null;
+            let basePath = "";
+
+            function connectWs(){
+            document.getElementById("server-status").textContent = "connecting...";
+            ws = new WebSocket(WS_URL);
+
+            ws.addEventListener("open", () => {
+                document.getElementById("server-status").textContent = "connected";
+                reconnectDelay = 1000;
+                ws.send(JSON.stringify({action:"request_state"}));
+                // also request a top-play list if you want:
+                // ws.send(JSON.stringify({action:"get_toplay"}));
+            });
+
+            ws.addEventListener("close", () => {
+                document.getElementById("server-status").textContent = "disconnected — reconnecting...";
+                setTimeout(connectWs, reconnectDelay);
+                reconnectDelay = Math.min(10000, reconnectDelay + 1000);
+            });
+
+            ws.addEventListener("error", (e) => {
+                console.warn("WS error", e);
+                document.getElementById("server-status").textContent = "error";
+            });
+
+            ws.addEventListener("message", (evt) => {
+                try {
+                const msg = JSON.parse(evt.data);
+                handleMessage(msg);
+                } catch (e) {
+                console.warn("Bad msg", evt.data);
+                }
+            });
+            }
+
+            function handleMessage(msg){
+                // Events: initial_state, playlist, new_track, progress, state
+                if(msg.event === "state"){
+                    const d = msg.data || {};
+                    if(d.playlist) { playlist = d.playlist; renderPlaylist(); }
+                    applyProgressState(d.track);
+                    updateDirs(d.dirs);
+                } else if(msg.event === "playlist"){
+                    playlist = msg.data || [];
+                    renderPlaylist();
+                } else if(msg.event === "new_track"){
+                    // msg.data contains index, track, next_track
+                    const t = msg.data;
+                    applyTrackState(t);
+                } else if(msg.event === "progress"){
+                    applyProgressState(msg.data);
+                } else if(msg.event === "dirs"){
+                    updateDirs(d.dirs);
+                } else if(msg.status || msg.response || msg.error){
+                    // simple ack or response from server for commands
+                    console.debug("ws ack", msg);
+                }
+            }
+
+            function applyTrackState(payload){
+                // payload: {index, track, next_track}
+                const track = payload.track || {};
+                const next = payload.next_track || {};
+                currentTrackPath = (track.official ? "" : "!") + (track.path||"<none>");
+                document.getElementById("now-track").textContent = `${track.official ? "(official) " : ""}${track.path||"<none>"}`;
+                document.getElementById("next-track").textContent = `${next.official ? "(official) " : ""}${next.path||"<none>"}`;
+                renderPlaylist(); // because indexes changed
+            }
+
+            function applyProgressState(payload){
+                // payload: {index, track, elapsed, total, real_total}
+                const track = payload.track || {};
+                const next_track = payload.next_track || {};
+                const elapsed = Number(payload.elapsed || 0);
+                const total = Number(payload.total || payload.real_total || 1) || 1;
+                const percent = Math.max(0, Math.min(100, (elapsed/total)*100));
+                document.getElementById("prog-fill").style.width = percent + "%";
+                document.getElementById("time-label").textContent = formatTime(elapsed) + " / " + formatTime(total);
+
+                if(track.path){
+                    currentTrackPath = (track.official ? "" : "!") + track.path;
+                    document.getElementById("now-track").textContent = `${track.official ? "(official) " : ""}${track.path}`;
+                }
+                if(next_track.path){
+                    document.getElementById("next-track").textContent = `${next_track.official ? "(official) " : ""}${next_track.path}`;
+                }
+            }
+
+            function formatTime(s){
+                s = Number(s||0);
+                const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
+                return [h,m,sec].map(x => String(x).padStart(2,'0')).join(":");
+            }
+
+            // ---------- Playlist rendering ----------
+            function renderPlaylist(){
+                const ul = document.getElementById("playlist-ul");
+                ul.innerHTML = "";
+                let currentIndex = null;
+                // if server gives index with progress use that, otherwise try infer
+                // We'll ask server for state if needed
+                // Build lines similar to your Tkinter logic
+                playlist.forEach((t, i) => {
+                    const li = document.createElement("li");
+                    const idx = i+1;
+                    const path = t.path || "<no path>";
+                    const official = t.official || false;
+                    const displayPath = (official ? "" : "!") + path;
+                    li.textContent = `${String(idx).padStart(2,'0')}: ${displayPath}`;
+                    li.dataset.path = path;
+                    li.dataset.idx = i;
+                    li.addEventListener("click", () => {
+                    selectPlaylistItem(i, li);
+                    });
+                    ul.appendChild(li);
+                });
+                // highlight current: try to find index that matches currentTrackPath
+                for(let i=0;i<ul.children.length;i++){
+                    const child = ul.children[i];
+                    const p = child.dataset.path;
+                    if(p && currentTrackPath.includes(p)){
+                    child.classList.add("current");
+                    currentIndex = i;
+                    } else child.classList.remove("current");
+                }
+                // scroll to current
+                if(currentIndex !== null){
+                    const el = ul.children[currentIndex];
+                    if(el) el.scrollIntoView({block:'center'});
+                }
+                }
+
+                function selectPlaylistItem(i, el){
+                // single-select visual
+                const ul = document.getElementById("playlist-ul");
+                Array.from(ul.children).forEach(c => c.classList.remove("selected"));
+                el.classList.add("selected");
+                selectedPlaylistIndex = i;
+            }
+
+            async function updateDirs(payload){
+                const dirsBox = document.getElementById("dirs-box");
+                dirsBox.innerHTML = "Loading...";
+                try {
+                    // basePath = data.base || "";
+                    const files = payload.files || [];
+                    const dirs = payload.dirs || [];
+                    dirsBox.innerHTML = "";
+                    dirs.sort().forEach(f => {
+                        const node = document.createElement("div");
+                        node.className = "item";
+                        node.textContent = f;
+                        node.addEventListener("click", () => onDirClicked(f, node));
+                        dirsBox.appendChild(node);
+                    });
+                    files.sort().forEach(f => {
+                        const node = document.createElement("div");
+                        node.className = "item";
+                        node.textContent = f;
+                        node.addEventListener("click", () => onDirClicked(f, node));
+                        dirsBox.appendChild(node);
+                    });
+                }catch(e){
+                    dirsBox.innerHTML = "Error fetching dirs: "+e.message;
+                }
+            }
+
+            function onDirClicked(name, node){
+            // highlight selection
+            Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
+            node.classList.add("selected");
+            selectedDir = name;
+            updateSubdirFiles(name);
+            }
+
+            async function updateSubdirFiles(dirname){
+            const sub = document.getElementById("subdir-box");
+            document.getElementById("current-subdir").textContent = dirname;
+            sub.innerHTML = "Loading...";
+            try{
+                const res = await fetch(`${API_BASE}/dir/${encodeURIComponent(dirname)}`, {cache:'no-cache'});
+                if(!res.ok) throw new Error(res.statusText);
+                const files = await res.json();
+                sub.innerHTML = "";
+                files.sort().forEach(f => {
+                const node = document.createElement("div");
+                node.className = "item";
+                node.textContent = f;
+                node.addEventListener("click", () => {
+                    Array.from(sub.children).forEach(c=>c.classList.remove("selected"));
+                    node.classList.add("selected"); selectedSubFile = f;
+                });
+                sub.appendChild(node);
+                });
+            }catch(e){
+                sub.innerHTML = "Error: "+e.message;
+            }
+            }
+
+            // ---------- Buttons actions ----------
+            document.getElementById("skip-btn").addEventListener("click", () => {
+            if(ws && ws.readyState === WebSocket.OPEN){
+                ws.send(JSON.stringify({action:"skip"}));
+            } else {
+                // fallback to HTTP endpoint
+                fetch(`${API_BASE}/skip`, {method:'POST'}).catch(()=>alert("Skip failed"));
+            }
+            });
+
+            document.getElementById("readd-btn").addEventListener("click", () => {
+            if(selectedPlaylistIndex == null){
+                alert("Select a playlist item to re-add.");
+                return;
+            }
+            const selected = playlist[selectedPlaylistIndex];
+            if(!selected) { alert("Invalid selection"); return; }
+            const path = selected.path;
+            sendAddToToplay([path]);
+            });
+
+            document.getElementById("add-file-btn").addEventListener("click", () => {
+            // add selected item from dirs (only if it's a file)
+            const dirEls = document.getElementById("dirs-box").children;
+            let sel = null;
+            for(let c of dirEls) if(c.classList.contains("selected")) { sel = c; break; }
+            if(!sel) { alert("Select file or directory from left list"); return; }
+            const name = sel.textContent;
+            // only add if it looks like a file (has extension)
+            if(name.indexOf('.') === -1){ alert("Select a file (not a directory) or use subdir files"); return; }
+            const full = basePath.replace(/\/$/,'') + '/' + name;
+            sendAddToToplay([full]);
+            });
+
+            document.getElementById("add-sub-file-btn").addEventListener("click", () => {
+            if(!selectedDir) { alert("Select a directory first"); return; }
+            if(!selectedSubFile) { alert("Select a file from subdirectory"); return; }
+            const full = basePath.replace(/\/$/,'') + '/' + selectedDir + '/' + selectedSubFile;
+            sendAddToToplay([full]);
+            });
+
+            function sendAddToToplay(songs){
+                ws.send(JSON.stringify({action:"add_to_toplay", songs: songs}));
+                // optionally ask server for playlist update
+                ws.send(JSON.stringify({action:"request_state", what:"playlist"}));
+            }
+
+            // Post-initialization
+            connectWs();
+
+            // expose for debugging
+            window._radio95 = {connectWs, playlist, updateSubdirFiles};
+
+        </script>
+    </body>
+</html>

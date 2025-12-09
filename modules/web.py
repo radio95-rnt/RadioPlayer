@@ -6,51 +6,37 @@ import asyncio
 import websockets
 from websockets import ServerConnection
 
-# keep these imports/names so this file can be used in the same place as your original
 from . import Track, PlayerModule, Path
 
 MAIN_PATH_DIR = Path("/home/user/mixes")
 
-# ---------- WebSocket server process ----------
-# This runs in a separate process. It uses the manager.dict() (shared) for reads
-# and uses imc_q to send control messages to the main process.
-#
-# The Module will place broadcast messages onto ws_q (a manager.Queue) which
-# this server reads and forwards to all connected clients.
-
 async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
-    """
-    Per-connection handler. Accepts JSON messages from clients and responds.
-    Also sends initial state on connect.
-    """
-    # send initial state
     try:
-        # shared_data stores JSON strings like before; try to send parsed objects
         initial = {
             "playlist": json.loads(shared_data.get("playlist", "[]")),
             "track": json.loads(shared_data.get("track", "{}")),
             "progress": json.loads(shared_data.get("progress", "{}")),
+            "dirs": {
+                "files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()],
+                "base": str(MAIN_PATH_DIR)
+            }
         }
-    except Exception:
-        initial = {"playlist": [], "track": {}, "progress": {}}
-    await websocket.send(json.dumps({"event": "initial_state", "data": initial}))
+    except Exception: initial = {"playlist": [], "track": {}, "progress": {}}
+    await websocket.send(json.dumps({"event": "state", "data": initial}))
 
     async for raw in websocket:
-        try:
-            msg = json.loads(raw)
+        try: msg = json.loads(raw)
         except Exception:
             await websocket.send(json.dumps({"error": "invalid json"}))
             continue
 
-        # Simple control actions
         action = msg.get("action")
         if action == "skip":
             imc_q.put({"name": "procman", "data": {"op": 2}})
             await websocket.send(json.dumps({"status": "ok", "action": "skip_requested"}))
         elif action == "add_to_toplay":
             songs = msg.get("songs")
-            if not isinstance(songs, list):
-                await websocket.send(json.dumps({"error": "songs must be a list"}))
+            if not isinstance(songs, list): await websocket.send(json.dumps({"error": "songs must be a list"}))
             else:
                 imc_q.put({"name": "activemod", "data": {"action": "add_to_toplay", "songs": songs}})
                 await websocket.send(json.dumps({"status": "ok", "message": f"{len(songs)} song(s) queued"}))
@@ -66,32 +52,27 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                     result = shared_data.pop(key)
                     break
                 await asyncio.sleep(0.05)
-            if result is None:
-                await websocket.send(json.dumps({"error": "timeout", "code": 504}))
-            else:
-                await websocket.send(json.dumps({"status": "ok", "response": result}))
+            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
+            else: await websocket.send(json.dumps({"status": "ok", "response": result}))
         elif action == "request_state":
             # supports requesting specific parts if provided
             what = msg.get("what")
             try:
-                if what == "playlist":
-                    payload = json.loads(shared_data.get("playlist", "[]"))
-                elif what == "track":
-                    payload = json.loads(shared_data.get("track", "{}"))
-                elif what == "progress":
-                    payload = json.loads(shared_data.get("progress", "{}"))
+                if what == "playlist": payload = json.loads(shared_data.get("playlist", "[]"))
+                elif what == "track": payload = json.loads(shared_data.get("track", "{}"))
+                elif what == "progress": payload = json.loads(shared_data.get("progress", "{}"))
                 else:
                     payload = {
                         "playlist": json.loads(shared_data.get("playlist", "[]")),
                         "track": json.loads(shared_data.get("track", "{}")),
                         "progress": json.loads(shared_data.get("progress", "{}")),
                     }
-            except Exception:
-                payload = {}
+            except Exception: payload = {}
             await websocket.send(json.dumps({"event": "state", "data": payload}))
+        elif action == "request_dirs":
+            await websocket.send(json.dumps({"event": "dirs", "files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)}))
         else:
             await websocket.send(json.dumps({"error": "unknown action"}))
-
 
 async def broadcast_worker(shared_data: dict, ws_q: multiprocessing.Queue, clients: set):
     """
