@@ -69,7 +69,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             except Exception: payload = {}
             await websocket.send(json.dumps({"event": "state", "data": payload}))
         elif action == "request_dir":
-            what: str = msg.get(what, "")
+            what: str = msg.get("what", "")
             try:
                 dir = Path(MAIN_PATH_DIR, what).resolve()
                 payload = {"files": [i.name for i in list(dir.iterdir()) if i.is_file()], "base": str(dir), "dir": dir.name}
