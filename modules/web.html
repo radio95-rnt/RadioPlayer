@@ -33,11 +33,11 @@
             ul.playlist li.selected{background:rgba(62, 165, 255, 0.305)}
             .controls{display:flex; gap:8px; margin-top:8px}
             .two-col{display:flex; gap:8px; align-items:flex-start; height:100%}
-            .box{display:flex; flex-direction:column; gap:8px}
-            .listbox{height:100%; min-height:220px; overflow:auto; border-radius:6px; background:var(--card); padding:8px; font-size:14px}
+            .box{display:flex; flex-direction:column; gap:8px; flex-grow: 1; overflow: hidden;}
+            .listbox{height:100%; min-height:220px; overflow:auto; border-radius:6px; background:var(--card); padding:8px; font-size:14px; scrollbar-width: none;}
             .listbox div.item{padding:6px; border-radius:6px}
             .listbox div.item:hover{background:rgba(255,255,255,0.02); cursor:pointer}
-            .listbox div.item.selected{background:rgba(62,166,255,0.08)}
+            .listbox div.item.selected{background:rgba(62, 165, 255, 0.305)}
             .small{font-size:12px; color:var(--muted)}
             .row{display:flex; gap:8px; align-items:center}
             .muted{color:var(--muted); font-size:13px}
@@ -107,13 +107,13 @@
         </div>
 
         <script>
-            const HOST = "192.168.1.93";
-            const WS_URL = `ws://${HOST}:3001`;            // WebSocket endpoint
+            const WS_URL = `ws://192.168.1.93:3001`;
 
             let ws = null;
             let reconnectDelay = 1000;
             let playlist = [];
-            let putQueue = []; // if available via HTTP
+            let lastplaylist_len = 0;
+            let putQueue = [];
             let currentTrackPath = "";
             let selectedPlaylistIndex = null;
             let selectedDir = null;
@@ -145,10 +145,9 @@
 
             ws.addEventListener("message", (evt) => {
                 try {
-                const msg = JSON.parse(evt.data);
-                handleMessage(msg);
+                    handleMessage(JSON.parse(evt.data));
                 } catch (e) {
-                console.warn("Bad msg", evt.data);
+                    console.warn("Bad msg", evt.data);
                 }
             });
             }
@@ -165,13 +164,12 @@
                     renderPlaylist();
                 } else if(msg.event === "new_track"){
                     // msg.data contains index, track, next_track
-                    const t = msg.data;
-                    applyTrackState(t);
+                    applyTrackState(msg.data);
                 } else if(msg.event === "progress"){
                     applyProgressState(msg.data);
-                } else if(msg.event === "dirs"){
-                    updateDirs(d.dirs);
-                } else if(msg.status || msg.response || msg.error){
+                } else if(msg.event === "toplay") {
+                    putQueue = msg.response.data;
+                } else if(msg.status || msg.response || msg.error) {
                     // simple ack or response from server for commands
                     console.debug("ws ack", msg);
                 }
@@ -217,6 +215,8 @@
                 const ul = document.getElementById("playlist-ul");
                 ul.innerHTML = "";
                 let currentIndex = null;
+                if(lastplaylist_len === playlist.length + putQueue.length) return;
+                else lastplaylist_len = playlist.length + putQueue.length;
                 // if server gives index with progress use that, otherwise try infer
                 // We'll ask server for state if needed
                 // Build lines similar to your Tkinter logic
@@ -229,9 +229,7 @@
                     li.textContent = `${String(idx).padStart(2,'0')}: ${displayPath}`;
                     li.dataset.path = path;
                     li.dataset.idx = i;
-                    li.addEventListener("click", () => {
-                    selectPlaylistItem(i, li);
-                    });
+                    li.addEventListener("click", () => { selectPlaylistItem(i, li); });
                     ul.appendChild(li);
                 });
                 // highlight current: try to find index that matches currentTrackPath
@@ -239,18 +237,25 @@
                     const child = ul.children[i];
                     const p = child.dataset.path;
                     if(p && currentTrackPath.includes(p)){
-                    child.classList.add("current");
-                    currentIndex = i;
+                        child.classList.add("current");
+                        currentIndex = i;
                     } else child.classList.remove("current");
                 }
                 // scroll to current
                 if(currentIndex !== null){
                     const el = ul.children[currentIndex];
+                    putQueue.forEach(element => {
+                        console.log(element)
+                    });
                     if(el) el.scrollIntoView({block:'center'});
                 }
-                }
+            }
 
-                function selectPlaylistItem(i, el){
+            function selectPlaylistItem(i, el){
+                if(el.classList.contains("selected")) {
+                    el.classList.remove("selected");
+                    return;
+                }
                 // single-select visual
                 const ul = document.getElementById("playlist-ul");
                 Array.from(ul.children).forEach(c => c.classList.remove("selected"));
@@ -262,7 +267,7 @@
                 const dirsBox = document.getElementById("dirs-box");
                 dirsBox.innerHTML = "Loading...";
                 try {
-                    // basePath = data.base || "";
+                    basePath = payload.base || "";
                     const files = payload.files || [];
                     const dirs = payload.dirs || [];
                     dirsBox.innerHTML = "";
@@ -277,85 +282,88 @@
                         const node = document.createElement("div");
                         node.className = "item";
                         node.textContent = f;
-                        node.addEventListener("click", () => onDirClicked(f, node));
+                        node.addEventListener("click", () => {
+                            Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
+                            node.classList.add("selected"); selectedSubFile = f;
+                        });
                         dirsBox.appendChild(node);
                     });
-                }catch(e){
+                } catch(e) {
                     dirsBox.innerHTML = "Error fetching dirs: "+e.message;
                 }
             }
 
             function onDirClicked(name, node){
-            // highlight selection
-            Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
-            node.classList.add("selected");
-            selectedDir = name;
-            updateSubdirFiles(name);
+                // highlight selection
+                Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
+                node.classList.add("selected");
+                selectedDir = name;
+                updateSubdirFiles(name);
             }
 
             async function updateSubdirFiles(dirname){
-            const sub = document.getElementById("subdir-box");
-            document.getElementById("current-subdir").textContent = dirname;
-            sub.innerHTML = "Loading...";
-            try{
-                const res = await fetch(`${API_BASE}/dir/${encodeURIComponent(dirname)}`, {cache:'no-cache'});
-                if(!res.ok) throw new Error(res.statusText);
-                const files = await res.json();
-                sub.innerHTML = "";
-                files.sort().forEach(f => {
-                const node = document.createElement("div");
-                node.className = "item";
-                node.textContent = f;
-                node.addEventListener("click", () => {
-                    Array.from(sub.children).forEach(c=>c.classList.remove("selected"));
-                    node.classList.add("selected"); selectedSubFile = f;
-                });
-                sub.appendChild(node);
-                });
-            }catch(e){
-                sub.innerHTML = "Error: "+e.message;
-            }
+                const sub = document.getElementById("subdir-box");
+                document.getElementById("current-subdir").textContent = dirname;
+                sub.innerHTML = "Loading...";
+                try{
+                    const res = await fetch(`${API_BASE}/dir/${encodeURIComponent(dirname)}`, {cache:'no-cache'});
+                    if(!res.ok) throw new Error(res.statusText);
+                    const files = await res.json();
+                    sub.innerHTML = "";
+                    files.sort().forEach(f => {
+                    const node = document.createElement("div");
+                    node.className = "item";
+                    node.textContent = f;
+                    node.addEventListener("click", () => {
+                        Array.from(sub.children).forEach(c=>c.classList.remove("selected"));
+                        node.classList.add("selected"); selectedSubFile = f;
+                    });
+                    sub.appendChild(node);
+                    });
+                }catch(e){
+                    sub.innerHTML = "Error: "+e.message;
+                }
             }
 
             // ---------- Buttons actions ----------
             document.getElementById("skip-btn").addEventListener("click", () => {
-            if(ws && ws.readyState === WebSocket.OPEN){
-                ws.send(JSON.stringify({action:"skip"}));
-            } else {
-                // fallback to HTTP endpoint
-                fetch(`${API_BASE}/skip`, {method:'POST'}).catch(()=>alert("Skip failed"));
-            }
+                if(ws && ws.readyState === WebSocket.OPEN){
+                    ws.send(JSON.stringify({action:"skip"}));
+                } else {
+                    // fallback to HTTP endpoint
+                    fetch(`${API_BASE}/skip`, {method:'POST'}).catch(()=>alert("Skip failed"));
+                }
             });
 
             document.getElementById("readd-btn").addEventListener("click", () => {
-            if(selectedPlaylistIndex == null){
-                alert("Select a playlist item to re-add.");
-                return;
-            }
-            const selected = playlist[selectedPlaylistIndex];
-            if(!selected) { alert("Invalid selection"); return; }
-            const path = selected.path;
-            sendAddToToplay([path]);
+                if(selectedPlaylistIndex == null){
+                    alert("Select a playlist item to re-add.");
+                    return;
+                }
+                const selected = playlist[selectedPlaylistIndex];
+                if(!selected) { alert("Invalid selection"); return; }
+                const path = selected.path;
+                sendAddToToplay([path]);
             });
 
             document.getElementById("add-file-btn").addEventListener("click", () => {
-            // add selected item from dirs (only if it's a file)
-            const dirEls = document.getElementById("dirs-box").children;
-            let sel = null;
-            for(let c of dirEls) if(c.classList.contains("selected")) { sel = c; break; }
-            if(!sel) { alert("Select file or directory from left list"); return; }
-            const name = sel.textContent;
-            // only add if it looks like a file (has extension)
-            if(name.indexOf('.') === -1){ alert("Select a file (not a directory) or use subdir files"); return; }
-            const full = basePath.replace(/\/$/,'') + '/' + name;
-            sendAddToToplay([full]);
+                // add selected item from dirs (only if it's a file)
+                const dirEls = document.getElementById("dirs-box").children;
+                let sel = null;
+                for(let c of dirEls) if(c.classList.contains("selected")) { sel = c; break; }
+                if(!sel) { alert("Select file or directory from left list"); return; }
+                const name = sel.textContent;
+                // only add if it looks like a file (has extension)
+                if(name.indexOf('.') === -1){ alert("Select a file (not a directory) or use subdir files"); return; }
+                const full = basePath.replace(/\/$/,'') + '/' + name;
+                sendAddToToplay([full]);
             });
 
             document.getElementById("add-sub-file-btn").addEventListener("click", () => {
-            if(!selectedDir) { alert("Select a directory first"); return; }
-            if(!selectedSubFile) { alert("Select a file from subdirectory"); return; }
-            const full = basePath.replace(/\/$/,'') + '/' + selectedDir + '/' + selectedSubFile;
-            sendAddToToplay([full]);
+                if(!selectedDir) { alert("Select a directory first"); return; }
+                if(!selectedSubFile) { alert("Select a file from subdirectory"); return; }
+                const full = basePath.replace(/\/$/,'') + '/' + selectedDir + '/' + selectedSubFile;
+                sendAddToToplay([full]);
             });
 
             function sendAddToToplay(songs){
@@ -364,12 +372,7 @@
                 ws.send(JSON.stringify({action:"request_state", what:"playlist"}));
             }
 
-            // Post-initialization
             connectWs();
-
-            // expose for debugging
-            window._radio95 = {connectWs, playlist, updateSubdirFiles};
-
         </script>
     </body>
 </html>

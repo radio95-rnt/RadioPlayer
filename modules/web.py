@@ -22,7 +22,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
     await websocket.send(json.dumps({"event": "state", "data": initial}))
 
     async for raw in websocket:
-        try: msg = json.loads(raw)
+        try: msg: dict = json.loads(raw)
         except Exception:
             await websocket.send(json.dumps({"error": "invalid json"}))
             continue
@@ -50,10 +50,10 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                     break
                 await asyncio.sleep(0.05)
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
-            else: await websocket.send(json.dumps({"status": "ok", "response": result}))
+            else: await websocket.send(json.dumps({"status": "ok", "response": result, "event": "toplay"}))
         elif action == "request_state":
             # supports requesting specific parts if provided
-            what = msg.get("what")
+            what = msg.get("what", "")
             try:
                 if what == "playlist": payload = json.loads(shared_data.get("playlist", "[]"))
                 elif what == "track": payload = json.loads(shared_data.get("track", "{}"))
@@ -68,24 +68,25 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                     }
             except Exception: payload = {}
             await websocket.send(json.dumps({"event": "state", "data": payload}))
-        else:
-            await websocket.send(json.dumps({"error": "unknown action"}))
+        elif action == "request_dir":
+            what: str = msg.get(what, "")
+            try:
+                dir = Path(MAIN_PATH_DIR, what).resolve()
+                payload = {"files": [i.name for i in list(dir.iterdir()) if i.is_file()], "dirs": [i.name for i in list(dir.iterdir()) if i.is_dir()], "base": str(dir)}
+            except Exception: payload = {}
+            await websocket.send(json.dumps({"event": "state", "data": payload}))
+        else: await websocket.send(json.dumps({"error": "unknown action"}))
 
-async def broadcast_worker(shared_data: dict, ws_q: multiprocessing.Queue, clients: set):
+async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
     """
     Reads messages from ws_q (a blocking multiprocessing.Queue) using run_in_executor
     and broadcasts them to all connected clients.
     """
     loop = asyncio.get_event_loop()
     while True:
-        # blocking get executed in default threadpool so we don't block the event loop
         msg = await loop.run_in_executor(None, ws_q.get)
-        if msg is None:
-            # sentinel to shut down
-            break
-        # msg expected to be serializable (e.g. {"event": "playlist", "data": ...})
+        if msg is None: break
         payload = json.dumps(msg)
-        # send concurrently; ignore per-client errors (client may disconnect)
         if clients:
             coros = []
             for ws in list(clients):
@@ -94,15 +95,10 @@ async def broadcast_worker(shared_data: dict, ws_q: multiprocessing.Queue, clien
 
 
 async def _safe_send(ws, payload: str, clients: set):
-    try:
-        await ws.send(payload)
+    try: await ws.send(payload)
     except Exception:
-        # remove dead websocket
-        try:
-            clients.discard(ws)
-        except Exception:
-            pass
-
+        try: clients.discard(ws)
+        except Exception: pass
 
 def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
     """
@@ -123,7 +119,7 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
         # start server
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001)
         # background task: broadcast worker
-        broadcaster = asyncio.create_task(broadcast_worker(shared_data, ws_q, clients))
+        broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
         # run forever until server closes
         await server.wait_closed()
         # ensure broadcaster stops
