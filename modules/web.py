@@ -16,10 +16,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             "playlist": json.loads(shared_data.get("playlist", "[]")),
             "track": json.loads(shared_data.get("track", "{}")),
             "progress": json.loads(shared_data.get("progress", "{}")),
-            "dirs": {
-                "files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()],
-                "base": str(MAIN_PATH_DIR)
-            }
+            "dirs": {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)}
         }
     except Exception: initial = {"playlist": [], "track": {}, "progress": {}}
     await websocket.send(json.dumps({"event": "state", "data": initial}))
@@ -61,11 +58,13 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 if what == "playlist": payload = json.loads(shared_data.get("playlist", "[]"))
                 elif what == "track": payload = json.loads(shared_data.get("track", "{}"))
                 elif what == "progress": payload = json.loads(shared_data.get("progress", "{}"))
+                elif what == "dirs": payload = {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)}
                 else:
                     payload = {
                         "playlist": json.loads(shared_data.get("playlist", "[]")),
                         "track": json.loads(shared_data.get("track", "{}")),
                         "progress": json.loads(shared_data.get("progress", "{}")),
+                        "dirs": {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)}
                     }
             except Exception: payload = {}
             await websocket.send(json.dumps({"event": "state", "data": payload}))
