@@ -160,9 +160,9 @@
             function handleMessage(msg){
                 if(msg.event === "state"){
                     const d = msg.data || {};
-                    if(d.playlist) { playlist = d.playlist; renderPlaylist(); }
                     applyProgressState(d.track);
                     updateDirs(d.dirs);
+                    if(d.playlist) { playlist = d.playlist; renderPlaylist(); }
                 } else if(msg.event === "playlist"){
                     playlist = msg.data || [];
                     renderPlaylist();
