@@ -127,7 +127,7 @@
             ws.addEventListener("open", () => {
                 document.getElementById("server-status").textContent = "connected";
                 reconnectDelay = 1000;
-                ws.send(JSON.stringify({action:"request_state"}));
+                // ws.send(JSON.stringify({action:"request_state"}));
                 // also request a top-play list if you want:
                 // ws.send(JSON.stringify({action:"get_toplay"}));
             });

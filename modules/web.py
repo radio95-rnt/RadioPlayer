@@ -68,8 +68,6 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                     }
             except Exception: payload = {}
             await websocket.send(json.dumps({"event": "state", "data": payload}))
-        elif action == "request_dirs":
-            await websocket.send(json.dumps({"event": "dirs", "files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)}))
         else:
             await websocket.send(json.dumps({"error": "unknown action"}))
 
