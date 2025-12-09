@@ -72,10 +72,18 @@
                 <div class="track" id="next-track">Loading...</div>
             </div>
 
-            <div style="margin-top:12px" class="box" >
-                <div class="frame-title">Playlist Queue</div>
-                <div class="list listbox" id="playlist-box">
-                <ul class="playlist" id="playlist-ul"></ul>
+            <div style="margin-top:12px; display:flex; flex-direction: column; flex-grow: 1; overflow: hidden;">
+                <div class="box" style="flex-grow: 1;">
+                    <div class="frame-title">Playlist Queue</div>
+                    <div class="list listbox" id="playlist-box">
+                        <ul class="playlist" id="playlist-ul"></ul>
+                    </div>
+                </div>
+                <div class="box" style="margin-top: 12px; flex-shrink: 0;">
+                    <div class="frame-title">PUT Queue</div>
+                    <div class="list listbox" id="put-queue-box" style="min-height: 80px; max-height: 200px;">
+                        <ul class="playlist" id="put-queue-ul"></ul>
+                    </div>
                 </div>
             </div>
             </div>
@@ -112,48 +120,45 @@
             let ws = null;
             let reconnectDelay = 1000;
             let playlist = [];
-            let lastplaylist_len = 0;
             let putQueue = [];
             let currentTrackPath = "";
             let selectedPlaylistIndex = null;
             let selectedDir = null;
             let selectedSubFile = null;
             let basePath = "";
+            let subbasePath = "";
 
             function connectWs(){
-            document.getElementById("server-status").textContent = "connecting...";
-            ws = new WebSocket(WS_URL);
+                document.getElementById("server-status").textContent = "connecting...";
+                ws = new WebSocket(WS_URL);
 
-            ws.addEventListener("open", () => {
-                document.getElementById("server-status").textContent = "connected";
-                reconnectDelay = 1000;
-                // ws.send(JSON.stringify({action:"request_state"}));
-                // also request a top-play list if you want:
-                // ws.send(JSON.stringify({action:"get_toplay"}));
-            });
+                ws.addEventListener("open", () => {
+                    document.getElementById("server-status").textContent = "connected";
+                    reconnectDelay = 1000;
+                    ws.send(JSON.stringify({action:"get_toplay"}));
+                });
 
-            ws.addEventListener("close", () => {
-                document.getElementById("server-status").textContent = "disconnected — reconnecting...";
-                setTimeout(connectWs, reconnectDelay);
-                reconnectDelay = Math.min(10000, reconnectDelay + 1000);
-            });
+                ws.addEventListener("close", () => {
+                    document.getElementById("server-status").textContent = "disconnected — reconnecting...";
+                    setTimeout(connectWs, reconnectDelay);
+                    reconnectDelay = Math.min(10000, reconnectDelay + 1000);
+                });
 
-            ws.addEventListener("error", (e) => {
-                console.warn("WS error", e);
-                document.getElementById("server-status").textContent = "error";
-            });
+                ws.addEventListener("error", (e) => {
+                    console.warn("WS error", e);
+                    document.getElementById("server-status").textContent = "error";
+                });
 
-            ws.addEventListener("message", (evt) => {
-                try {
-                    handleMessage(JSON.parse(evt.data));
-                } catch (e) {
-                    console.warn("Bad msg", evt.data);
-                }
-            });
+                ws.addEventListener("message", (evt) => {
+                    try {
+                        handleMessage(JSON.parse(evt.data));
+                    } catch (e) {
+                        console.warn("Bad msg", evt.data);
+                    }
+                });
             }
 
             function handleMessage(msg){
-                // Events: initial_state, playlist, new_track, progress, state
                 if(msg.event === "state"){
                     const d = msg.data || {};
                     if(d.playlist) { playlist = d.playlist; renderPlaylist(); }
@@ -163,30 +168,30 @@
                     playlist = msg.data || [];
                     renderPlaylist();
                 } else if(msg.event === "new_track"){
-                    // msg.data contains index, track, next_track
                     applyTrackState(msg.data);
+                    ws.send(JSON.stringify({action:"get_toplay"}))
                 } else if(msg.event === "progress"){
                     applyProgressState(msg.data);
                 } else if(msg.event === "toplay") {
-                    putQueue = msg.response.data;
+                    putQueue = msg.response.data || [];
+                    renderPutQueue(); 
+                } else if(msg.event === "request_dir") {
+                    applySubdir(d.data || {})
                 } else if(msg.status || msg.response || msg.error) {
-                    // simple ack or response from server for commands
                     console.debug("ws ack", msg);
                 }
             }
 
             function applyTrackState(payload){
-                // payload: {index, track, next_track}
                 const track = payload.track || {};
                 const next = payload.next_track || {};
                 currentTrackPath = (track.official ? "" : "!") + (track.path||"<none>");
                 document.getElementById("now-track").textContent = `${track.official ? "(official) " : ""}${track.path||"<none>"}`;
                 document.getElementById("next-track").textContent = `${next.official ? "(official) " : ""}${next.path||"<none>"}`;
-                renderPlaylist(); // because indexes changed
+                renderPlaylist();
             }
 
             function applyProgressState(payload){
-                // payload: {index, track, elapsed, total, real_total}
                 const track = payload.track || {};
                 const next_track = payload.next_track || {};
                 const elapsed = Number(payload.elapsed || 0);
@@ -204,22 +209,41 @@
                 }
             }
 
+            function applySubdir(payload) {
+                if(payload.dir !== selectedSubFile) return;
+
+                const dirsBox = document.getElementById("subdir-box");
+                dirsBox.innerHTML = "Loading...";
+                try {
+                    subbasePath = payload.base || "";
+                    const files = payload.files || [];
+                    dirsBox.innerHTML = "";
+                    files.sort().forEach(f => {
+                        const node = document.createElement("div");
+                        node.className = "item";
+                        node.textContent = f;
+                        node.addEventListener("click", () => {
+                            Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
+                            node.classList.add("selected"); selectedSubFile = f;
+                        });
+                        dirsBox.appendChild(node);
+                    });
+                } catch(e) {
+                    dirsBox.innerHTML = "Error fetching dirs: "+e.message;
+                }
+            }
+
             function formatTime(s){
                 s = Number(s||0);
                 const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
                 return [h,m,sec].map(x => String(x).padStart(2,'0')).join(":");
             }
 
-            // ---------- Playlist rendering ----------
             function renderPlaylist(){
                 const ul = document.getElementById("playlist-ul");
                 ul.innerHTML = "";
                 let currentIndex = null;
-                if(lastplaylist_len === playlist.length + putQueue.length) return;
-                else lastplaylist_len = playlist.length + putQueue.length;
-                // if server gives index with progress use that, otherwise try infer
-                // We'll ask server for state if needed
-                // Build lines similar to your Tkinter logic
+                
                 playlist.forEach((t, i) => {
                     const li = document.createElement("li");
                     const idx = i+1;
@@ -230,33 +254,37 @@
                     li.dataset.path = path;
                     li.dataset.idx = i;
                     li.addEventListener("click", () => { selectPlaylistItem(i, li); });
+
+                    const p = li.dataset.path;
+                    if(p && currentTrackPath.includes(p)){
+                        li.classList.add("current");
+                        currentIndex = i;
+                    }
                     ul.appendChild(li);
                 });
-                // highlight current: try to find index that matches currentTrackPath
-                for(let i=0;i<ul.children.length;i++){
-                    const child = ul.children[i];
-                    const p = child.dataset.path;
-                    if(p && currentTrackPath.includes(p)){
-                        child.classList.add("current");
-                        currentIndex = i;
-                    } else child.classList.remove("current");
-                }
-                // scroll to current
+                
                 if(currentIndex !== null){
                     const el = ul.children[currentIndex];
-                    putQueue.forEach(element => {
-                        console.log(element)
-                    });
-                    if(el) el.scrollIntoView({block:'center'});
+                    if(el) el.scrollIntoView({block:'center', behavior: 'smooth'});
                 }
+            }
+            
+            function renderPutQueue() {
+                const ul = document.getElementById("put-queue-ul");
+                ul.innerHTML = "";
+                putQueue.forEach((element, i) => {
+                    const li = document.createElement("li");
+                    li.textContent = element;
+                    ul.appendChild(li);
+                });
             }
 
             function selectPlaylistItem(i, el){
                 if(el.classList.contains("selected")) {
                     el.classList.remove("selected");
+                    selectedPlaylistIndex = null;
                     return;
                 }
-                // single-select visual
                 const ul = document.getElementById("playlist-ul");
                 Array.from(ul.children).forEach(c => c.classList.remove("selected"));
                 el.classList.add("selected");
@@ -294,44 +322,17 @@
             }
 
             function onDirClicked(name, node){
-                // highlight selection
                 Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
                 node.classList.add("selected");
                 selectedDir = name;
-                updateSubdirFiles(name);
+                ws.send(JSON.stringify({action:"request_dir", what: selectedDir}))
             }
 
-            async function updateSubdirFiles(dirname){
-                const sub = document.getElementById("subdir-box");
-                document.getElementById("current-subdir").textContent = dirname;
-                sub.innerHTML = "Loading...";
-                try{
-                    const res = await fetch(`${API_BASE}/dir/${encodeURIComponent(dirname)}`, {cache:'no-cache'});
-                    if(!res.ok) throw new Error(res.statusText);
-                    const files = await res.json();
-                    sub.innerHTML = "";
-                    files.sort().forEach(f => {
-                    const node = document.createElement("div");
-                    node.className = "item";
-                    node.textContent = f;
-                    node.addEventListener("click", () => {
-                        Array.from(sub.children).forEach(c=>c.classList.remove("selected"));
-                        node.classList.add("selected"); selectedSubFile = f;
-                    });
-                    sub.appendChild(node);
-                    });
-                }catch(e){
-                    sub.innerHTML = "Error: "+e.message;
-                }
-            }
-
-            // ---------- Buttons actions ----------
             document.getElementById("skip-btn").addEventListener("click", () => {
                 if(ws && ws.readyState === WebSocket.OPEN){
                     ws.send(JSON.stringify({action:"skip"}));
                 } else {
-                    // fallback to HTTP endpoint
-                    fetch(`${API_BASE}/skip`, {method:'POST'}).catch(()=>alert("Skip failed"));
+                    console.error("WebSocket not connected.");
                 }
             });
 
@@ -347,13 +348,11 @@
             });
 
             document.getElementById("add-file-btn").addEventListener("click", () => {
-                // add selected item from dirs (only if it's a file)
                 const dirEls = document.getElementById("dirs-box").children;
                 let sel = null;
                 for(let c of dirEls) if(c.classList.contains("selected")) { sel = c; break; }
                 if(!sel) { alert("Select file or directory from left list"); return; }
                 const name = sel.textContent;
-                // only add if it looks like a file (has extension)
                 if(name.indexOf('.') === -1){ alert("Select a file (not a directory) or use subdir files"); return; }
                 const full = basePath.replace(/\/$/,'') + '/' + name;
                 sendAddToToplay([full]);
@@ -362,14 +361,15 @@
             document.getElementById("add-sub-file-btn").addEventListener("click", () => {
                 if(!selectedDir) { alert("Select a directory first"); return; }
                 if(!selectedSubFile) { alert("Select a file from subdirectory"); return; }
-                const full = basePath.replace(/\/$/,'') + '/' + selectedDir + '/' + selectedSubFile;
+                const full = subbasePath.replace(/\/$/,'') + '/' + selectedSubFile;
                 sendAddToToplay([full]);
             });
 
             function sendAddToToplay(songs){
-                ws.send(JSON.stringify({action:"add_to_toplay", songs: songs}));
-                // optionally ask server for playlist update
-                ws.send(JSON.stringify({action:"request_state", what:"playlist"}));
+                if(ws && ws.readyState === WebSocket.OPEN){
+                    ws.send(JSON.stringify({action:"add_to_toplay", songs: songs}));
+                    setTimeout(() => ws.send(JSON.stringify({action:"get_toplay"})), 250);
+                }
             }
 
             connectWs();

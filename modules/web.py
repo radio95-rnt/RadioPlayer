@@ -72,9 +72,9 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             what: str = msg.get(what, "")
             try:
                 dir = Path(MAIN_PATH_DIR, what).resolve()
-                payload = {"files": [i.name for i in list(dir.iterdir()) if i.is_file()], "dirs": [i.name for i in list(dir.iterdir()) if i.is_dir()], "base": str(dir)}
+                payload = {"files": [i.name for i in list(dir.iterdir()) if i.is_file()], "base": str(dir), "dir": dir.name}
             except Exception: payload = {}
-            await websocket.send(json.dumps({"event": "state", "data": payload}))
+            await websocket.send(json.dumps({"event": "request_dir", "data": payload}))
         else: await websocket.send(json.dumps({"error": "unknown action"}))
 
 async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
