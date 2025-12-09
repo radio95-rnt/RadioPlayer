@@ -10,13 +10,13 @@
                 --success:#47d18b; --danger:#ff6b6b; --glass: rgba(255,255,255,0.03);
                 font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
             }
-            html,body{height:100%; margin:0; background:linear-gradient(180deg,#071018,#0b1220 60%); color:#e6eef6}
+            html,body{height:100%; margin:0; background:linear-gradient(180deg,#071018,#0b1220 60%); color:#e6eef6; overflow: hidden;}
             .container{max-width:1400px; margin:18px auto; padding:18px; display:flex; flex-direction:column; gap:12px}
             h1{margin:0; font-size:22px; font-weight:700}
             .layout{display:flex; gap:14px; height:calc(100vh - 140px);}
             .panel{background:var(--panel); border-radius:10px; padding:12px; box-shadow: 0 6px 18px rgba(2,8,16,0.6); display:flex; flex-direction:column; overflow:hidden}
             .left{flex:1.2; min-width:420px}
-            .right{flex:1; display:grid; grid-template-columns:1fr 1fr; gap:12px}
+            .right{flex:1; display:flex; flex-direction:column; gap:12px}
             .frame-title{font-size:16px; color:var(--muted); margin-bottom:8px}
             .now, .next {margin-bottom:12px}
             .now .track, .next .track {font-weight:600; font-size:14px; word-break:break-all}
@@ -89,22 +89,20 @@
             </div>
 
             <div class="panel right">
-            <div class="box" style="padding:8px">
-                <div class="frame-title">Directory Browser</div>
-                <div class="listbox" id="dirs-box"></div>
-                <div style="margin-top:8px" class="row">
-                <button id="add-file-btn" class="btn primary">Add File to PUT Queue</button>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; flex-grow:1; overflow:hidden">
+                    <div class="box" style="padding:8px">
+                        <div class="frame-title">Directory Browser</div>
+                        <div class="listbox" id="dirs-box"></div>
+                    </div>
+        
+                    <div class="box" style="padding:8px">
+                        <div class="frame-title">Subdirectory Files</div>
+                        <div class="listbox" id="subdir-box"></div>
+                    </div>
                 </div>
-            </div>
-
-            <div class="box" style="padding:8px">
-                <div class="frame-title">Subdirectory Files</div>
-                <div class="listbox" id="subdir-box"></div>
-                <div style="margin-top:8px" class="row">
-                <button id="add-sub-file-btn" class="btn primary">Add File to PUT Queue</button>
-                <div class="small" id="current-subdir"></div>
+                <div style="margin-top:8px">
+                    <button id="add-to-put-btn" class="btn primary" style="width:100%">Add Selected File to PUT Queue</button>
                 </div>
-            </div>
             </div>
         </div>
 
@@ -122,6 +120,7 @@
             let playlist = [];
             let putQueue = [];
             let currentTrackPath = "";
+            let currentTrackIndex = 0;
             let selectedPlaylistIndex = null;
             let selectedDir = null;
             let selectedSubFile = null;
@@ -153,7 +152,7 @@
                     try {
                         handleMessage(JSON.parse(evt.data));
                     } catch (e) {
-                        console.warn("Bad msg", evt.data);
+                        console.warn("Bad msg", evt.data, e);
                     }
                 });
             }
@@ -176,7 +175,7 @@
                     putQueue = msg.response.data || [];
                     renderPutQueue(); 
                 } else if(msg.event === "request_dir") {
-                    applySubdir(d.data || {})
+                    applySubdir(msg.data || {})
                 } else if(msg.status || msg.response || msg.error) {
                     console.debug("ws ack", msg);
                 }
@@ -186,6 +185,7 @@
                 const track = payload.track || {};
                 const next = payload.next_track || {};
                 currentTrackPath = (track.official ? "" : "!") + (track.path||"<none>");
+                currentTrackIndex = payload.index;
                 document.getElementById("now-track").textContent = `${track.official ? "(official) " : ""}${track.path||"<none>"}`;
                 document.getElementById("next-track").textContent = `${next.official ? "(official) " : ""}${next.path||"<none>"}`;
                 renderPlaylist();
@@ -199,6 +199,7 @@
                 const percent = Math.max(0, Math.min(100, (elapsed/total)*100));
                 document.getElementById("prog-fill").style.width = percent + "%";
                 document.getElementById("time-label").textContent = formatTime(elapsed) + " / " + formatTime(total);
+                currentTrackIndex = payload.index;
 
                 if(track.path){
                     currentTrackPath = (track.official ? "" : "!") + track.path;
@@ -210,7 +211,7 @@
             }
 
             function applySubdir(payload) {
-                if(payload.dir !== selectedSubFile) return;
+                if(payload.dir !== selectedDir) return;
 
                 const dirsBox = document.getElementById("subdir-box");
                 dirsBox.innerHTML = "Loading...";
@@ -256,7 +257,7 @@
                     li.addEventListener("click", () => { selectPlaylistItem(i, li); });
 
                     const p = li.dataset.path;
-                    if(p && currentTrackPath.includes(p)){
+                    if(p && currentTrackPath.includes(p) && i === currentTrackIndex){
                         li.classList.add("current");
                         currentIndex = i;
                     }
@@ -312,7 +313,10 @@
                         node.textContent = f;
                         node.addEventListener("click", () => {
                             Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
-                            node.classList.add("selected"); selectedSubFile = f;
+                            node.classList.add("selected");
+                            selectedDir = null; 
+                            selectedSubFile = null;
+                            document.getElementById("subdir-box").innerHTML = "";
                         });
                         dirsBox.appendChild(node);
                     });
@@ -325,6 +329,7 @@
                 Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
                 node.classList.add("selected");
                 selectedDir = name;
+                selectedSubFile = null;
                 ws.send(JSON.stringify({action:"request_dir", what: selectedDir}))
             }
 
@@ -345,24 +350,34 @@
                 if(!selected) { alert("Invalid selection"); return; }
                 const path = selected.path;
                 sendAddToToplay([path]);
+                Array.from(document.getElementById("playlist-box").children).forEach(c => c.classList.remove("selected"));
             });
+            
+            document.getElementById("add-to-put-btn").addEventListener("click", () => {
+                let fullPath = null;
 
-            document.getElementById("add-file-btn").addEventListener("click", () => {
-                const dirEls = document.getElementById("dirs-box").children;
-                let sel = null;
-                for(let c of dirEls) if(c.classList.contains("selected")) { sel = c; break; }
-                if(!sel) { alert("Select file or directory from left list"); return; }
-                const name = sel.textContent;
-                if(name.indexOf('.') === -1){ alert("Select a file (not a directory) or use subdir files"); return; }
-                const full = basePath.replace(/\/$/,'') + '/' + name;
-                sendAddToToplay([full]);
-            });
+                // Priority 1: Check for a selected file in the subdirectory list
+                if (selectedSubFile && selectedDir) {
+                    fullPath = subbasePath.replace(/\/$/, '') + '/' + selectedSubFile;
+                } else {
+                    // Priority 2: Check for a selected file in the main directory list
+                    const dirEls = document.getElementById("dirs-box").children;
+                    const selectedItem = Array.from(dirEls).find(el => el.classList.contains("selected"));
+                    
+                    if (selectedItem) {
+                        const name = selectedItem.textContent;
+                        // A simple check to see if the selected item is a file
+                        if (name.includes('.')) {
+                            fullPath = basePath.replace(/\/$/, '') + '/' + name;
+                        }
+                    }
+                }
 
-            document.getElementById("add-sub-file-btn").addEventListener("click", () => {
-                if(!selectedDir) { alert("Select a directory first"); return; }
-                if(!selectedSubFile) { alert("Select a file from subdirectory"); return; }
-                const full = subbasePath.replace(/\/$/,'') + '/' + selectedSubFile;
-                sendAddToToplay([full]);
+                if (fullPath) {
+                    sendAddToToplay([fullPath]);
+                } else {
+                    alert("Please select a file to add.");
+                }
             });
 
             function sendAddToToplay(songs){
