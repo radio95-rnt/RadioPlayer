@@ -62,6 +62,7 @@ def update_rds(track_name: str):
     rtp.append(1) # type 2
     rtp.append(prt.find(title)) # start 2
     rtp.append(len(title) - 1) # len 2
+    rtp = ','.join(list(map(str, rtp)))
 
     try:
         f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -72,7 +73,7 @@ def update_rds(track_name: str):
         f.close()
     except Exception as e: logger.error(f"Error updating RDS: {e}")
 
-    return prt, ','.join(list(map(str, rtp)))
+    return prt, rtp
 
 class Module(PlayerModule):
     def on_new_track(self, index: int, track: Track, next_track: Track | None):
