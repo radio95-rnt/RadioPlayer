@@ -37,7 +37,7 @@ class Module(ActiveModifier):
             if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
             with open("/tmp/radioPlayer_toplay", "r") as f: songs = [s.strip() for s in f.readlines() if s.strip()]
 
-        songs[:] = [f for s in songs for f in glob.glob(s) if os.path.isfile(f)] # expand glob
+        songs[:] = [f for s in songs for f in glob.glob(s.removeprefix("!")) if os.path.isfile(f)] # expand glob
 
         def get_song(pop: bool = True):
             nonlocal songs
