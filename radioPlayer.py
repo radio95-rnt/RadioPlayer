@@ -28,7 +28,7 @@ class ProcessManager(Skeleton_ProcessManager):
             result = float(result.stdout.strip())
             self.duration_cache.saveElement(file_path.as_posix(), result, (60*60*2), False, True)
             return result
-    def play(self, track: Track, fade_in_time: int=0, fade_out_time: int=0) -> Process:
+    def play(self, track: Track, fade_in_time: float=0, fade_out_time: float=0) -> Process:
         assert track.path.exists()
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
 
@@ -216,13 +216,13 @@ class RadioPlayer:
                 return
 
             playlist: list[Track] | None = []
-            [playlist.extend(Track(Path(line).absolute(), True, True, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
+            [playlist.extend(Track(Path(line).absolute(), 0, 0, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
 
             [(playlist := module.modify(global_args, playlist) or playlist) for module in self.playlist_modifier_modules if module] # yep
             assert len(playlist)
 
             prefetch(playlist[0].path)
-            [mod.on_new_playlist(playlist) for mod in self.simple_modules + [self.active_modifier] if mod] # one liner'd everything
+            [mod.on_new_playlist(playlist, global_args) for mod in self.simple_modules + [self.active_modifier] if mod] # one liner'd everything
 
             max_iterator = len(playlist)
         else:
@@ -230,7 +230,6 @@ class RadioPlayer:
             playlist = None
             global_args = {}
         return_pending = track = False
-        cross_fade = int(global_args.get("crossfade", 5)) # TODO: get rid of global_args usage in the core and instead just store fades in track (that would require a pretty much rewrite of the active modifier tho...)
         song_i = i = 0
 
         def get_track():
@@ -273,11 +272,9 @@ class RadioPlayer:
             self.logger.info(f"Now playing: {track.path.name}")
             prefetch(track.path)
 
-            pr = self.procman.play(track, cross_fade, cross_fade)
+            pr = self.procman.play(track, track.fade_in, track.fade_out)
             [module.on_new_track(song_i, pr.track, next_track) for module in self.simple_modules if module]
-
-            end_time = pr.started_at + pr.duration
-            if track.fade_out: end_time -= cross_fade
+            end_time = pr.started_at + pr.duration + pr.track.focus_time_offset
 
             while end_time >= time.monotonic() and pr.process.poll() is None:
                 start = time.monotonic()

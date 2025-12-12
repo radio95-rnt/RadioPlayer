@@ -7,11 +7,12 @@ from pathlib import Path
 @dataclass
 class Track:
     path: Path
-    fade_out: bool
-    fade_in: bool
+    fade_out: float
+    fade_in: float
     official: bool
     args: dict[str, str] | None
     offset: float = 0.0
+    focus_time_offset: float = 0.0 # Offset according to the duration
 
 @dataclass
 class Process:
@@ -23,7 +24,7 @@ class Process:
 class Skeleton_ProcessManager:
     processes: list[Process]
     def _get_audio_duration(self, file_path): ...
-    def play(self, track: Track, fade_in_time: int=0, fade_out_time: int=0) -> Process: ...
+    def play(self, track: Track, fade_in_time: float=0, fade_out_time: float=0) -> Process: ...
     def anything_playing(self) -> bool: ...
     def stop_all(self, timeout: float | None = None) -> None: ...
     def wait_all(self, timeout: float | None = None) -> None: ...
@@ -72,7 +73,7 @@ class PlayerModule(BaseIMCModule):
     """
     Simple passive observer, this allows you to send the current track the your RDS encoder, or to your website
     """
-    def on_new_playlist(self, playlist: list[Track]) -> None:
+    def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]) -> None:
         """This is called every new playlist"""
         pass
     def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:
@@ -132,7 +133,7 @@ class ActiveModifier(BaseIMCModule):
         The second track object is the next track, which is optional which is also only used for metadata and will not be taken in as data to play
         """
         return (track, None), False
-    def on_new_playlist(self, playlist: list[Track]) -> None:
+    def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]) -> None:
         """
         Same behaviour as the basic module function
         """

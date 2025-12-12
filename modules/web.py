@@ -1,4 +1,4 @@
-# websocket_module.py
+# TODO: focus time in track
 import multiprocessing, os
 import json
 import threading, uuid, time
@@ -165,7 +165,8 @@ class Module(PlayerModule):
                 if key := message.get("key", None): self.data[key] = out
             except Exception: pass
 
-    def on_new_playlist(self, playlist: list[Track]) -> None:
+    def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]) -> None:
+        # TODO: add global args to data
         api_data = []
         for track in playlist:
             api_data.append({

@@ -18,8 +18,10 @@ class Module(ActiveModifier):
         self.can_limit_tracks = False
         self.morning_start = self.day_end = 0
         self.file_lock = Lock()
-    def on_new_playlist(self, playlist: list[Track]):
+        self.crossfade = 5
+    def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]):
         self.playlist = playlist
+        self.crossfade = float(global_args.get("crossfade", 5.0))
 
         if not self._imc: return
         self.limit_tracks, self.morning_start, self.day_end = self._imc.send(self, "advisor", None) # pyright: ignore[reportGeneralTypeIssues]
@@ -27,8 +29,7 @@ class Module(ActiveModifier):
         if self.limit_tracks: logger.info("Skipping tracks if they bleed into other times.")
         self.can_limit_tracks = self.limit_tracks
     def play(self, index: int, track: Track | None, next_track: Track | None):
-        if not track:
-            raise NotImplementedError("This active modifer does not support advisor-less mode")
+        if not track: raise NotImplementedError("This active modifer does not support advisor-less mode")
 
         if not self.playlist: return (track, next_track), False
 
@@ -50,17 +51,17 @@ class Module(ActiveModifier):
 
         if len(songs):
             song, official = get_song()
-
-            if self.last_track: last_track_to_fade_out = self.last_track.fade_out
+ 
+            if self.last_track: last_track_fade_out = self.last_track.fade_out
             else:
-                if (index - 1) >= 0: last_track_to_fade_out = self.playlist[index - 1].fade_out
-                else: last_track_to_fade_out = False
+                if (index - 1) >= 0: last_track_fade_out = self.playlist[index - 1].fade_out
+                else: last_track_fade_out = 0.0
 
-            if len(songs) != 0: next_track_to_fade_in = True
+            if len(songs) != 0: next_track_fade_in = self.crossfade
             else:
-                if index + 1 < len(self.playlist) and next_track: next_track_to_fade_in = next_track.fade_in
-                elif not next_track: next_track_to_fade_in = False
-                else: next_track_to_fade_in = True
+                if index + 1 < len(self.playlist) and next_track: next_track_fade_in = next_track.fade_in
+                elif not next_track: next_track_fade_in = 0.0
+                else: next_track_fade_in = self.crossfade
 
             if not self.originals or self.originals[-1] != track: self.originals.append(track)
 
@@ -74,10 +75,10 @@ class Module(ActiveModifier):
             if len(songs):
                 # There are more tracks on the temp list
                 new_song, new_official = get_song(False)
-                self.last_track = Track(song, new_official, last_track_to_fade_out, official, {})
-                next_track = Track(new_song, new_official if len(songs) else next_track_to_fade_in, new_official, new_official, {})
+                self.last_track = Track(song, self.crossfade if new_official else 0, last_track_fade_out, official, {}, focus_time_offset=-self.crossfade if new_official else 0)
+                next_track = Track(new_song, self.crossfade if len(songs) else next_track_fade_in, self.crossfade if new_official else 0, new_official, {}, focus_time_offset=-self.crossfade if len(songs) else -next_track_fade_in)
             else:
-                self.last_track = Track(song, next_track_to_fade_in, last_track_to_fade_out, official, {})
+                self.last_track = Track(song, next_track_fade_in, last_track_fade_out, official, {}, focus_time_offset=-next_track_fade_in)
                 next_track = track
             self.limit_tracks = False
             return (self.last_track, next_track), True
