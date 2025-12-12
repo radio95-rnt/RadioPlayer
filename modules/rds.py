@@ -62,6 +62,10 @@ def update_rds(track_name: str):
     rtp.append(1) # type 2
     rtp.append(prt.find(title)) # start 2
     rtp.append(len(title) - 1) # len 2
+
+    for i,(i_rt,j_size) in enumerate(zip(rtp, [255,0x3f,0x3f,255,0x3f,0x1f])):
+        if i_rt > j_size: rtp[i] = j_size
+
     rtp = ','.join(list(map(str, rtp)))
 
     try:
