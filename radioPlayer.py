@@ -28,7 +28,7 @@ class ProcessManager(Skeleton_ProcessManager):
             result = float(result.stdout.strip())
             self.duration_cache.saveElement(file_path.as_posix(), result, (60*60*2), False, True)
             return result
-    def play(self, track: Track, fade_time: int=5) -> Process:
+    def play(self, track: Track, fade_in_time: int=0, fade_out_time: int=0) -> Process:
         assert track.path.exists()
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
 
@@ -38,8 +38,8 @@ class ProcessManager(Skeleton_ProcessManager):
         if track.offset > 0: cmd.extend(['-ss', str(track.offset)])
 
         filters = []
-        if track.fade_in and fade_time != 0: filters.append(f"afade=t=in:st=0:d={fade_time}")
-        if track.fade_out and fade_time != 0: filters.append(f"afade=t=out:st={duration - fade_time - track.offset}:d={fade_time}")
+        if track.fade_in and fade_in_time != 0: filters.append(f"afade=t=in:st=0:d={fade_in_time}")
+        if track.fade_out and fade_out_time != 0: filters.append(f"afade=t=out:st={duration - fade_out_time}:d={fade_out_time}")
         if filters: cmd.extend(['-af', ",".join(filters)])
         cmd.append(str(track.path.absolute()))
 
@@ -278,7 +278,7 @@ class RadioPlayer:
             self.logger.info(f"Now playing: {track.path.name}")
             prefetch(track.path)
 
-            pr = self.procman.play(track, cross_fade)
+            pr = self.procman.play(track, cross_fade, cross_fade)
             [module.on_new_track(song_i, pr.track, next_track) for module in self.simple_modules if module]
 
             end_time = pr.started_at + pr.duration
