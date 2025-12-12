@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os, subprocess, importlib.util, importlib.machinery, types
-import sys, signal, glob, time, traceback, atexit
+import sys, signal, glob, time, traceback
 import libcache
 from modules import *
 from threading import Lock
@@ -117,8 +117,7 @@ class RadioPlayer:
         self.playlist_advisor: PlaylistAdvisor | None = None
         self.active_modifier: ActiveModifier | None = None
         self.exit_pending = False
-        self.exit_status_code = 0
-        self.intr_time = 0
+        self.exit_status_code = self.intr_time = 0
         self.exit_lock = Lock()
         self.procman = ProcessManager()
         self.modules: list[tuple[importlib.machinery.ModuleSpec, types.ModuleType, str]] = []
@@ -132,19 +131,16 @@ class RadioPlayer:
         for module in self.simple_modules:
             if module:
                 try: module.shutdown()
-                except Exception:
-                    traceback.print_last(file=self.logger.output)
-                    self.logger.error("Exception while shutting down module.")
+                except Exception: traceback.print_exc(file=self.logger.output)
         self.logger.output.close()
 
     def handle_sigint(self, signum: int, frame: types.FrameType | None):
         with self.exit_lock:
             self.logger.info("Received CTRL+C (SIGINT)")
-            if (time.monotonic() - self.intr_time) > 5:
-                self.intr_time = time.monotonic()
+            if (now := time.monotonic()) and ((now - self.intr_time) > 5):
+                self.intr_time = now
                 self.logger.info("Will quit on song end.")
-                self.exit_pending = True
-                self.exit_status_code = 130
+                self.exit_pending, self.exit_status_code = True, 130
             else:
                 self.logger.warning("Force-Quit pending")
                 raise SystemExit(130)
@@ -178,8 +174,7 @@ class RadioPlayer:
             try:
                 start = time.perf_counter()
                 spec.loader.exec_module(module)
-                time_took = time.perf_counter() - start
-                if time_took > 0.15: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
+                if (time_took := time.perf_counter() - start) > 0.15: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
             except Exception as e:
                 traceback.print_exc(file=self.logger.output)
                 self.logger.error(f"Failed loading {module_name} due to {e}, continuing")
@@ -235,7 +230,7 @@ class RadioPlayer:
             playlist = None
             global_args = {}
         return_pending = track = False
-        cross_fade = int(global_args.get("crossfade", 5))
+        cross_fade = int(global_args.get("crossfade", 5)) # TODO: get rid of global_args usage in the core and instead just store fades in track (that would require a pretty much rewrite of the active modifier tho...)
         song_i = i = 0
 
         def get_track():
@@ -287,9 +282,7 @@ class RadioPlayer:
             while end_time >= time.monotonic() and pr.process.poll() is None:
                 start = time.monotonic()
                 [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, end_time - pr.started_at) for module in self.simple_modules if module]
-                elapsed = time.monotonic() - start
-                remaining_until_end = end_time - time.monotonic()
-                if elapsed < 1 and remaining_until_end > 0: time.sleep(min(1 - elapsed, remaining_until_end))
+                if (elapsed := time.monotonic() - start) < 1 and (remaining_until_end := end_time - time.monotonic()) > 0: time.sleep(min(1 - elapsed, remaining_until_end))
 
             i += 1
             if not extend: song_i += 1

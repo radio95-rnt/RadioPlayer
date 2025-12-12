@@ -118,23 +118,16 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
 
         # start server
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001)
-        # background task: broadcast worker
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
-        # run forever until server closes
         await server.wait_closed()
-        # ensure broadcaster stops
         ws_q.put(None)
         await broadcaster
 
-    # On SIGINT/SIGTERM, stop gracefully
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(runner())
-    except (KeyboardInterrupt, SystemExit):
-        pass
-    finally:
-        loop.close()
+    try: loop.run_until_complete(runner())
+    except (KeyboardInterrupt, SystemExit): pass
+    finally: loop.close()
 
 # ---------- Module class (drop-in replacement) ----------
 
@@ -143,29 +136,21 @@ class Module(PlayerModule):
         self.manager = multiprocessing.Manager()
         self.data = self.manager.dict()
         self.imc_q = self.manager.Queue()
-        # queue for sending broadcasts to the websocket process
         self.ws_q = self.manager.Queue()
 
-        # initial state
         self.data["playlist"] = "[]"
         self.data["track"] = "{}"
         self.data["progress"] = "{}"
 
-        # ipc thread: listens for responses from other modules (same as before)
         self.ipc_thread_running = True
         self.ipc_thread = threading.Thread(target=self._ipc_worker, daemon=True)
         self.ipc_thread.start()
 
-        # start websocket server process
-        self.ws_process = multiprocessing.Process(
-            target=websocket_server_process, args=(self.data, self.imc_q, self.ws_q), daemon=False
-        )
+        self.ws_process = multiprocessing.Process(target=websocket_server_process, args=(self.data, self.imc_q, self.ws_q), daemon=False)
         self.ws_process.start()
         if os.name == "posix":
-            try:
-                os.setpgid(self.ws_process.pid, self.ws_process.pid)
-            except Exception:
-                pass
+            try: os.setpgid(self.ws_process.pid, self.ws_process.pid)
+            except Exception: pass
 
     def _ipc_worker(self):
         """
@@ -176,17 +161,10 @@ class Module(PlayerModule):
             try:
                 message: dict | None = self.imc_q.get()
                 if message is None: break
-                # send to upper layer (existing player IPC)
                 out = self._imc.send(self, message["name"], message["data"])
-                # if message had a key, store the response for the requester
-                if key := message.get("key", None):
-                    # store response into shared dict (accessible to ws process)
-                    self.data[key] = out
-            except Exception:
-                # swallow errors to avoid killing the ipc thread
-                pass
+                if key := message.get("key", None): self.data[key] = out
+            except Exception: pass
 
-    # The following functions update the shared_data and also push a broadcast message onto ws_q
     def on_new_playlist(self, playlist: list[Track]) -> None:
         api_data = []
         for track in playlist:
@@ -199,7 +177,6 @@ class Module(PlayerModule):
                 "offset": track.offset
             })
         self.data["playlist"] = json.dumps(api_data)
-        # broadcast
         try: self.ws_q.put({"event": "playlist", "data": api_data})
         except Exception: pass
 
@@ -216,18 +193,15 @@ class Module(PlayerModule):
         track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset}
         payload = {"index": index, "track": track_data, "elapsed": elapsed, "total": total, "real_total": real_total}
         self.data["progress"] = json.dumps(payload)
-        # For frequent progress updates you might want to rate-limit; this pushes every call
         try: self.ws_q.put({"event": "progress", "data": payload})
         except Exception: pass
 
     def shutdown(self):
-        # stop ipc thread
         self.ipc_thread_running = False
         try: self.imc_q.put(None)
         except Exception: pass
         self.ipc_thread.join(timeout=2)
 
-        # shutdown websocket process by putting sentinel into ws_q and then terminating if needed
         try: self.ws_q.put(None)
         except Exception: pass
 
