@@ -127,7 +127,7 @@ class RadioPlayer:
         self.arg = arg
         self.logger = log95.log95("CORE", output=output)
 
-    def shutdown(self): 
+    def shutdown(self):
         self.procman.stop_all()
         for module in self.simple_modules:
             if module:
@@ -208,46 +208,49 @@ class RadioPlayer:
         """Single functon for starting the core, returns but might exit raising an SystemExit"""
         self.logger.info("Core starting, loading modules")
         self.load_modules();self.start_modules()
-        if not self.playlist_advisor:
-            self.logger.critical_error("Playlist advisor was not found")
-            raise SystemExit(1)
+        if not self.playlist_advisor: self.logger.warning("Playlist advisor was not found. Beta mode of advisor-less is running (playlist modifiers will not work)")
 
     def play_once(self):
         """Plays a single playlist"""
-        if not self.playlist_advisor or not (playlist_path := self.playlist_advisor.advise(self.arg)): return
-        try: global_args, parsed = self.parser.parse(playlist_path)
-        except Exception as e:
-            self.logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...");traceback.print_exc(file=self.logger.output)
-            time.sleep(15)
-            return
+        if self.playlist_advisor:
+            if not (playlist_path := self.playlist_advisor.advise(self.arg)): return
+            try: global_args, parsed = self.parser.parse(playlist_path)
+            except Exception as e:
+                self.logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...");traceback.print_exc(file=self.logger.output)
+                time.sleep(15)
+                return
 
-        playlist: list[Track] = []
-        [playlist.extend(Track(Path(line).absolute(), True, True, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
+            playlist: list[Track] | None = []
+            [playlist.extend(Track(Path(line).absolute(), True, True, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
 
-        [(playlist := module.modify(global_args, playlist) or playlist) for module in self.playlist_modifier_modules if module] # yep
-        assert len(playlist)
-    
-        prefetch(playlist[0].path)
-        [mod.on_new_playlist(playlist) for mod in self.simple_modules + [self.active_modifier] if mod] # one liner'd everything
+            [(playlist := module.modify(global_args, playlist) or playlist) for module in self.playlist_modifier_modules if module] # yep
+            assert len(playlist)
 
+            prefetch(playlist[0].path)
+            [mod.on_new_playlist(playlist) for mod in self.simple_modules + [self.active_modifier] if mod] # one liner'd everything
+
+            max_iterator = len(playlist)
+        else:
+            max_iterator = 1
+            playlist = None
+            global_args = {}
         return_pending = track = False
-
         cross_fade = int(global_args.get("crossfade", 5))
-
-        max_iterator = len(playlist)
         song_i = i = 0
 
         def get_track():
             nonlocal song_i, playlist, max_iterator
             track = None
             while track is None:
-                playlist_track = playlist[song_i % len(playlist)]
-                playlist_next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
+                if playlist:
+                    playlist_track = playlist[song_i % len(playlist)]
+                    playlist_next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
+                else: playlist_track = playlist_next_track = None
                 if self.active_modifier:
                     (track, next_track), extend = self.active_modifier.play(song_i, playlist_track, playlist_next_track)
                     if track is None: song_i += 1
                     if extend and track: max_iterator += 1
-                else: 
+                else:
                     track = playlist_track
                     next_track = playlist_next_track
                     extend = False

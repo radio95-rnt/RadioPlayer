@@ -26,7 +26,10 @@ class Module(ActiveModifier):
         self.limit_tracks = not bool(self.limit_tracks)
         if self.limit_tracks: logger.info("Skipping tracks if they bleed into other times.")
         self.can_limit_tracks = self.limit_tracks
-    def play(self, index: int, track: Track, next_track: Track | None):
+    def play(self, index: int, track: Track | None, next_track: Track | None):
+        if not track:
+            raise NotImplementedError("This active modifer does not support advisor-less mode")
+
         if not self.playlist: return (track, next_track), False
 
         with self.file_lock:

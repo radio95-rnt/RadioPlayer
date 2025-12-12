@@ -125,7 +125,7 @@ class ActiveModifier(BaseIMCModule):
         Called at start up with the program arguments
         """
         pass
-    def play(self, index: int, track: Track, next_track: Track | None) -> tuple[tuple[Track, None] | tuple[Track, Track], bool] | tuple[tuple[None, None], None]:
+    def play(self, index: int, track: Track | None, next_track: Track | None) -> tuple[tuple[Track | None, Track | None], bool | None]:
         """
         Returns a tuple, in the first case where a is the track and b is a bool, b corresponds to whether to extend the playlist, set to true when adding content instead of replacing it
         When None, None is returned then that is treated as a skip, meaning the core will skip this song

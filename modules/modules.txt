@@ -13,3 +13,4 @@ Each module shall have a python script in the modules directory. Each of the mod
 - activemod ('ActiveModifier')
 
 NEW! The procman communicator allows you to get the track duration, but also STOP WHATEVER IS PLAYING! That means we can skip tracks WHILE THEY ARE PLAYING
+Newer! You can run advisor-less, this however also remvoes the usage of any and all playlist modifiers, because there is no playlist in such case
