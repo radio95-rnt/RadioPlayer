@@ -360,7 +360,7 @@
                 }
                 const selected = playlist[selectedPlaylistIndex];
                 if(!selected) { alert("Invalid selection"); return; }
-                const path = selected.path;
+                const path = (selected.official ? "" : "!") + selected.path;
                 sendAddToToplay([path]);
                 Array.from(document.getElementById("playlist-box").children).forEach(c => c.classList.remove("selected"));
             });
