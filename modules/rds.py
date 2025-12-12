@@ -55,16 +55,16 @@ def update_rds(track_name: str):
 
 #    title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
 
-    prt = rds_base.format(artist, title)
-    rtp = [4] # type 1
-    rtp.append(prt.find(artist)) # start 1
-    rtp.append(len(artist) - 1) # len 1
+    prt = rds_base.format(artist, title)[:64]
+    rtp = []
     rtp.append(1) # type 2
     rtp.append(prt.find(title)) # start 2
     rtp.append(len(title) - 1) # len 2
+    rtp.append(4) # type 1
+    rtp.append(prt.find(artist)) # start 1
+    rtp.append(len(artist) - 1) # len 1
 
-    for i,(i_rt,j_size) in enumerate(zip(rtp, [255,0x3f,0x3f,255,0x3f,0x1f])):
-        if i_rt > j_size: rtp[i] = j_size
+    rtp = [j_size if i_rt > j_size else i_rt for i_rt,j_size in zip(rtp, [255,0x3f,0x3f,255,0x3f,0x1f])]
 
     rtp = ','.join(list(map(str, rtp)))
 
