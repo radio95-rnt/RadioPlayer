@@ -371,6 +371,8 @@
                 // Priority 1: Check for a selected file in the subdirectory list
                 if (selectedSubFile && selectedDir) {
                     fullPath = subbasePath.replace(/\/$/, '') + '/' + selectedSubFile;
+                    Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
+                    selectedSubFile = null;
                 } else {
                     // Priority 2: Check for a selected file in the main directory list
                     const dirEls = document.getElementById("dirs-box").children;
@@ -381,6 +383,8 @@
                         // A simple check to see if the selected item is a file
                         if (name.includes('.')) {
                             fullPath = basePath.replace(/\/$/, '') + '/' + name;
+                            Array.from(dirEls).forEach(c => c.classList.remove("selected"));
+                            selectedDir = null;
                         }
                     }
                 }
