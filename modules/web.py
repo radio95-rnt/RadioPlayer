@@ -1,4 +1,3 @@
-# TODO: focus time in track
 import multiprocessing, os
 import json
 import threading, uuid, time
@@ -175,15 +174,16 @@ class Module(PlayerModule):
                 "fade_in": track.fade_in,
                 "official": track.official,
                 "args": track.args,
-                "offset": track.offset
+                "offset": track.offset,
+                "focus_time_offset": track.focus_time_offset
             })
         self.data["playlist"] = json.dumps(api_data)
         try: self.ws_q.put({"event": "playlist", "data": api_data})
         except Exception: pass
 
     def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:
-        track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset}
-        if next_track: next_track_data = {"path": str(next_track.path), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset}
+        track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset, "focus_time_offset": track.focus_time_offset}
+        if next_track: next_track_data = {"path": str(next_track.path), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset, "focus_time_offset": track.focus_time_offset}
         else: next_track_data = None
         payload = {"index": index, "track": track_data, "next_track": next_track_data}
         self.data["track"] = json.dumps(payload)
@@ -191,7 +191,7 @@ class Module(PlayerModule):
         except Exception: pass
 
     def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float) -> None:
-        track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset}
+        track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset, "focus_time_offset": track.focus_time_offset}
         payload = {"index": index, "track": track_data, "elapsed": elapsed, "total": total, "real_total": real_total}
         self.data["progress"] = json.dumps(payload)
         try: self.ws_q.put({"event": "progress", "data": payload})

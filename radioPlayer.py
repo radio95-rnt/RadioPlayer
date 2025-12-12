@@ -228,7 +228,6 @@ class RadioPlayer:
         else:
             max_iterator = 1
             playlist = None
-            global_args = {}
         return_pending = track = False
         song_i = i = 0
 
