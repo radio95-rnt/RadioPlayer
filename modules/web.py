@@ -171,7 +171,7 @@ class Module(PlayerModule):
         self.ipc_thread.start()
 
         self.shutdown_evt = multiprocessing.Event()
-        self.ws_process = multiprocessing.Process(target=websocket_server_process, args=(self.data, self.imc_q, self.ws_q), daemon=False)
+        self.ws_process = multiprocessing.Process(target=websocket_server_process, args=(self.data, self.imc_q, self.ws_q, self.shutdown_evt), daemon=False)
         self.ws_process.start()
         if os.name == "posix":
             try: os.setpgid(self.ws_process.pid, self.ws_process.pid)
