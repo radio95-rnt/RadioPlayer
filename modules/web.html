@@ -397,10 +397,7 @@
             });
 
             function sendAddToToplay(songs){
-                if(ws && ws.readyState === WebSocket.OPEN){
-                    ws.send(JSON.stringify({action:"add_to_toplay", songs: songs}));
-                    setTimeout(() => ws.send(JSON.stringify({action:"get_toplay"})), 250);
-                }
+                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"add_to_toplay", songs: songs}))
             }
 
             connectWs();
