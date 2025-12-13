@@ -117,7 +117,9 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
             # register client
             clients.add(websocket)
             try: await ws_handler(websocket, shared_data, imc_q, ws_q)
-            finally: clients.discard(websocket)
+            finally: 
+                await websocket.close(1001, "")
+                clients.discard(websocket)
         async def process_request(websocket: ServerConnection, request: Request):
             if request.path == "/web.html" and (file := Path(__file__, "..", "web.html").resolve()).exists():
                 data = file.read_bytes()
@@ -140,15 +142,12 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
 
         await stop_evt.wait()
-        watcher.cancel()
-        await watcher
-
-        ws_q.put(None)
-        broadcaster.cancel()
-        await broadcaster
-
-        server.get_loop().stop()
         server.close()
+        ws_q.put(None)
+        await server.wait_closed()
+        watcher.cancel()
+        broadcaster.cancel()
+        await asyncio.gather(watcher, broadcaster, return_exceptions=True)
         return
 
     loop = asyncio.new_event_loop()
