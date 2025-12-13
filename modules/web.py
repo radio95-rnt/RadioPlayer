@@ -3,7 +3,7 @@ import json
 import threading, uuid, time
 import asyncio
 import websockets
-from websockets import ServerConnection
+from websockets import ServerConnection, Request, Response, Headers
 
 from . import Track, PlayerModule, Path
 
@@ -114,9 +114,17 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                 await ws_handler(websocket, shared_data, imc_q, ws_q)
             finally:
                 clients.discard(websocket)
-
+        async def process_request(websocket: ServerConnection, request: Request):
+            if request.path == "/web.html" and (file := Path(__file__, "..", "web.html").resolve()).exists():
+                data = file.read_bytes()
+                return Response(
+                    200,
+                    "OK",
+                    Headers([("Content-Type", "text/html"), ("Content-Length", f"{len(data)}")]),
+                    data
+                )
         # start server
-        server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001)
+        server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
         await server.wait_closed()
         ws_q.put(None)
