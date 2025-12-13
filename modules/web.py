@@ -123,6 +123,13 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                     Headers([("Content-Type", "text/html"), ("Content-Length", f"{len(data)}")]),
                     data
                 )
+            if not "upgrade" in request.headers.get("Connection", "").lower(): 
+                return Response(
+                    426,
+                    "Upgrade Required",
+                    Headers([("Connection", "Upgrade"), ("Upgrade", "websocket")]),
+                    b"WebSocket upgrade required\n"
+                )
         # start server
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
