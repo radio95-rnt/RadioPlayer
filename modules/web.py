@@ -84,15 +84,14 @@ async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
     """
     loop = asyncio.get_event_loop()
     while True:
-        try: msg = await asyncio.wait_for(loop.run_in_executor(None, ws_q.get), 1.0)
-        except asyncio.TimeoutError: continue
+        msg = await loop.run_in_executor(None, ws_q.get)
         if msg is None: break
         payload = json.dumps(msg)
         if clients:
-            await asyncio.gather(
-                *[_safe_send(ws, payload, clients) for ws in list(clients)],
-                return_exceptions=True
-            )
+            coros = []
+            for ws in list(clients):
+                coros.append(_safe_send(ws, payload, clients))
+            await asyncio.gather(*coros)
 
 
 async def _safe_send(ws, payload: str, clients: set):
