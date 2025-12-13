@@ -240,12 +240,12 @@ class Module(PlayerModule):
         self.logger.info("Shutting down...")
         self.ipc_thread_running = False
 
-        try: self.imc_q.put(None)
+        try: self.imc_q.put(None, block=False)
         except: pass
 
         self.shutdown_evt.set()
 
-        try: self.ws_q.put(None)
+        try: self.ws_q.put(None, block=False)
         except: pass
 
         self.ipc_thread.join(timeout=2)
