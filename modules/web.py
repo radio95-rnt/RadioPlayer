@@ -225,7 +225,7 @@ class Module(PlayerModule):
             self.ws_process.terminate()
             self.ws_process.join(timeout=2)
 
-        if self.ws_process.is_alive():
+        while self.ws_process.is_alive():
             try: self.ws_process.kill()
             except Exception: pass
 
