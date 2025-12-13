@@ -1,4 +1,4 @@
-import log95
+import log95, abc
 from collections.abc import Sequence
 from subprocess import Popen
 from dataclasses import dataclass
@@ -21,12 +21,17 @@ class Process:
     started_at: float
     duration: float
 
-class Skeleton_ProcessManager:
+class ABC_ProcessManager(abc.ABC):
     processes: list[Process]
+    @abc.abstractmethod
     def _get_audio_duration(self, file_path): ...
+    @abc.abstractmethod
     def play(self, track: Track) -> Process: ...
+    @abc.abstractmethod
     def anything_playing(self) -> bool: ...
+    @abc.abstractmethod
     def stop_all(self, timeout: float | None = None) -> None: ...
+    @abc.abstractmethod
     def wait_all(self, timeout: float | None = None) -> None: ...
 class BaseIMCModule:
     """
@@ -44,7 +49,7 @@ class BaseIMCModule:
         return None
 
 class ProcmanCommunicator(BaseIMCModule):
-    def __init__(self, procman: Skeleton_ProcessManager) -> None: self.procman = procman
+    def __init__(self, procman: ABC_ProcessManager) -> None: self.procman = procman
     def imc(self, imc: 'InterModuleCommunication') -> None:
         super().imc(imc)
         self._imc.register(self, "procman")
@@ -160,5 +165,5 @@ class InterModuleCommunication:
         """
         Sends the data to a named module, and return its response
         """
-        if not name in self.names_modules.keys(): raise Exception("No such module")
+        if not name in self.names_modules.keys(): raise ModuleNotFoundError("No such module")
         return self.names_modules[name].imc_data(source, next((k for k, v in self.names_modules.items() if v is source), None), data, False)

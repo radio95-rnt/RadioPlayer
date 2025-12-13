@@ -16,7 +16,7 @@ def prefetch(path):
 MODULES_PACKAGE = "modules"
 MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
 
-class ProcessManager(Skeleton_ProcessManager):
+class ProcessManager(ABC_ProcessManager):
     def __init__(self) -> None:
         self.lock = Lock()
         self.processes: list[Process] = []
@@ -110,41 +110,19 @@ class PlaylistParser:
             out.append(([f for f in glob.glob(line) if Path(f).is_file()], arguments))
         return global_arguments, out
 
-class RadioPlayer:
-    def __init__(self, arg: str | None, output: log95.TextIO):
+class ModuleManager:
+    def __init__(self, output: log95.TextIO) -> types.NoneType:
         self.simple_modules: list[PlayerModule] = []
         self.playlist_modifier_modules: list[PlaylistModifierModule] = []
         self.playlist_advisor: PlaylistAdvisor | None = None
         self.active_modifier: ActiveModifier | None = None
-        self.exit_pending = False
-        self.exit_status_code = self.intr_time = 0
-        self.exit_lock = Lock()
-        self.procman = ProcessManager()
         self.modules: list[tuple[importlib.machinery.ModuleSpec, types.ModuleType, str]] = []
-        self.parser = PlaylistParser(output)
-
-        self.arg = arg
-        self.logger = log95.log95("CORE", output=output)
-
-    def shutdown(self):
-        self.procman.stop_all()
+        self.logger = log95.log95("MODULES", output=output)
+    def shutdown_modules(self) -> None:
         for module in self.simple_modules:
             if module:
                 try: module.shutdown()
                 except Exception: traceback.print_exc(file=self.logger.output)
-        self.logger.output.close()
-
-    def handle_sigint(self, signum: int, frame: types.FrameType | None):
-        with self.exit_lock:
-            self.logger.info("Received CTRL+C (SIGINT)")
-            if (now := time.monotonic()) and ((now - self.intr_time) > 5):
-                self.intr_time = now
-                self.logger.info("Will quit on song end.")
-                self.exit_pending, self.exit_status_code = True, 130
-            else:
-                self.logger.warning("Force-Quit pending")
-                raise SystemExit(130)
-
     def load_modules(self):
         """Loads the modules into memory"""
         for file in MODULES_DIR.glob("*"):
@@ -167,8 +145,9 @@ class RadioPlayer:
                 module._log_out = self.logger.output # type: ignore
                 module.__dict__['_log_out'] = self.logger.output
                 self.modules.append((spec, module, module_name))
-    def start_modules(self):
+    def start_modules(self, arg):
         """Executes the module by the python interpreter"""
+        procman = ProcessManager()
         for (spec, module, module_name) in self.modules:
             assert spec.loader
             try:
@@ -196,19 +175,53 @@ class RadioPlayer:
             if md := getattr(module, "activemod", None):
                 if self.active_modifier: raise Exception("Multiple active modifiers")
                 self.active_modifier = md
-        InterModuleCommunication(self.simple_modules + [self.playlist_advisor, ProcmanCommunicator(self.procman), self.active_modifier])
-        if self.active_modifier: self.active_modifier.arguments(self.arg)
+            if md := getattr(module, "procman", None):
+                if not isinstance(md, ABC_ProcessManager):
+                    self.logger.error("Modular process manager does not inherit from ABC_ProcessManager.")
+                    continue
+                if procman.anything_playing(): procman.stop_all()
+                procman = md
+        InterModuleCommunication(self.simple_modules + [self.playlist_advisor, ProcmanCommunicator(procman), self.active_modifier])
+        if self.active_modifier: self.active_modifier.arguments(arg)
+        return procman
+
+class RadioPlayer:
+    def __init__(self, arg: str | None, output: log95.TextIO):
+        self.exit_pending = False
+        self.exit_status_code = self.intr_time = 0
+        self.exit_lock = Lock()
+        self.parser = PlaylistParser(output)
+        self.procman: ABC_ProcessManager | None = None
+        self.arg = arg
+        self.logger = log95.log95("CORE", output=output)
+        self.modman = ModuleManager(output)
+
+    def shutdown(self):
+        if self.procman: self.procman.stop_all()
+        self.logger.output.close()
+
+    def handle_sigint(self, signum: int, frame: types.FrameType | None):
+        with self.exit_lock:
+            self.logger.info("Received CTRL+C (SIGINT)")
+            if (now := time.monotonic()) and ((now - self.intr_time) > 5):
+                self.intr_time = now
+                self.logger.info("Will quit on song end.")
+                self.exit_pending, self.exit_status_code = True, 130
+            else:
+                self.logger.warning("Force-Quit pending")
+                raise SystemExit(130)
 
     def start(self):
         """Single functon for starting the core, returns but might exit raising an SystemExit"""
         self.logger.info("Core starting, loading modules")
-        self.load_modules();self.start_modules()
-        if not self.playlist_advisor: self.logger.warning("Playlist advisor was not found. Beta mode of advisor-less is running (playlist modifiers will not work)")
+        self.modman.load_modules()
+        self.procman = self.modman.start_modules(self.arg)
+        if not self.modman.playlist_advisor: self.logger.warning("Playlist advisor was not found. Beta mode of advisor-less is running (playlist modifiers will not work)")
 
     def play_once(self):
         """Plays a single playlist"""
-        if self.playlist_advisor:
-            if not (playlist_path := self.playlist_advisor.advise(self.arg)): return
+        if self.modman.playlist_advisor:
+            if not (playlist_path := self.modman.playlist_advisor.advise(self.arg)): return
             try: global_args, parsed = self.parser.parse(playlist_path)
             except Exception as e:
                 self.logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...");traceback.print_exc(file=self.logger.output)
@@ -218,11 +231,11 @@ class RadioPlayer:
             playlist: list[Track] | None = []
             [playlist.extend(Track(Path(line).absolute(), 0, 0, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
 
-            [(playlist := module.modify(global_args, playlist) or playlist) for module in self.playlist_modifier_modules if module] # yep
+            [(playlist := module.modify(global_args, playlist) or playlist) for module in self.modman.playlist_modifier_modules if module] # yep
             assert len(playlist)
 
             prefetch(playlist[0].path)
-            [mod.on_new_playlist(playlist, global_args) for mod in self.simple_modules + [self.active_modifier] if mod] # one liner'd everything
+            [mod.on_new_playlist(playlist, global_args) for mod in self.modman.simple_modules + [self.modman.active_modifier] if mod] # one liner'd everything
 
             max_iterator = len(playlist)
         else:
@@ -230,6 +243,7 @@ class RadioPlayer:
             playlist = None
         return_pending = track = False
         song_i = i = 0
+        assert self.procman
 
         def get_track():
             nonlocal song_i, playlist, max_iterator
@@ -239,8 +253,8 @@ class RadioPlayer:
                     playlist_track = playlist[song_i % len(playlist)]
                     playlist_next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
                 else: playlist_track = playlist_next_track = None
-                if self.active_modifier:
-                    (track, next_track), extend = self.active_modifier.play(song_i, playlist_track, playlist_next_track)
+                if self.modman.active_modifier:
+                    (track, next_track), extend = self.modman.active_modifier.play(song_i, playlist_track, playlist_next_track)
                     if track is None: song_i += 1
                     if extend and track: max_iterator += 1
                 else:
@@ -251,6 +265,7 @@ class RadioPlayer:
 
         def check_conditions():
             nonlocal return_pending
+            assert self.procman
             if self.exit_pending:
                 self.logger.info("Quit received, waiting for song end.")
                 self.procman.wait_all()
@@ -259,7 +274,7 @@ class RadioPlayer:
                 self.logger.info("Return reached, next song will reload the playlist.")
                 self.procman.wait_all()
                 return True
-            if self.playlist_advisor and self.playlist_advisor.new_playlist():
+            if self.modman.playlist_advisor and self.modman.playlist_advisor.new_playlist():
                 self.logger.info("Reloading now...")
                 return True
             return False
@@ -272,12 +287,12 @@ class RadioPlayer:
             prefetch(track.path)
 
             pr = self.procman.play(track)
-            [module.on_new_track(song_i, pr.track, next_track) for module in self.simple_modules if module]
+            [module.on_new_track(song_i, pr.track, next_track) for module in self.modman.simple_modules if module]
             end_time = pr.started_at + pr.duration + pr.track.focus_time_offset
 
             while end_time >= time.monotonic() and pr.process.poll() is None:
                 start = time.monotonic()
-                [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, end_time - pr.started_at) for module in self.simple_modules if module]
+                [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, end_time - pr.started_at) for module in self.modman.simple_modules if module]
                 if (elapsed := time.monotonic() - start) < 1 and (remaining_until_end := end_time - time.monotonic()) > 0: time.sleep(min(1 - elapsed, remaining_until_end))
 
             i += 1
@@ -307,5 +322,6 @@ def main():
         signal.signal(signal.SIGINT, core.handle_sigint)
         core.loop()
     except SystemExit:
-        core.shutdown()
+        try: core.shutdown()
+        except BaseException: traceback.print_exc()
         raise
