@@ -140,11 +140,17 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
         watcher = asyncio.create_task(shutdown_watcher())
+
         await stop_evt.wait()
+
+        ws_q.put(None)
+        broadcaster.cancel()
+
         server.close()
         await server.wait_closed()
-        ws_q.put(None)
+
         await broadcaster
+        watcher.cancel()
         await watcher
 
     loop = asyncio.new_event_loop()
@@ -230,7 +236,7 @@ class Module(PlayerModule):
 
         self.shutdown_evt.set()
 
-        self.ws_process.join(timeout=3)
+        self.ws_process.join(timeout=5)
 
         if self.ws_process.is_alive():
             self.ws_process.terminate()
