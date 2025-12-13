@@ -7,7 +7,12 @@ import asyncio
 import websockets
 from websockets import ServerConnection, Request, Response, Headers
 
-from . import Track, PlayerModule, Path
+from . import Track, PlayerModule, Path, log95
+
+from typing import TextIO
+_log_out: TextIO
+
+assert _log_out # pyright: ignore[reportUnboundVariable]
 
 MAIN_PATH_DIR = Path("/home/user/mixes")
 
@@ -162,6 +167,8 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
 
 class Module(PlayerModule):
     def __init__(self):
+        self.logger = log95.log95("WEB", output=_log_out)
+
         self.manager = multiprocessing.Manager()
         self.data = self.manager.dict()
         self.imc_q = multiprocessing.Queue()
@@ -250,5 +257,6 @@ class Module(PlayerModule):
         if self.ws_process.is_alive():
             self.ws_process.kill()
             self.ws_process.join(timeout=1)
+        self.logger.info(f"Stopped the ws process ({self.ws_process.is_alive()=} {self.ipc_thread.is_alive()=} {self.ipc_thread_running=})")
 
 module = Module()
