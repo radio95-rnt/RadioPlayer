@@ -237,6 +237,7 @@ class Module(PlayerModule):
         except Exception: pass
 
     def shutdown(self):
+        self.logger.info("Shutting down...")
         self.ipc_thread_running = False
 
         try: self.imc_q.put(None)
