@@ -1,4 +1,5 @@
 import multiprocessing, os
+from multiprocessing.synchronize import Event
 import json
 import threading, uuid, time
 import asyncio
@@ -99,13 +100,18 @@ async def _safe_send(ws, payload: str, clients: set):
         try: clients.discard(ws)
         except Exception: pass
 
-def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
+def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue, shutdown_evt: Event):
     """
     Entrypoint for the separate process that runs the asyncio-based websocket server.
     """
     # create the asyncio loop and run server
     async def runner():
         clients = set()
+        stop_evt = asyncio.Event()
+
+        async def shutdown_watcher():
+            await loop.run_in_executor(None, shutdown_evt.wait)
+            stop_evt.set()
 
         async def handler_wrapper(websocket: ServerConnection):
             # register client
@@ -133,9 +139,13 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
         # start server
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
+        watcher = asyncio.create_task(shutdown_watcher())
+        await stop_evt.wait()
+        server.close()
         await server.wait_closed()
         ws_q.put(None)
         await broadcaster
+        await watcher
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -149,8 +159,8 @@ class Module(PlayerModule):
     def __init__(self):
         self.manager = multiprocessing.Manager()
         self.data = self.manager.dict()
-        self.imc_q = self.manager.Queue()
-        self.ws_q = self.manager.Queue()
+        self.imc_q = multiprocessing.Queue()
+        self.ws_q = multiprocessing.Queue()
 
         self.data["playlist"] = "[]"
         self.data["track"] = "{}"
@@ -160,6 +170,7 @@ class Module(PlayerModule):
         self.ipc_thread = threading.Thread(target=self._ipc_worker, daemon=True)
         self.ipc_thread.start()
 
+        self.shutdown_evt = multiprocessing.Event()
         self.ws_process = multiprocessing.Process(target=websocket_server_process, args=(self.data, self.imc_q, self.ws_q), daemon=False)
         self.ws_process.start()
         if os.name == "posix":
@@ -214,19 +225,18 @@ class Module(PlayerModule):
 
     def shutdown(self):
         self.ipc_thread_running = False
-        try: self.imc_q.put(None)
-        except Exception: pass
+        self.imc_q.put(None)
         self.ipc_thread.join(timeout=2)
 
-        try: self.ws_q.put(None)
-        except Exception: pass
+        self.shutdown_evt.set()
+
+        self.ws_process.join(timeout=3)
 
         if self.ws_process.is_alive():
             self.ws_process.terminate()
             self.ws_process.join(timeout=2)
 
-        while self.ws_process.is_alive():
-            try: self.ws_process.kill()
-            except Exception: pass
+        if self.ws_process.is_alive():
+            self.ws_process.kill()
 
 module = Module()
