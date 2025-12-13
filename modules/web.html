@@ -58,7 +58,7 @@
                 <div class="track" id="now-track">Loading...</div>
                 <div class="progress-wrap" style="margin-top:8px">
                 <div class="progress-bar" title="progress"><div class="progress-fill" id="prog-fill"></div></div>
-                <div class="small" id="time-label">00:00:00 / 00:00:00</div>
+                <div class="small" id="time-label">00:00:00 / 00:00:00 (00:00:00)</div>
                 </div>
                 <div class="controls" style="margin-top:10px">
                 <button id="skip-btn" class="btn">⏭ Skip Track</button>
@@ -194,9 +194,10 @@
                 const next_track = payload.next_track || {};
                 const elapsed = Number(payload.elapsed || 0);
                 const total = Number(payload.total || payload.real_total || 1) || 1;
+                const realtotal = Number(payload.real_total || payload.total || 1) || 1;
                 const percent = Math.max(0, Math.min(100, (elapsed/total)*100));
                 document.getElementById("prog-fill").style.width = percent + "%";
-                document.getElementById("time-label").textContent = formatTime(elapsed) + " / " + formatTime(total);
+                document.getElementById("time-label").textContent = formatTime(elapsed) + " / " + formatTime(total) + ` (${formatTime(realtotal)})`;
                 currentTrackIndex = payload.index;
 
                 if(track.path){
