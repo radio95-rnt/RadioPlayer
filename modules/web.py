@@ -147,8 +147,9 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
         broadcaster.cancel()
         await broadcaster
 
+        server.get_loop().stop()
         server.close()
-        server.get_loop().close()
+        return
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
