@@ -215,14 +215,14 @@ class Module(PlayerModule):
     def shutdown(self):
         self.ipc_thread_running = False
 
-        try: self.imc_q.put(None, block=False)
+        try: self.imc_q.put(None)
         except: pass
 
-        try: self.ws_q.put(None, block=False)
+        try: self.ws_q.put(None)
         except: pass
 
         self.ipc_thread.join(timeout=2)
-        self.ws_process.join(timeout=5)
+        self.ws_process.join(timeout=3)
 
         if self.ws_process.is_alive():
             self.ws_process.terminate()
