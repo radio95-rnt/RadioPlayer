@@ -122,7 +122,7 @@ class ModuleManager:
         for module in self.simple_modules:
             if module:
                 try: module.shutdown()
-                except Exception: traceback.print_exc(file=self.logger.output)
+                except BaseException: traceback.print_exc(file=self.logger.output)
     def load_modules(self):
         """Loads the modules into memory"""
         for file in MODULES_DIR.glob("*"):
@@ -198,6 +198,7 @@ class RadioPlayer:
 
     def shutdown(self):
         if self.procman: self.procman.stop_all()
+        self.modman.shutdown_modules()
         self.logger.output.close()
 
     def handle_sigint(self, signum: int, frame: types.FrameType | None):
