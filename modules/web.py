@@ -52,7 +52,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
 
                 result = await get_imc("activemod", {"action": "get_toplay"})
                 if result is not None: 
-                    await websocket.loop.run_in_executor(None, ws_q.put, ({"data": result, "event": "toplay"},))
+                    await websocket.loop.run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
         elif action == "get_toplay":
             result = await get_imc("activemod", {"action": "get_toplay"})
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
