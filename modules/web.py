@@ -10,7 +10,7 @@ from . import Track, PlayerModule, Path
 
 MAIN_PATH_DIR = Path("/home/user/mixes")
 
-async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: multiprocessing.Queue):
+async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
     try:
         initial = {
             "playlist": json.loads(shared_data.get("playlist", "[]")),
@@ -27,6 +27,18 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             await websocket.send(json.dumps({"error": "invalid json"}))
             continue
 
+        async def get_imc(name, data):
+            key = str(uuid.uuid4())
+            imc_q.put({"name": name, "data": data, "key": key})
+            start = time.monotonic()
+            result = None
+            while time.monotonic() - start < 2:
+                if key in shared_data:
+                    result = shared_data.pop(key)
+                    break
+                await asyncio.sleep(0.05)
+            return result
+
         action = msg.get("action")
         if action == "skip":
             imc_q.put({"name": "procman", "data": {"op": 2}})
@@ -37,20 +49,14 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             else:
                 imc_q.put({"name": "activemod", "data": {"action": "add_to_toplay", "songs": songs}})
                 await websocket.send(json.dumps({"status": "ok", "message": f"{len(songs)} song(s) queued"}))
+
+                result = await get_imc("activemod", {"action": "get_toplay"})
+                if result is not None: 
+                    await websocket.loop.run_in_executor(None, ws_q.put, ({"data": result, "event": "toplay"},))
         elif action == "get_toplay":
-            # replicate the previous behavior: send request to activemod and wait for keyed response
-            key = str(uuid.uuid4())
-            imc_q.put({"name": "activemod", "data": {"action": "get_toplay"}, "key": key})
-            # wait up to 2 seconds for shared_data[key] to appear
-            start = time.monotonic()
-            result = None
-            while time.monotonic() - start < 2:
-                if key in shared_data:
-                    result = shared_data.pop(key)
-                    break
-                await asyncio.sleep(0.05)
+            result = await get_imc("activemod", {"action": "get_toplay"})
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
-            else: await websocket.send(json.dumps({"status": "ok", "response": result, "event": "toplay"}))
+            else: await websocket.send(json.dumps({"data": result, "event": "toplay"}))
         elif action == "request_state":
             # supports requesting specific parts if provided
             what = msg.get("what", "")
@@ -111,7 +117,7 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
         async def handler_wrapper(websocket: ServerConnection):
             # register client
             clients.add(websocket)
-            try: await ws_handler(websocket, shared_data, imc_q)
+            try: await ws_handler(websocket, shared_data, imc_q, ws_q)
             finally:
                 await websocket.close(1001, "")
                 clients.discard(websocket)

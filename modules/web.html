@@ -170,7 +170,7 @@
                 } else if(msg.event === "progress"){
                     applyProgressState(msg.data);
                 } else if(msg.event === "toplay") {
-                    putQueue = msg.response.data || [];
+                    putQueue = msg.data.data || [];
                     renderPutQueue(); 
                 } else if(msg.event === "request_dir") {
                     applySubdir(msg.data || {})
@@ -399,7 +399,6 @@
             function sendAddToToplay(songs){
                 if(ws && ws.readyState === WebSocket.OPEN){
                     ws.send(JSON.stringify({action:"add_to_toplay", songs: songs}));
-                    setTimeout(() => ws.send(JSON.stringify({action:"get_toplay"})), 250);
                 }
             }
 
