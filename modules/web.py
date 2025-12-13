@@ -11,7 +11,7 @@ from . import Track, PlayerModule, Path
 
 MAIN_PATH_DIR = Path("/home/user/mixes")
 
-async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
+async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: multiprocessing.Queue):
     try:
         initial = {
             "playlist": json.loads(shared_data.get("playlist", "[]")),
@@ -90,10 +90,10 @@ async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
         if msg is None: break
         payload = json.dumps(msg)
         if clients:
-            await asyncio.gather(
-                *[_safe_send(ws, payload, clients) for ws in list(clients)],
-                return_exceptions=True
-            )
+            coros = []
+            for ws in list(clients):
+                coros.append(_safe_send(ws, payload, clients))
+            await asyncio.gather(*coros)
 
 
 async def _safe_send(ws, payload: str, clients: set):
@@ -118,7 +118,7 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
         async def handler_wrapper(websocket: ServerConnection):
             # register client
             clients.add(websocket)
-            try: await ws_handler(websocket, shared_data, imc_q, ws_q)
+            try: await ws_handler(websocket, shared_data, imc_q)
             finally:
                 await websocket.close(1001, "")
                 clients.discard(websocket)
