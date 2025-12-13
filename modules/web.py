@@ -107,6 +107,11 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
     # create the asyncio loop and run server
     async def runner():
         clients = set()
+        stop_evt = asyncio.Event()
+
+        async def shutdown_watcher():
+            await loop.run_in_executor(None, shutdown_evt.wait)
+            stop_evt.set()
 
         async def handler_wrapper(websocket: ServerConnection):
             # register client
@@ -132,10 +137,12 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                     b"WebSocket upgrade required\n"
                 )
         # start server
+        watcher = asyncio.create_task(shutdown_watcher())
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
 
-        shutdown_evt.wait()
+        await stop_evt.wait()
+        watcher.cancel()
         server.close()
 
         ws_q.put(None)
@@ -151,8 +158,6 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
     try: loop.run_until_complete(runner())
     except (KeyboardInterrupt, SystemExit): pass
     finally: loop.close()
-
-# ---------- Module class (drop-in replacement) ----------
 
 class Module(PlayerModule):
     def __init__(self):
