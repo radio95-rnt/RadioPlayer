@@ -116,10 +116,8 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
         async def handler_wrapper(websocket: ServerConnection):
             # register client
             clients.add(websocket)
-            try:
-                await ws_handler(websocket, shared_data, imc_q, ws_q)
-            finally:
-                clients.discard(websocket)
+            try: await ws_handler(websocket, shared_data, imc_q, ws_q)
+            finally: clients.discard(websocket)
         async def process_request(websocket: ServerConnection, request: Request):
             if request.path == "/web.html" and (file := Path(__file__, "..", "web.html").resolve()).exists():
                 data = file.read_bytes()
@@ -143,15 +141,14 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
 
         await stop_evt.wait()
         watcher.cancel()
-        server.close()
+        await watcher
 
         ws_q.put(None)
         broadcaster.cancel()
+        await broadcaster
 
         server.close()
-        await server.wait_closed()
-
-        await broadcaster
+        server.get_loop().close()
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -240,7 +237,8 @@ class Module(PlayerModule):
             self.ws_process.terminate()
             self.ws_process.join(timeout=2)
 
-        if self.ws_process.is_alive():
+        while self.ws_process.is_alive():
             self.ws_process.kill()
+            self.ws_process.close()
 
 module = Module()
