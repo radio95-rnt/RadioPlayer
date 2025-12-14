@@ -54,7 +54,7 @@ class Module(ActiveModifier):
 
         if len(songs):
             song, official = get_song()
- 
+
             if self.last_track: last_track_fade_out = self.last_track.fade_out
             else:
                 if (index - 1) >= 0: last_track_fade_out = self.playlist[index - 1].fade_out
@@ -78,10 +78,19 @@ class Module(ActiveModifier):
             if len(songs):
                 # There are more tracks on the temp list
                 new_song, new_official = get_song(False)
-                self.last_track = Track(song, self.crossfade if new_official else 0, last_track_fade_out, official, {}, focus_time_offset=-self.crossfade if new_official else 0)
-                next_track = Track(new_song, self.crossfade if len(songs) else next_track_fade_in, self.crossfade if new_official else 0, new_official, {}, focus_time_offset=-self.crossfade if len(songs) else -next_track_fade_in)
+                current_track_fade_in = last_track_fade_out if official else 0
+                crossfade_amount = self.crossfade if official and new_official else 0
+                self.last_track = Track(song, crossfade_amount, current_track_fade_in, official, {}, focus_time_offset=-crossfade_amount)
+
+                next_track_fade_out = self.crossfade if new_official else 0
+                next_track = Track(new_song, next_track_fade_out, crossfade_amount, new_official, {}, focus_time_offset=-crossfade_amount)
             else:
-                self.last_track = Track(song, next_track_fade_in, last_track_fade_out, official, {}, focus_time_offset=-next_track_fade_in)
+                next_playlist_track_fade_in = next_track.fade_in if next_track else self.crossfade
+
+                current_track_fade_in = last_track_fade_out if official else 0
+                current_track_fade_out = next_playlist_track_fade_in if official else 0
+
+                self.last_track = Track(song, current_track_fade_out, current_track_fade_in, official, {}, focus_time_offset=-current_track_fade_out)
                 next_track = track
             self.limit_tracks = False
             if self.skip_next:
@@ -138,9 +147,9 @@ class Module(ActiveModifier):
         elif data.get("action") == "clear_toplay":
             with self.file_lock:
                 # Due to policy, i will not recommend to strip the next song but only the songs after.
-                with open(TOPLAY, "r") as f: 
+                with open(TOPLAY, "r") as f:
                     first_line, i = "", 0
-                    while not first_line.strip() and i < 3: 
+                    while not first_line.strip() and i < 3:
                         first_line = f.readline()
                         i += 1
                 with open(TOPLAY, "w") as f: f.write(first_line.strip() + "\n")
