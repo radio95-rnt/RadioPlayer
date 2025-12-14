@@ -9,6 +9,8 @@ _log_out: TextIO
 assert _log_out # pyright: ignore[reportUnboundVariable]
 logger = log95.log95("AC-MOD", output=_log_out)
 
+TOPLAY = Path("/tmp/radioPlayer_toplay")
+
 class Module(ActiveModifier):
     def __init__(self) -> None:
         self.playlist = None
@@ -34,8 +36,8 @@ class Module(ActiveModifier):
         if not self.playlist: return (track, next_track), False
 
         with self.file_lock:
-            if not os.path.exists("/tmp/radioPlayer_toplay"): open("/tmp/radioPlayer_toplay", "a").close()
-            with open("/tmp/radioPlayer_toplay", "r") as f: songs = [s.strip() for s in f.readlines() if s.strip()]
+            TOPLAY.touch()
+            with open(TOPLAY, "r") as f: songs = [s.strip() for s in f.readlines() if s.strip()]
 
         songs[:] = [f for s in songs for f in glob.glob(s.removeprefix("!")) if os.path.isfile(f)] # expand glob
 
@@ -66,7 +68,7 @@ class Module(ActiveModifier):
             if not self.originals or self.originals[-1] != track: self.originals.append(track)
 
             with self.file_lock:
-                with open("/tmp/radioPlayer_toplay", "w") as f:
+                with open(TOPLAY, "w") as f:
                     f.write('\n'.join(songs))
                     f.write("\n")
 
@@ -118,11 +120,17 @@ class Module(ActiveModifier):
             songs_to_add = data.get("songs")
             if isinstance(songs_to_add, list):
                 with self.file_lock:
-                    with open("/tmp/radioPlayer_toplay", "a") as f:
+                    with open(TOPLAY, "a") as f:
                         for song_path in songs_to_add: f.write(f"{song_path}\n")
                 return {"status": "ok", "message": f"{len(songs_to_add)} songs added."}
         elif data.get("action") == "get_toplay":
             with self.file_lock:
-                with open("/tmp/radioPlayer_toplay", "r") as f: return {"status": "ok", "data": [i.strip() for i in f.readlines() if i.strip()]}
+                with open(TOPLAY, "r") as f: return {"status": "ok", "data": [i.strip() for i in f.readlines() if i.strip()]}
+        elif data.get("action") == "clear_toplay":
+            with self.file_lock:
+                # Due to policy, i will not recommend to strip the next song but only the songs after.
+                with open(TOPLAY, "r") as f: first_line = f.readline()
+                with open(TOPLAY, "w") as f: f.write(first_line.strip() + "\n")
+                return {"status": "ok", "data": [first_line.strip()]}
 
 activemod = Module()

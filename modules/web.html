@@ -74,6 +74,7 @@
                 <div class="controls" style="margin-top:10px">
                 <button id="skip-btn" class="btn">⏭ Skip Track</button>
                 <button id="readd-btn" class="btn">↺ Re-add Selected</button>
+                <button id="clear-btn" class="btn">✖ Clear the PUT Queue</button>
                 </div>
             </div>
 
@@ -370,6 +371,9 @@
                 const path = (selected.official ? "" : "!") + selected.path;
                 ws.send(JSON.stringify({action:"add_to_toplay", songs: [path]}))
                 Array.from(document.getElementById("playlist-box").children).forEach(c => c.classList.remove("selected"));
+            });
+            document.getElementById("clear-btn").addEventListener("click", () => {
+                ws.send(JSON.stringify({action:"clear_toplay"}))
             });
 
             document.getElementById("add-to-put-btn").addEventListener("click", () => {
