@@ -76,6 +76,7 @@
                     <button id="readd-btn" class="btn">↺ Re-add Selected</button>
                     <button id="clear-btn" class="btn">✖ Clear the PUT Queue</button>
                     <button id="skpn-btn" class="btn">⏭? Toggle skip next</button>
+                    <button id="jingle-btn" class="btn">🕭 Add Jingle</button>
                 </div>
             </div>
 
@@ -376,6 +377,10 @@
             });
             document.getElementById("skpn-btn").addEventListener("click", () => {
                 if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"skip_next"}));
+                else console.error("WebSocket not connected.");
+            });
+            document.getElementById("jingle-btn").addEventListener("click", () => {
+                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"jingle"}));
                 else console.error("WebSocket not connected.");
             });
 

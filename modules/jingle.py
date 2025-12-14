@@ -8,7 +8,9 @@ Reacts to the 'no_jingle' argument, for global usage it does not add jingles to 
 
 import random
 
-from . import PlaylistModifierModule, Track, Path
+from modules import BaseIMCModule, InterModuleCommunication
+
+from . import PlaylistModifierModule, Track, Path, PlayerModule
 
 class Module(PlaylistModifierModule):
     def __init__(self, primary: Path, secondary: list[Path] | None = None) -> None:
@@ -32,5 +34,22 @@ class Module(PlaylistModifierModule):
             out.append(Track(track.path, crossfade, crossfade, True, track.args,focus_time_offset=-crossfade))
             last_jingiel = False
         return out
+    
+class Module2(PlayerModule):
+    def __init__(self, primary: Path, secondary: list[Path] | None = None) -> None:
+        if secondary is None: secondary = []
+        self.primary = primary.absolute()
+        assert primary.exists()
+        self.secondary = [f.absolute() for f in secondary if f.exists()]
+    def imc(self, imc: InterModuleCommunication) -> None:
+        super().imc(imc)
+        self._imc.register(self, "jingle")
+    def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
+        if broadcast: return
+        jingle = self.primary
+        if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary)
+        return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [jingle]})
 
-playlistmod = (Module(Path("/home/user/Jingiel.mp3"), [Path("/home/user/jing2.opus"), Path("Jing3.opus")]), 1)
+options = Path("/home/user/Jingiel.mp3"), [Path("/home/user/jing2.opus"), Path("Jing3.opus")]
+module = Module2(*options)
+playlistmod = (Module(*options), 1)

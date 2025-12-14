@@ -51,7 +51,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 await websocket.send(json.dumps({"status": "ok", "message": f"{len(songs)} song(s) queued"}))
 
                 result = await get_imc("activemod", {"action": "get_toplay"})
-                if result is not None: 
+                if result is not None:
                     await websocket.loop.run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
         elif action == "get_toplay":
             result = await get_imc("activemod", {"action": "get_toplay"})
@@ -60,11 +60,21 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
         elif action == "clear_toplay":
             result = await get_imc("activemod", {"action": "clear_toplay"})
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
-            else: await websocket.send(json.dumps({"data": result, "event": "toplay"})) # Yes, this is not an accident
+            else:
+                await websocket.send(json.dumps({"data": result, "event": "toplay"})) # Yes, this is not an accident
+                await websocket.loop.run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
         elif action == "skip_next":
             result = await get_imc("activemod", {"action": "skip_next", "set": msg.get("set",True)})
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else: await websocket.send(json.dumps({"data": result, "event": "skip_next"}))
+        elif action == "jingle":
+            result = await get_imc("jingle", None)
+            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
+            else:
+                await websocket.send(json.dumps(result))
+                result = await get_imc("activemod", {"action": "get_toplay"})
+                if result is not None:
+                    await websocket.loop.run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
         elif action == "request_state":
             # supports requesting specific parts if provided
             what = msg.get("what", "")
@@ -224,7 +234,7 @@ class Module(PlayerModule):
         self.data["progress"] = json.dumps(payload)
         try: self.ws_q.put({"event": "progress", "data": payload})
         except Exception: pass
-    
+
     def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
         try: self.ws_q.put({"event": "imc", "data": {"name": source_name, "data": data, "broadcast": broadcast}})
         except Exception: pass
