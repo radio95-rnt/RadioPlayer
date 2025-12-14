@@ -33,6 +33,7 @@
             ul.playlist li:hover{background:rgba(255,255,255,0.02)}
             ul.playlist li.current{background:rgba(62,166,255,0.08)}
             ul.playlist li.selected{background:rgba(62, 165, 255, 0.305)}
+            ul.playlist li.pointer{background:rgba(62, 165, 255, 0.197)}
             .controls{display:flex; gap:8px; margin-top:8px}
             .two-col{display:flex; gap:8px; align-items:flex-start; height:100%}
             .box{display:flex; flex-direction:column; gap:8px; flex-grow: 1; overflow: hidden;}
@@ -287,11 +288,7 @@
                         li.classList.add("current");
                         currentIndex = i;
                     } else if (i === currentTrackIndex) {
-                        function replaceAt(str, index, replacement) {
-                            if (index < 0 || index >= str.length) return str; // index out of bounds
-                            return str.slice(0, index) + replacement + str.slice(index + 1);
-                        }
-                        li.textContent = replaceAt(li.textContent, 0, ">")
+                        li.classList.add("pointer");
                     }
                     if(currentIndex && (currentIndex+1 === i) && skipNext && (putQueue.length === 0)) {
                         li.style.textDecoration = "line-through";
