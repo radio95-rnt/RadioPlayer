@@ -276,7 +276,7 @@
                     const path = t.path || "<no path>";
                     const official = t.official || false;
                     const displayPath = (official ? "" : "!") + path;
-                    li.textContent = `${String(idx).padStart(2,'0')}: ${displayPath}`;
+                    li.textContent = ` ${String(idx).padStart(2,'0')}: ${displayPath}`;
                     li.dataset.path = path;
                     li.dataset.idx = i;
                     li.addEventListener("click", () => { selectPlaylistItem(i, li); });
@@ -286,6 +286,12 @@
                     if(p && currentTrackPath.includes(p) && i === currentTrackIndex){
                         li.classList.add("current");
                         currentIndex = i;
+                    } else if (i === currentTrackIndex) {
+                        function replaceAt(str, index, replacement) {
+                            if (index < 0 || index >= str.length) return str; // index out of bounds
+                            return str.slice(0, index) + replacement + str.slice(index + 1);
+                        }
+                        li.textContent = replaceAt(li.textContent, 0, ">")
                     }
                     if(currentIndex && (currentIndex+1 === i) && skipNext && (putQueue.length === 0)) {
                         li.style.textDecoration = "line-through";
