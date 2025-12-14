@@ -282,8 +282,8 @@
                     li.addEventListener("click", () => { selectPlaylistItem(i, li); });
 
                     const p = li.dataset.path;
+                    console.log(currentTrackPath, p, currentTrackIndex)
                     if(p && currentTrackPath.includes(p) && i === currentTrackIndex){
-                        console.log(currentTrackPath, p, currentTrackIndex)
                         li.classList.add("current");
                         currentIndex = i;
                     }
