@@ -283,6 +283,7 @@
 
                     const p = li.dataset.path;
                     if(p && currentTrackPath.includes(p) && i === currentTrackIndex){
+                        console.log(currentTrackPath, p, currentTrackIndex)
                         li.classList.add("current");
                         currentIndex = i;
                     }
