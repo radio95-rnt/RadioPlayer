@@ -6,7 +6,7 @@ import asyncio
 import websockets
 from websockets import ServerConnection, Request, Response, Headers
 
-from . import Track, PlayerModule, Path
+from . import Track, PlayerModule, Path, BaseIMCModule
 
 MAIN_PATH_DIR = Path("/home/user/mixes")
 
@@ -32,7 +32,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             imc_q.put({"name": name, "data": data, "key": key})
             start = time.monotonic()
             result = None
-            while time.monotonic() - start < 2:
+            while time.monotonic() - start < 1.5:
                 if key in shared_data:
                     result = shared_data.pop(key)
                     break
@@ -215,6 +215,10 @@ class Module(PlayerModule):
         payload = {"index": index, "track": track_data, "elapsed": elapsed, "total": total, "real_total": real_total}
         self.data["progress"] = json.dumps(payload)
         try: self.ws_q.put({"event": "progress", "data": payload})
+        except Exception: pass
+    
+    def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
+        try: self.ws_q.put({"event": "imc", "data": {"name": source_name, "data": data, "broadcast": broadcast}})
         except Exception: pass
 
     def shutdown(self):

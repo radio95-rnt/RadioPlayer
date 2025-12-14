@@ -111,7 +111,6 @@
         </div>
 
         <script>
-            const WS_URL = `ws://192.168.1.93:3001`;
 
             let ws = null;
             let reconnectDelay = 1000;
@@ -127,7 +126,7 @@
 
             function connectWs(){
                 document.getElementById("server-status").textContent = "connecting...";
-                ws = new WebSocket(WS_URL);
+                ws = new WebSocket("ws://192.168.1.93:3001");
 
                 ws.addEventListener("open", () => {
                     document.getElementById("server-status").textContent = "connected";
@@ -195,7 +194,7 @@
                 const elapsed = Number(payload.elapsed || 0);
                 const total = Number(payload.total || payload.real_total || 1) || 1;
                 const realtotal = Number(payload.real_total || payload.total || 1) || 1;
-                const percent = Math.max(0, Math.min(100, (elapsed/total)*100));
+                const percent = Math.max(0, Math.min(100, (elapsed/realtotal)*100));
                 document.getElementById("prog-fill").style.width = percent + "%";
                 document.getElementById("time-label").textContent = formatTime(elapsed) + " / " + formatTime(total) + ` (${formatTime(realtotal)})`;
                 currentTrackIndex = payload.index;
@@ -346,11 +345,8 @@
             }
 
             document.getElementById("skip-btn").addEventListener("click", () => {
-                if(ws && ws.readyState === WebSocket.OPEN){
-                    ws.send(JSON.stringify({action:"skip"}));
-                } else {
-                    console.error("WebSocket not connected.");
-                }
+                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"skip"}));
+                else console.error("WebSocket not connected.");
             });
 
             document.getElementById("readd-btn").addEventListener("click", () => {
@@ -361,7 +357,7 @@
                 const selected = playlist[selectedPlaylistIndex];
                 if(!selected) { alert("Invalid selection"); return; }
                 const path = (selected.official ? "" : "!") + selected.path;
-                sendAddToToplay([path]);
+                ws.send(JSON.stringify({action:"add_to_toplay", songs: [path]}))
                 Array.from(document.getElementById("playlist-box").children).forEach(c => c.classList.remove("selected"));
             });
             
@@ -389,16 +385,9 @@
                     }
                 }
 
-                if (fullPath) {
-                    sendAddToToplay([fullPath]);
-                } else {
-                    alert("Please select a file to add.");
-                }
+                if (fullPath) ws.send(JSON.stringify({action:"add_to_toplay", songs: [fullPath]}))
+                else alert("Please select a file to add.");
             });
-
-            function sendAddToToplay(songs){
-                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"add_to_toplay", songs: songs}))
-            }
 
             connectWs();
         </script>
