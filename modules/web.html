@@ -285,9 +285,8 @@
                         li.classList.add("current");
                         currentIndex = i;
                     }
-                    if(currentIndex+1 === i && skipNext && putQueue.length === 0) {
+                    if(currentIndex && (currentIndex+1 === i) && skipNext && (putQueue.length === 0)) {
                         li.style.textDecoration = "line-through";
-                        console.log(i, currentIndex, li.textContent)
                     }
                     ul.appendChild(li);
                 });
