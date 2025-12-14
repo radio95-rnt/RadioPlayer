@@ -189,7 +189,7 @@
                 } else if(msg.event === "request_dir") {
                     applySubdir(msg.data || {})
                 } else if(msg.event === "skip_next") {
-                    skip_next = msg.data.data || false;
+                    skipNext = msg.data.data || false;
                     renderPlaylist();
                     renderPutQueue();
                 } else if(msg.status || msg.response || msg.error) {
