@@ -21,6 +21,7 @@ class Module(ActiveModifier):
         self.morning_start = self.day_end = 0
         self.file_lock = Lock()
         self.crossfade = 5
+        self.skip_next = False
     def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]):
         self.playlist = playlist
         self.crossfade = float(global_args.get("crossfade", 5.0))
@@ -108,6 +109,10 @@ class Module(ActiveModifier):
                     logger.warning("Skipping track as it the next day")
                     return (None, None), None
                 if last_track_duration: logger.info("Track ends at", repr(future))
+        if self.skip_next:
+            logger.info("Skip next flag was on, skipping this song.")
+            self.skip_next = False
+            return (None, None), None
         return (self.last_track, next_track), False
 
     def imc(self, imc: InterModuleCommunication) -> None:
@@ -136,5 +141,8 @@ class Module(ActiveModifier):
                         i += 1
                 with open(TOPLAY, "w") as f: f.write(first_line.strip() + "\n")
                 return {"status": "ok", "data": [first_line.strip()]}
+        elif data.get("action") == "skip_next":
+            if data.get("set", True): self.skip_next = not self.skip_next
+            return {"status": "ok", "data": self.skip_next}
 
 activemod = Module()

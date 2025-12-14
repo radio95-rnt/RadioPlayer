@@ -72,9 +72,10 @@
                 <div class="small" id="time-label">00:00 / 00:00 (00:00)</div>
                 </div>
                 <div class="controls" style="margin-top:10px">
-                <button id="skip-btn" class="btn">⏭ Skip Track</button>
-                <button id="readd-btn" class="btn">↺ Re-add Selected</button>
-                <button id="clear-btn" class="btn">✖ Clear the PUT Queue</button>
+                    <button id="skip-btn" class="btn">⏭ Skip Track</button>
+                    <button id="readd-btn" class="btn">↺ Re-add Selected</button>
+                    <button id="clear-btn" class="btn">✖ Clear the PUT Queue</button>
+                    <button id="skpn-btn" class="btn">⏭? Toggle skip next</button>
                 </div>
             </div>
 
@@ -135,6 +136,7 @@
             let selectedSubFile = null;
             let basePath = "";
             let subbasePath = "";
+            let skipNext = false;
 
             function connectWs(){
                 document.getElementById("server-status").textContent = "connecting...";
@@ -144,6 +146,7 @@
                     document.getElementById("server-status").textContent = "connected";
                     reconnectDelay = 1000;
                     ws.send(JSON.stringify({action:"get_toplay"}));
+                    ws.send(JSON.stringify({action:"skip_next",set:false}));
                 });
 
                 ws.addEventListener("close", () => {
@@ -185,6 +188,10 @@
                     renderPutQueue();
                 } else if(msg.event === "request_dir") {
                     applySubdir(msg.data || {})
+                } else if(msg.event === "skip_next") {
+                    skip_next = msg.data.data || false;
+                    renderPlaylist();
+                    renderPutQueue();
                 } else if(msg.status || msg.response || msg.error) {
                     console.debug("ws ack", msg);
                 }
@@ -277,6 +284,9 @@
                         li.classList.add("current");
                         currentIndex = i;
                     }
+                    if(currentIndex+1 === i && skipNext) {
+                        li.style.textDecoration = "line-through";
+                    }
                     ul.appendChild(li);
                 });
 
@@ -292,6 +302,9 @@
                 putQueue.forEach((element, i) => {
                     const li = document.createElement("li");
                     li.textContent = element;
+                    if(i === 0 && skipNext) {
+                        li.style.textDecoration = "line-through";
+                    }
                     ul.appendChild(li);
                 });
             }
@@ -358,6 +371,10 @@
 
             document.getElementById("skip-btn").addEventListener("click", () => {
                 if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"skip"}));
+                else console.error("WebSocket not connected.");
+            });
+            document.getElementById("skpn-btn").addEventListener("click", () => {
+                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"skip_next"}));
                 else console.error("WebSocket not connected.");
             });
 

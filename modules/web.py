@@ -61,6 +61,10 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             result = await get_imc("activemod", {"action": "clear_toplay"})
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else: await websocket.send(json.dumps({"data": result, "event": "toplay"})) # Yes, this is not an accident
+        elif action == "skip_next":
+            result = await get_imc("activemod", {"action": "skip_next", "set": msg.get("set",True)})
+            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
+            else: await websocket.send(json.dumps({"data": result, "event": "skip_next"}))
         elif action == "request_state":
             # supports requesting specific parts if provided
             what = msg.get("what", "")
