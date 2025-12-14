@@ -48,7 +48,7 @@ class Module2(PlayerModule):
         if broadcast: return
         jingle = self.primary
         if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary)
-        return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [jingle]})
+        return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [f"!{jingle}"]})
 
 options = Path("/home/user/Jingiel.mp3"), [Path("/home/user/jing2.opus"), Path("Jing3.opus")]
 module = Module2(*options)
