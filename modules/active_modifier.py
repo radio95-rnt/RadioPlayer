@@ -129,7 +129,11 @@ class Module(ActiveModifier):
         elif data.get("action") == "clear_toplay":
             with self.file_lock:
                 # Due to policy, i will not recommend to strip the next song but only the songs after.
-                with open(TOPLAY, "r") as f: first_line = f.readline()
+                with open(TOPLAY, "r") as f: 
+                    first_line, i = "", 0
+                    while not first_line.strip() and i < 3: 
+                        first_line = f.readline()
+                        i += 1
                 with open(TOPLAY, "w") as f: f.write(first_line.strip() + "\n")
                 return {"status": "ok", "data": [first_line.strip()]}
 
