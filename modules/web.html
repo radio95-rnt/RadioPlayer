@@ -308,9 +308,7 @@
                 putQueue.forEach((element, i) => {
                     const li = document.createElement("li");
                     li.textContent = element;
-                    if(i === 0 && skipNext) {
-                        li.style.textDecoration = "line-through";
-                    }
+                    if(i === 0 && skipNext) li.style.textDecoration = "line-through";
                     ul.appendChild(li);
                 });
             }
@@ -399,9 +397,7 @@
                 ws.send(JSON.stringify({action:"add_to_toplay", songs: [path]}))
                 Array.from(document.getElementById("playlist-box").children).forEach(c => c.classList.remove("selected"));
             });
-            document.getElementById("clear-btn").addEventListener("click", () => {
-                ws.send(JSON.stringify({action:"clear_toplay"}))
-            });
+            document.getElementById("clear-btn").addEventListener("click", () => {ws.send(JSON.stringify({action:"clear_toplay"}))});
 
             document.getElementById("add-to-put-btn").addEventListener("click", () => {
                 let fullPath = null;
@@ -431,7 +427,7 @@
                 else alert("Please select a file to add.");
             });
 
-            connectWs();
+            setTimeout(connectWs, 100)
         </script>
     </body>
 </html>
