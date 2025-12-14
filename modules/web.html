@@ -181,6 +181,7 @@
                 } else if(msg.event === "new_track"){
                     applyTrackState(msg.data);
                     ws.send(JSON.stringify({action:"get_toplay"}));
+                    ws.send(JSON.stringify({action:"skip_next",set:false}));
                 } else if(msg.event === "progress"){
                     applyProgressState(msg.data);
                 } else if(msg.event === "toplay") {

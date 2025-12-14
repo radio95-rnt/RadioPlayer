@@ -84,6 +84,10 @@ class Module(ActiveModifier):
                 self.last_track = Track(song, next_track_fade_in, last_track_fade_out, official, {}, focus_time_offset=-next_track_fade_in)
                 next_track = track
             self.limit_tracks = False
+            if self.skip_next:
+                logger.info("Skip next flag was on, skipping this song.")
+                self.skip_next = False
+                return (None, None), None
             return (self.last_track, next_track), True
         elif len(self.originals):
             self.last_track = self.originals.pop(0)
