@@ -33,7 +33,7 @@
             ul.playlist li:hover{background:rgba(255,255,255,0.02)}
             ul.playlist li.current{background:rgba(62,166,255,0.08)}
             ul.playlist li.selected{background:rgba(62, 165, 255, 0.305)}
-            ul.playlist li.pointer{background:rgba(62, 165, 255, 0.197)}
+            ul.playlist li.pointer{background:rgba(62, 165, 255, 0.13)}
             .controls{display:flex; gap:8px; margin-top:8px}
             .two-col{display:flex; gap:8px; align-items:flex-start; height:100%}
             .box{display:flex; flex-direction:column; gap:8px; flex-grow: 1; overflow: hidden;}
@@ -283,7 +283,6 @@
                     li.addEventListener("click", () => { selectPlaylistItem(i, li); });
 
                     const p = li.dataset.path;
-                    console.log(currentTrackPath, p, currentTrackIndex, i)
                     if(p && currentTrackPath.includes(p) && i === currentTrackIndex){
                         li.classList.add("current");
                         currentIndex = i;
