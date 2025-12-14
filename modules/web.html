@@ -288,6 +288,7 @@
                         currentIndex = i;
                     } else if (i === currentTrackIndex) {
                         li.classList.add("pointer");
+                        currentIndex = i;
                     }
                     if(currentIndex && (currentIndex+1 === i) && skipNext && (putQueue.length === 0)) {
                         li.style.textDecoration = "line-through";
