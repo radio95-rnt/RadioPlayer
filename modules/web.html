@@ -23,8 +23,10 @@
             .progress-wrap{display:flex; gap:10px; align-items:center}
             .progress-bar{flex:1; height:12px; background:var(--glass); border-radius:8px; overflow:hidden; position:relative}
             .progress-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent), #6cc7ff); transition:width 0.2s linear}
-            button, .btn{background:transparent;border:1px solid rgba(255,255,255,0.06); padding:8px 12px;border-radius:8px;color:inherit;cursor:pointer}
+            button, .btn{background:transparent;border:1px solid rgba(255,255,255,0.06); padding:8px 12px;border-radius:8px;color:inherit;cursor:pointer; transition: background-color 0.12s ease;}
+            button:hover, .btn:hover {background-color: var(--glass);}
             .btn.primary{background:linear-gradient(90deg,var(--accent), #6cc7ff); color:#001; border:none; font-weight:600}
+            .btn.primary:hover { background:linear-gradient(90deg, #3399ee, #5bbaff); }
             .list{background:#07121a; border-radius:8px; padding:8px; overflow:auto; border:1px solid rgba(255,255,255,0.02)}
             ul.playlist{list-style:none; padding:6px; margin:0; font-family: "Consolas",monospace; font-size:13px;}
             ul.playlist li{padding:6px 8px; border-radius:6px; display:flex; justify-content:space-between; gap:8px; transition: background-color 0.12s ease;}
@@ -42,7 +44,16 @@
             .row{display:flex; gap:8px; align-items:center}
             .muted{color:var(--muted); font-size:13px}
             .footer{display:flex; justify-content:space-between; gap:8px; align-items:center; margin-top:8px}
-            @media (max-width:900px){ .layout{flex-direction:column} .right{grid-template-columns:1fr} .left{min-width:auto} }
+            .directory-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; flex-grow:1; overflow:hidden}
+            @media (max-width:800px){
+                html, body{overflow: auto; height: auto}
+                .container{padding: 10px; margin: 0}
+                .layout{flex-direction: column; height: auto}
+                .left{min-width:auto}
+                .directory-grid {grid-template-columns: 1fr}
+                .listbox {min-height: 250px}
+                button, .btn {padding: 10px 14px}
+            }
         </style>
     </head>
     <body>
@@ -58,7 +69,7 @@
                 <div class="track" id="now-track">Loading...</div>
                 <div class="progress-wrap" style="margin-top:8px">
                 <div class="progress-bar" title="progress"><div class="progress-fill" id="prog-fill"></div></div>
-                <div class="small" id="time-label">00:00:00 / 00:00:00 (00:00:00)</div>
+                <div class="small" id="time-label">00:00 / 00:00 (00:00)</div>
                 </div>
                 <div class="controls" style="margin-top:10px">
                 <button id="skip-btn" class="btn">⏭ Skip Track</button>
@@ -88,12 +99,12 @@
             </div>
 
             <div class="panel right">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; flex-grow:1; overflow:hidden">
+                <div class="directory-grid">
                     <div class="box" style="padding:8px">
                         <div class="frame-title">Directory Browser</div>
                         <div class="listbox" id="dirs-box"></div>
                     </div>
-        
+
                     <div class="box" style="padding:8px">
                         <div class="frame-title">Subdirectory Files</div>
                         <div class="listbox" id="subdir-box"></div>
@@ -170,7 +181,7 @@
                     applyProgressState(msg.data);
                 } else if(msg.event === "toplay") {
                     putQueue = msg.data.data || [];
-                    renderPutQueue(); 
+                    renderPutQueue();
                 } else if(msg.event === "request_dir") {
                     applySubdir(msg.data || {})
                 } else if(msg.status || msg.response || msg.error) {
@@ -248,7 +259,7 @@
                 const ul = document.getElementById("playlist-ul");
                 ul.innerHTML = "";
                 let currentIndex = null;
-                
+
                 playlist.forEach((t, i) => {
                     const li = document.createElement("li");
                     const idx = i+1;
@@ -267,13 +278,13 @@
                     }
                     ul.appendChild(li);
                 });
-                
+
                 if(currentIndex !== null){
                     const el = ul.children[currentIndex];
                     if(el) el.scrollIntoView({block:'center', behavior: 'smooth'});
                 }
             }
-            
+
             function renderPutQueue() {
                 const ul = document.getElementById("put-queue-ul");
                 ul.innerHTML = "";
@@ -318,7 +329,7 @@
                         node.addEventListener("click", () => {
                             Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
                             node.classList.add("selected");
-                            selectedDir = null; 
+                            selectedDir = null;
                             selectedSubFile = null;
                             document.getElementById("subdir-box").innerHTML = "";
                         });
@@ -360,7 +371,7 @@
                 ws.send(JSON.stringify({action:"add_to_toplay", songs: [path]}))
                 Array.from(document.getElementById("playlist-box").children).forEach(c => c.classList.remove("selected"));
             });
-            
+
             document.getElementById("add-to-put-btn").addEventListener("click", () => {
                 let fullPath = null;
 
@@ -373,7 +384,7 @@
                     // Priority 2: Check for a selected file in the main directory list
                     const dirEls = document.getElementById("dirs-box").children;
                     const selectedItem = Array.from(dirEls).find(el => el.classList.contains("selected"));
-                    
+
                     if (selectedItem) {
                         const name = selectedItem.textContent;
                         // A simple check to see if the selected item is a file
