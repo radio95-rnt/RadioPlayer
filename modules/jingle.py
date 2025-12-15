@@ -52,4 +52,4 @@ class Module2(PlayerModule):
 
 options = Path("/home/user/Jingiel.mp3"), [Path("/home/user/jing2.opus"), Path("Jing3.opus")]
 module = Module2(*options)
-playlistmod = (Module(*options), 1)
+playlistmod = (Module(*options), 2)
