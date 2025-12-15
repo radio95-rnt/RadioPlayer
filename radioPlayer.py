@@ -152,7 +152,14 @@ class ModuleManager:
             assert spec.loader
             try:
                 start = time.perf_counter()
-                spec.loader.exec_module(module)
+                if sys.platform == "linux":
+                    def handler(signum, frame): raise TimeoutError("Module loading timed out")
+                    signal.signal(signal.SIGALRM, handler)
+                    signal.alarm(5)
+                try: spec.loader.exec_module(module)
+                except TimeoutError: self.logger.error(f"Module {module_name} took too long to load and was skipped.")
+                finally:
+                    if sys.platform == "linux": signal.alarm(0)
                 if (time_took := time.perf_counter() - start) > 0.15: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
             except Exception as e:
                 traceback.print_exc(file=self.logger.output)
