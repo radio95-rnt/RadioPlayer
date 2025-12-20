@@ -2,7 +2,7 @@ from modules import BaseIMCModule, InterModuleCommunication
 from . import ActiveModifier, log95, Track, Path
 import os, glob, datetime
 from threading import Lock
-from crossfade_init import DEFAULT_CROSSFADE
+DEFAULT_CROSSFADE = 5
 
 from typing import TextIO
 _log_out: TextIO
