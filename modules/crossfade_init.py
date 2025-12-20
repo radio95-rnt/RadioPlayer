@@ -10,3 +10,4 @@ class Module(PlaylistModifierModule):
                 out.append(Track(track.path, track_crossfade, track_crossfade, do_cross_fade, track.args, focus_time_offset=-track_crossfade))
             else: out.append(track)
         return out
+playlistmod = (Module(),1)
