@@ -51,6 +51,8 @@ class PopularitySorterModule(PlaylistModifierModule):
             track1 = playlist[i]
             track2 = playlist[i+1]
 
+            if not (track1.official and track2.official): continue
+
             # Get play counts for both tracks, defaulting to 0 if not found.
             count1 = play_counts.get(track1.path.as_posix(), 0)
             count2 = play_counts.get(track2.path.as_posix(), 0)
