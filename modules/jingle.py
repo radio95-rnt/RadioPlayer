@@ -22,16 +22,15 @@ class Module(PlaylistModifierModule):
         if int(global_args.get("no_jingle", 0)) != 0 or not self.primary: return None
         out: list[Track] = []
         last_jingiel = True
-        crossfade = float(global_args.get("crossfade", 5.0))
         for track in playlist:
             if not last_jingiel and (random.randint(1,3) == 1) and (track.args is None or int(track.args.get("no_jingle", 0)) == 0):
-                out.append(Track(track.path, crossfade, 0, True, track.args, focus_time_offset=-crossfade))
+                out.append(Track(track.path, 0, track.fade_in, True, track.args))
                 jingle = self.primary
                 if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary)
                 out.append(Track(jingle, 0, 0, False, {}))
                 last_jingiel = True
                 continue
-            out.append(Track(track.path, crossfade, crossfade, True, track.args,focus_time_offset=-crossfade))
+            out.append(Track(track.path, track.fade_out, track.fade_in, True, track.args,focus_time_offset=-track.fade_out))
             last_jingiel = False
         return out
     
@@ -52,4 +51,4 @@ class Module2(PlayerModule):
 
 options = Path("/home/user/Jingiel.mp3"), [Path("/home/user/jing2.opus"), Path("Jing3.opus")]
 module = Module2(*options)
-playlistmod = (Module(*options), 2)
+playlistmod = Module(*options)

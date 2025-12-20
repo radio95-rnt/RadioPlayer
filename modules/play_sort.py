@@ -76,4 +76,4 @@ class PopularitySorterModule(PlaylistModifierModule):
         return playlist
 
 # The radioPlayer will look for a 'playlistmod' variable to load the module.
-playlistmod = (PopularitySorterModule(), 1)
+playlistmod = (PopularitySorterModule(), 2)

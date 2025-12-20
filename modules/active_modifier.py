@@ -2,6 +2,7 @@ from modules import BaseIMCModule, InterModuleCommunication
 from . import ActiveModifier, log95, Track, Path
 import os, glob, datetime
 from threading import Lock
+from crossfade_init import DEFAULT_CROSSFADE
 
 from typing import TextIO
 _log_out: TextIO
@@ -20,11 +21,11 @@ class Module(ActiveModifier):
         self.can_limit_tracks = False
         self.morning_start = self.day_end = 0
         self.file_lock = Lock()
-        self.crossfade = 5
+        self.crossfade = DEFAULT_CROSSFADE
         self.skip_next = False
     def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]):
         self.playlist = playlist
-        self.crossfade = float(global_args.get("crossfade", 5.0))
+        self.crossfade = float(global_args.get("crossfade", DEFAULT_CROSSFADE))
 
         if not self._imc: return
         self.limit_tracks, self.morning_start, self.day_end = self._imc.send(self, "advisor", None) # pyright: ignore[reportGeneralTypeIssues]
