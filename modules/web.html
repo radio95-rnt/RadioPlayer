@@ -21,10 +21,11 @@
             .now, .next {margin-bottom:12px}
             .now .track, .next .track {font-weight:600; font-size:14px; word-break:break-all}
             .progress-wrap{display:flex; gap:10px; align-items:center}
-            .progress-bar{flex:1; height:12px; background:var(--glass); border-radius:8px; overflow:hidden; position:relative}
+            .progress-bar{flex:1; height:9px; background:var(--glass); border-radius:8px; overflow:hidden; position:relative}
             .progress-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent), #6cc7ff); transition:width 0.2s linear}
-            button, .btn{background:transparent;border:1px solid rgba(255,255,255,0.06); padding:8px 12px;border-radius:8px;color:inherit;cursor:pointer; transition: background-color 0.12s ease;}
+            button, .btn{background:transparent;border:1px solid rgba(255,255,255,0.06); padding:8px 12px;border-radius:8px;color:inherit;cursor:pointer; transition: background-color 0.12s ease}
             button:hover, .btn:hover {background-color: var(--glass);}
+            .btn.activated { background:linear-gradient(90deg, #9ed3ff46, #5bbbff2a); }
             .btn.primary{background:linear-gradient(90deg,var(--accent), #6cc7ff); color:#001; border:none; font-weight:600}
             .btn.primary:hover { background:linear-gradient(90deg, #3399ee, #5bbaff); }
             .list{background:#07121a; border-radius:8px; padding:8px; overflow:auto; border:1px solid rgba(255,255,255,0.02)}
@@ -46,6 +47,8 @@
             .muted{color:var(--muted); font-size:13px}
             .footer{display:flex; justify-content:space-between; gap:8px; align-items:center; margin-top:8px}
             .directory-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; flex-grow:1; overflow:hidden}
+            #keybinds {display: flex; gap: 10px; align-items: center; white-space: nowrap; }
+            #keybinds kbd {background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 6px; font-family: "Consolas", monospace; font-size: 12px; color: #e6eef6; }
             @media (max-width:800px){
                 html, body{overflow: auto; height: auto}
                 .container{padding: 10px; margin: 0}
@@ -54,6 +57,7 @@
                 .directory-grid {grid-template-columns: 1fr}
                 .listbox {min-height: 250px}
                 button, .btn {padding: 10px 14px}
+                #playlist-box {display: none;}
             }
         </style>
     </head>
@@ -75,7 +79,7 @@
                 <div class="controls" style="margin-top:10px">
                     <button id="skip-btn" class="btn">⏭ Skip Track</button>
                     <button id="readd-btn" class="btn">↺ Re-add Selected</button>
-                    <button id="clear-btn" class="btn">✖ Clear the PUT Queue</button>
+                    <button id="clear-btn" class="btn">✖ Clear the Queue</button>
                     <button id="skpn-btn" class="btn">⏭? Toggle skip next</button>
                     <button id="jingle-btn" class="btn">🕭 Add Jingle</button>
                 </div>
@@ -94,9 +98,9 @@
                     </div>
                 </div>
                 <div class="box" style="margin-top: 12px; flex-shrink: 0;">
-                    <div class="frame-title">PUT Queue</div>
-                    <div class="list listbox" id="put-queue-box" style="min-height: 80px; max-height: 200px;">
-                        <ul class="playlist" id="put-queue-ul"></ul>
+                    <div class="frame-title">Queue</div>
+                    <div class="list listbox" id="queue-box" style="min-height: 80px; max-height: 200px;">
+                        <ul class="playlist" id="queue-ul"></ul>
                     </div>
                 </div>
             </div>
@@ -115,14 +119,21 @@
                     </div>
                 </div>
                 <div style="margin-top:8px">
-                    <button id="add-to-put-btn" class="btn primary" style="width:100%">Add Selected File to PUT Queue</button>
+                    <button id="add-to-queue-btn" class="btn primary" style="width:100%">Add Selected File to Queue</button>
                 </div>
             </div>
         </div>
 
         <div class="footer">
-            <div class="muted">Server: <span id="server-status">connecting...</span></div>
-        </div>
+            <div class="muted">
+                Server: <span id="server-status">connecting...</span>
+            </div>
+            <div class="muted small" id="keybinds">
+                <b>Keys:</b>
+                <span><kbd>S</kbd> skip</span>
+                <span><kbd>N</kbd> skip next</span>
+                <span><kbd>J</kbd> jingle</span>
+            </div>
         </div>
 
         <script>
@@ -130,7 +141,7 @@
             let ws = null;
             let reconnectDelay = 1000;
             let playlist = [];
-            let putQueue = [];
+            let Queue = [];
             let currentTrackPath = "";
             let currentTrackIndex = 0;
             let selectedPlaylistIndex = null;
@@ -187,14 +198,16 @@
                 } else if(msg.event === "progress"){
                     applyProgressState(msg.data);
                 } else if(msg.event === "toplay") {
-                    putQueue = msg.data.data || [];
-                    renderPutQueue();
+                    Queue = msg.data.data || [];
+                    renderQueue();
                 } else if(msg.event === "request_dir") {
                     applySubdir(msg.data || {})
                 } else if(msg.event === "skip_next") {
-                    skipNext = msg.data.data || false;
+                    skipNext = msg.data?.data === true;
+                    if(!skipNext && document.getElementById("skpn-btn").classList.contains("activated")) document.getElementById("skpn-btn").classList.remove("activated")
+                    else if(skipNext) document.getElementById("skpn-btn").classList.add("activated")
                     renderPlaylist();
-                    renderPutQueue();
+                    renderQueue();
                 } else if(msg.status || msg.response || msg.error) {
                     console.debug("ws ack", msg);
                 }
@@ -205,8 +218,8 @@
                 const next = payload.next_track || {};
                 currentTrackPath = (track.official ? "" : "!") + (track.path||"<none>");
                 currentTrackIndex = payload.index;
-                document.getElementById("now-track").textContent = `${track.official ? "(official) " : ""}${track.path||"<none>"}`;
-                document.getElementById("next-track").textContent = `${next.official ? "(official) " : ""}${next.path||"<none>"}`;
+                document.getElementById("now-track").textContent = `${track.official ? "(official) " : "(unofficial)"}${track.path||"<none>"}`;
+                document.getElementById("next-track").textContent = `${next.official ? "(official) " : "(unofficial)"}${next.path||"<none>"}`;
                 renderPlaylist();
             }
 
@@ -218,7 +231,7 @@
                 const realtotal = Number(payload.real_total || payload.total || 1) || 1;
                 const percent = Math.max(0, Math.min(100, (elapsed/realtotal)*100));
                 document.getElementById("prog-fill").style.width = percent + "%";
-                document.getElementById("time-label").textContent = formatTime(elapsed) + " / " + formatTime(total) + ` (${formatTime(realtotal)})`;
+                document.getElementById("time-label").textContent = formatTime(elapsed) + " / " + formatTime(total) + ` (${formatTime(total-elapsed)})`;
                 currentTrackIndex = payload.index;
 
                 if(track.path){
@@ -277,22 +290,24 @@
                     const path = t.path || "<no path>";
                     const official = t.official || false;
                     const displayPath = (official ? "" : "!") + path;
-                    li.textContent = ` ${String(idx).padStart(2,'0')}: ${displayPath}`;
                     li.dataset.path = path;
                     li.dataset.idx = i;
                     li.addEventListener("click", () => { selectPlaylistItem(i, li); });
 
                     const p = li.dataset.path;
-                    if(p && currentTrackPath.includes(p) && i === currentTrackIndex){
+                    const currentPath = currentTrackPath.replace(/^!/, "");
+                    if (p === currentPath && i === currentTrackIndex) {
                         li.classList.add("current");
                         currentIndex = i;
-                    } else if (i === currentTrackIndex) {
+                    }
+                    else if (i === currentTrackIndex) {
                         li.classList.add("pointer");
                         currentIndex = i - 1;
                     }
-                    if(currentIndex && (currentIndex+1 === i) && skipNext && (putQueue.length === 0)) {
-                        li.style.textDecoration = "line-through";
-                    }
+                    if(currentIndex !== null && (currentIndex+1 === i) && skipNext && Queue.length === 0) li.style.textDecoration = "line-through";
+
+                    li.textContent = ` ${String(idx).padStart(2,'0')}: `;
+                    li.textContent = li.textContent + (i === currentTrackIndex ? "▶ " : "  ") + displayPath;
                     ul.appendChild(li);
                 });
 
@@ -300,17 +315,19 @@
                     const el = ul.children[currentIndex];
                     if(el) el.scrollIntoView({block:'center', behavior: 'smooth'});
                 }
+                updateControls();
             }
 
-            function renderPutQueue() {
-                const ul = document.getElementById("put-queue-ul");
+            function renderQueue() {
+                const ul = document.getElementById("queue-ul");
                 ul.innerHTML = "";
-                putQueue.forEach((element, i) => {
+                Queue.forEach((element, i) => {
                     const li = document.createElement("li");
                     li.textContent = element;
                     if(i === 0 && skipNext) li.style.textDecoration = "line-through";
                     ul.appendChild(li);
                 });
+                updateControls()
             }
 
             function selectPlaylistItem(i, el){
@@ -323,6 +340,7 @@
                 Array.from(ul.children).forEach(c => c.classList.remove("selected"));
                 el.classList.add("selected");
                 selectedPlaylistIndex = i;
+                updateControls()
             }
 
             async function updateDirs(payload){
@@ -351,6 +369,7 @@
                             selectedSubFile = null;
                             document.getElementById("subdir-box").innerHTML = "";
                         });
+                        node.dataset.type = "file";
                         dirsBox.appendChild(node);
                     });
                 } catch(e) {
@@ -361,9 +380,9 @@
             function onDirClicked(name, node){
                 if(node.classList.contains("selected")) {
                     node.classList.remove("selected");
-                    selectedSubFile = null;
-                    applySubdir({dir: selectedDir});
                     selectedDir = null;
+                    selectedSubFile = null;
+                    document.getElementById("subdir-box").innerHTML = "";
                     return;
                 }
                 Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
@@ -395,11 +414,12 @@
                 if(!selected) { alert("Invalid selection"); return; }
                 const path = (selected.official ? "" : "!") + selected.path;
                 ws.send(JSON.stringify({action:"add_to_toplay", songs: [path]}))
-                Array.from(document.getElementById("playlist-box").children).forEach(c => c.classList.remove("selected"));
+                Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
+                selectedPlaylistIndex = null;
             });
             document.getElementById("clear-btn").addEventListener("click", () => {ws.send(JSON.stringify({action:"clear_toplay"}))});
 
-            document.getElementById("add-to-put-btn").addEventListener("click", () => {
+            document.getElementById("add-to-queue-btn").addEventListener("click", () => {
                 let fullPath = null;
 
                 // Priority 1: Check for a selected file in the subdirectory list
@@ -415,7 +435,7 @@
                     if (selectedItem) {
                         const name = selectedItem.textContent;
                         // A simple check to see if the selected item is a file
-                        if (name.includes('.')) {
+                        if (selectedItem.dataset.type === "file") {
                             fullPath = basePath.replace(/\/$/, '') + '/' + name;
                             Array.from(dirEls).forEach(c => c.classList.remove("selected"));
                             selectedDir = null;
@@ -425,6 +445,22 @@
 
                 if (fullPath) ws.send(JSON.stringify({action:"add_to_toplay", songs: [fullPath]}))
                 else alert("Please select a file to add.");
+            });
+
+            function updateControls() {
+                document.getElementById("readd-btn").disabled =
+                    selectedPlaylistIndex === null;
+
+                document.getElementById("clear-btn").disabled =
+                    Queue.length === 0;
+            }
+
+            document.addEventListener("keydown", e => {
+                if (e.target.tagName === "INPUT") return;
+
+                if (e.key === "s") ws.send(JSON.stringify({action:"skip"}));
+                if (e.key === "n") ws.send(JSON.stringify({action:"skip_next"}));
+                if (e.key === "j") ws.send(JSON.stringify({action:"jingle"}));
             });
 
             setTimeout(connectWs, 100)
