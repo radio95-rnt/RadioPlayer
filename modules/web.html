@@ -419,33 +419,35 @@
             });
             document.getElementById("clear-btn").addEventListener("click", () => {ws.send(JSON.stringify({action:"clear_toplay"}))});
 
-            document.getElementById("add-to-queue-btn").addEventListener("click", () => {
+            function addSelectedFileToQueue() {
                 let fullPath = null;
 
-                // Priority 1: Check for a selected file in the subdirectory list
+                // Priority 1: selected subdirectory file
                 if (selectedSubFile && selectedDir) {
                     fullPath = subbasePath.replace(/\/$/, '') + '/' + selectedSubFile;
                     Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
                     selectedSubFile = null;
-                } else {
-                    // Priority 2: Check for a selected file in the main directory list
+                } 
+                // Priority 2: selected main directory file
+                else {
                     const dirEls = document.getElementById("dirs-box").children;
                     const selectedItem = Array.from(dirEls).find(el => el.classList.contains("selected"));
 
-                    if (selectedItem) {
-                        const name = selectedItem.textContent;
-                        // A simple check to see if the selected item is a file
-                        if (selectedItem.dataset.type === "file") {
-                            fullPath = basePath.replace(/\/$/, '') + '/' + name;
-                            Array.from(dirEls).forEach(c => c.classList.remove("selected"));
-                            selectedDir = null;
-                        }
+                    if (selectedItem && selectedItem.dataset.type === "file") {
+                        fullPath = basePath.replace(/\/$/, '') + '/' + selectedItem.textContent;
+                        Array.from(dirEls).forEach(c => c.classList.remove("selected"));
+                        selectedDir = null;
                     }
                 }
 
-                if (fullPath) ws.send(JSON.stringify({action:"add_to_toplay", songs: [fullPath]}))
-                else alert("Please select a file to add.");
-            });
+                if (fullPath && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ action:"add_to_toplay", songs:[fullPath] }));
+                    return true;
+                }
+
+                return false;
+            }
+            document.getElementById("add-to-queue-btn").addEventListener("click", addSelectedFileToQueue);
 
             function updateControls() {
                 document.getElementById("readd-btn").disabled =
@@ -458,6 +460,10 @@
             document.addEventListener("keydown", e => {
                 if (e.target.tagName === "INPUT") return;
 
+                if (e.key === "Enter") {
+                    const added = addSelectedFileToQueue();
+                    if (added) e.preventDefault();
+                }
                 if (e.key === "s") ws.send(JSON.stringify({action:"skip"}));
                 if (e.key === "n") ws.send(JSON.stringify({action:"skip_next"}));
                 if (e.key === "j") ws.send(JSON.stringify({action:"jingle"}));
