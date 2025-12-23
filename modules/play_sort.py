@@ -59,20 +59,10 @@ class PopularitySorterModule(PlaylistModifierModule):
             count1 = play_counts.get(track1.path.as_posix(), 0)
             count2 = play_counts.get(track2.path.as_posix(), 0)
 
-            # Determine if the first track in the pair has been played less or an equal number of times.
-            is_track1_less_played = count1 <= count2
+            # If the first track has been played more than the second, swap them.
+            if count1 > count2:
+                playlist[i], playlist[i+1] = track2, track1
 
-            # With a 60% chance, we want the less popular song to come first.
-            if random.random() < 0.6:
-                # If the more popular song is currently first, swap them.
-                if not is_track1_less_played:
-                    playlist[i], playlist[i+1] = track2, track1
-            # With a 40% chance, we want the more popular song to come first.
-            else:
-                # If the less popular song is currently first, swap them.
-                if is_track1_less_played:
-                    playlist[i], playlist[i+1] = track2, track1
-            
             # Move to the next pair of tracks.
             i += 2
 
