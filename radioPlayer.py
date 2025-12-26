@@ -71,7 +71,7 @@ class PlaylistParser:
         if seen is None: seen = set()
         if not path.exists():
             self.logger.error(f"Playlist not found: {path.name}")
-            return []
+            raise Exception("Playlist doesn't exist")
         lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
 
         out = []
