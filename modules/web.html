@@ -64,7 +64,7 @@
             .controls{display:flex; gap:8px; margin-top:8px}
             .two-col{display:flex; gap:8px; align-items:flex-start; height:100%}
             .box{display:flex; flex-direction:column; gap:8px; flex-grow: 1; overflow: hidden;}
-            .listbox{height:100%; min-height:100px; overflow:auto; border-radius:6px; background:var(--card); padding:8px; font-size:14px; scrollbar-width: none;}
+            .listbox{height:100%; min-height:100px; overflow:hidden; border-radius:6px; background:var(--card); padding:8px; font-size:14px; scrollbar-width: none;}
             .listbox div.item{padding:6px; border-radius:6px; transition: background-color 0.12s ease;}
             .listbox div.item:hover{background:rgba(255,255,255,0.02); cursor:pointer}
             .listbox div.item.selected{background:rgba(62, 165, 255, 0.305)}
@@ -81,7 +81,7 @@
                 .container{padding: 10px; margin: 0}
                 .layout{flex-direction: column; height: auto}
                 .left{min-width:auto}
-                .directory-grid {grid-template-columns: 1fr; height: auto; overflow: visible}
+                .directory-grid {grid-template-columns: 1fr; height: auto; overflow: hidden}
                 .listbox {min-height: 200px}
                 button, .btn {padding: 10px 14px}
                 /* Mobile accessibility fix: remove fixed heights so collapsed items actually shrink */
