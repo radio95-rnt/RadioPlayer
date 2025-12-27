@@ -8,7 +8,7 @@ version = "0.1"
 dependencies = ["log95", "unidecode", "libcache"]
 
 [tool.setuptools]
-py-modules = ["radioPlaylist", "radioPlayer"]
+py-modules = ["radioPlaylist", "radioPlayer", "tinytag"]
 packages = ["modules"]
 
 [project.scripts]
