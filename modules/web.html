@@ -73,17 +73,25 @@
 
             /* --- STICKY QUEUE IMPLEMENTATION --- */
             #section-playlist {
-                flex: 1 1 0; /* Let it grow and shrink, with a zero basis */
-                min-height: 150px; /* Ensure it's always at least this tall */
+                flex: 2 1 0; /* Increased priority to take more space when both are open */
+                min-height: 150px;
             }
+
             #section-queue {
-                flex: 0 0 160px; /* Don't grow, don't shrink, and have a fixed height */
+                /* Changed from 0 0 160px to 1 1 160px */
+                /* This allows it to GROW (1) and SHRINK (1) with a base size of 160px */
+                flex: 1 1 160px; 
+                display: flex;
+                flex-direction: column;
+                min-height: 50px; 
             }
+
             #section-queue .frame-title {
                 cursor: default;
             }
+
             #section-queue .frame-title::after {
-                display: none; /* Hide collapse arrow */
+                display: none; 
             }
 
             .small{font-size:12px; color:var(--muted)}
@@ -151,7 +159,7 @@
                     <!-- Queue -->
                     <div class="box" id="section-queue" style="flex-grow: 0;">
                         <div class="frame-title" onclick="toggleSection('section-queue')">Queue</div>
-                        <div class="collapsible-content listbox" id="queue-box" style="height: 140px;">
+                        <div class="collapsible-content listbox" id="queue-box" style="flex-grow: 1;">
                             <ul class="playlist" id="queue-ul"></ul>
                         </div>
                     </div>
