@@ -117,9 +117,9 @@
                         <div class="listbox" id="subdir-box"></div>
                     </div>
                 </div>
-                <div style="margin-top:8px">
-                    <button id="add-to-queue-btn" class="btn primary" style="width:50%">Add Selected File to the bottom of the Queue</button>
-                    <button id="add-to-queue2-btn" class="btn primary" style="width:50%">Add Selected File to the top of the Queue</button>
+                <div style="margin-top:8px; display: flex; gap: 8px;">
+                    <button id="add-to-queue-btn" class="btn primary" style="flex: 1;">Add to Bottom of Queue</button>
+                    <button id="add-to-queue2-btn" class="btn primary" style="flex: 1;">Add to Top of Queue</button>
                 </div>
             </div>
         </div>
@@ -427,7 +427,7 @@
                     const selected = playlist[selectedPlaylistIndex];
                     if(!selected) { alert("Invalid selection"); return; }
                     const path = (selected.official ? "" : "!") + selected.path;
-                    ws.send(JSON.stringify({action:"add_to_toplay", songs: [path]}))
+                    ws.send(JSON.stringify({action:"add_to_toplay", songs: [path], on_top: top}))
                     Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
                     selectedPlaylistIndex = null;
                     return;
@@ -458,8 +458,8 @@
 
                 return false;
             }
-            document.getElementById("add-to-queue-btn").addEventListener("click", addSelectedFileToQueue, false);
-            document.getElementById("add-to-queue2-btn").addEventListener("click", addSelectedFileToQueue, true);
+            document.getElementById("add-to-queue-btn").addEventListener("click", () => addSelectedFileToQueue(false));
+            document.getElementById("add-to-queue2-btn").addEventListener("click", () => addSelectedFileToQueue(true));
 
             function updateControls() {
                 document.getElementById("clear-btn").disabled =
