@@ -103,6 +103,11 @@
             #section-queue {
                 flex: 1 1 0;
             }
+            #section-playlist,
+            #section-queue {
+                transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
 
             .small{font-size:12px; color:var(--muted)}
             .muted{color:var(--muted); font-size:13px}
@@ -167,7 +172,7 @@
                     </div>
 
                     <!-- Queue -->
-                    <div class="box" id="section-queue" style="flex-grow: 0;">
+                    <div class="box" id="section-queue">
                         <div class="frame-title" onclick="toggleSection('section-queue')">Queue</div>
                         <div class="collapsible-content listbox" id="queue-box" style="flex-grow: 1;">
                             <ul class="playlist" id="queue-ul"></ul>
