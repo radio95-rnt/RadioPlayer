@@ -22,7 +22,7 @@
             .frame-title{ font-size:16px; color:var(--muted); margin-bottom:8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; padding: 4px 0; transition: color 0.2s ease; }
             .frame-title:hover { color: #fff; }
             .frame-title::after { content: '▼'; font-size: 10px; transition: transform 0.3s ease; opacity: 0.5; }
-            
+
             .box { transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
             .box.collapsed { flex-grow: 0 !important; flex-shrink: 0; flex-basis: auto !important; }
             .box.collapsed .collapsible-content { display: none; }
@@ -34,14 +34,14 @@
             .progress-wrap{display:flex; gap:10px; align-items:center}
             .progress-bar{flex:1; height:9px; background:var(--glass); border-radius:8px; overflow:hidden; position:relative}
             .progress-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent), #6cc7ff); transition:width 0.2s linear}
-            
+
             button, .btn{ background:transparent; border:1px solid rgba(255,255,255,0.06); padding:8px 12px; border-radius:8px; color:inherit; cursor:pointer; transition: background-color 0.2s ease, transform 0.15s ease; }
             button:hover, .btn:hover { background-color: var(--glass); transform: translateY(-1px); }
             button:active, .btn:active { transform: translateY(0); }
             .btn.activated { background:linear-gradient(90deg, #9ed3ff46, #5bbbff2a); border-color: #5bbbff55; }
             .btn.primary{background:linear-gradient(90deg,var(--accent), #6cc7ff); color:#001; border:none; font-weight:600}
             .btn.primary:hover { background:linear-gradient(90deg, #3399ee, #5bbaff); }
-            
+
             ul.playlist{list-style:none; padding:6px; margin:0; font-family: "Consolas",monospace; font-size:13px;}
             ul.playlist li{ padding:6px 8px; border-radius:6px; display:flex; justify-content:space-between; gap:8px; transition: background-color 0.2s ease, transform 0.15s ease; }
             ul.playlist li:hover{ background:rgba(255,255,255,0.04); transform: translateX(2px); }
@@ -51,15 +51,15 @@
 
             .controls{display:flex; gap:8px; margin-top:8px}
             .box{display:flex; flex-direction:column; gap:8px; flex-grow: 1; overflow: hidden;}
-            
+
             /* --- HIDE SCROLLBARS ON ALL LISTBOXES --- */
             .listbox{
-                height:100%; 
-                min-height:100px; 
-                overflow:auto; 
-                border-radius:6px; 
-                background:var(--card); 
-                padding:8px; 
+                height:100%;
+                min-height:100px;
+                overflow:auto;
+                border-radius:6px;
+                background:var(--card);
+                padding:8px;
                 font-size:14px;
                 scrollbar-width: none; /* For Firefox */
             }
@@ -70,7 +70,7 @@
             .listbox div.item{ padding:6px; border-radius:6px; transition: background-color 0.2s ease; }
             .listbox div.item:hover{background:rgba(255,255,255,0.04); cursor:pointer}
             .listbox div.item.selected{background:rgba(62, 165, 255, 0.305)}
-            
+
             /* --- STICKY QUEUE IMPLEMENTATION --- */
             #section-playlist {
                 flex: 1 1 0; /* Let it grow and shrink, with a zero basis */
@@ -92,7 +92,7 @@
             .directory-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; flex-grow:1; overflow:hidden}
             #keybinds {display: flex; gap: 10px; align-items: center; white-space: nowrap; }
             #keybinds kbd {background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 6px; font-family: "Consolas", monospace; font-size: 12px; }
-            
+
             @media (max-width:800px){
                 html, body{overflow: auto; height: auto}
                 .container{padding: 10px; margin: 0}
@@ -102,7 +102,7 @@
                 .listbox {min-height: 200px}
                 button, .btn {padding: 10px 14px}
                 .panel.right { height: auto; }
-                
+
                 /* On mobile, revert to a stacking layout instead of sticky */
                 #section-playlist, #section-queue { flex: 1 1 auto; }
             }
@@ -147,7 +147,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Queue -->
                     <div class="box" id="section-queue" style="flex-grow: 0;">
                         <div class="frame-title" onclick="toggleSection('section-queue')">Queue</div>
@@ -487,15 +487,14 @@
 
             function addSelectedFileToQueue(top) {
                 let fullPath = null;
-                if(selectedPlaylistIndex != null) {
+                let success = false;
+
+                if (selectedPlaylistIndex != null) {
                     const selected = playlist[selectedPlaylistIndex];
                     const path = (selected.official ? "" : "!") + selected.path;
-                    ws.send(JSON.stringify({action:"add_to_toplay", songs: [path], top: top}))
-                    Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
-                    selectedPlaylistIndex = null;
-                    return true;
-                }
-                if (selectedSubFile && selectedDir) {
+                    ws.send(JSON.stringify({ action: "add_to_toplay", songs: [path], top: top }));
+                    success = true;
+                } else if (selectedSubFile && selectedDir) {
                     fullPath = subbasePath.replace(/\/$/, '') + '/' + selectedSubFile;
                 } else {
                     const dirEls = document.getElementById("dirs-box").children;
@@ -504,11 +503,19 @@
                         fullPath = basePath.replace(/\/$/, '') + '/' + selectedItem.textContent;
                     }
                 }
+
                 if (fullPath) {
-                    ws.send(JSON.stringify({ action:"add_to_toplay", songs:[fullPath], top: top}));
-                    return true;
+                    ws.send(JSON.stringify({ action: "add_to_toplay", songs: [fullPath], top: top }));
+                    success = true;
                 }
-                return false;
+
+                Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
+                Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
+
+                selectedPlaylistIndex = null;
+                selectedSubFile = null;
+
+                return success;
             }
             document.getElementById("add-to-queue-btn").addEventListener("click", () => addSelectedFileToQueue(false));
             document.getElementById("add-to-queue2-btn").addEventListener("click", () => addSelectedFileToQueue(true));
