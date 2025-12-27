@@ -81,6 +81,7 @@
                     <button id="clear-btn" class="btn">✖ Clear the Queue</button>
                     <button id="skpn-btn" class="btn">⏭? Toggle skip next</button>
                     <button id="jingle-btn" class="btn">🕭 Add Jingle</button>
+                    <button id="jingle2-btn" class="btn">🕭 Add Jingle (prepend)</button>
                 </div>
             </div>
 
@@ -417,6 +418,10 @@
                 if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"jingle"}));
                 else console.error("WebSocket not connected.");
             });
+            document.getElementById("jingle2-btn").addEventListener("click", () => {
+                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"jingle", top: true}));
+                else console.error("WebSocket not connected.");
+            });
 
             document.getElementById("clear-btn").addEventListener("click", () => {ws.send(JSON.stringify({action:"clear_toplay"}))});
 
@@ -470,12 +475,12 @@
                 if (e.target.tagName === "INPUT") return;
 
                 if (e.key === "Enter") {
-                    const added = addSelectedFileToQueue(false);
+                    const added = addSelectedFileToQueue(e.shiftKey);
                     if (added) e.preventDefault();
                 }
                 if (e.key === "s") ws.send(JSON.stringify({action:"skip"}));
                 if (e.key === "n") ws.send(JSON.stringify({action:"skip_next"}));
-                if (e.key === "j") ws.send(JSON.stringify({action:"jingle"}));
+                if (e.key === "j") ws.send(JSON.stringify({action:"jingle", top: e.shiftKey}));
             });
 
             setTimeout(connectWs, 100)

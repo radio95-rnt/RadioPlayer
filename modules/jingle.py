@@ -43,11 +43,11 @@ class Module2(PlayerModule):
     def imc(self, imc: InterModuleCommunication) -> None:
         super().imc(imc)
         self._imc.register(self, "jingle")
-    def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
+    def imc_data(self, source: BaseIMCModule, source_name: str | None, data: bool, broadcast: bool) -> object:
         if broadcast: return
         jingle = self.primary
         if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary)
-        return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [f"!{jingle}"]})
+        return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [f"!{jingle}"], "top": bool(data)})
 
 options = Path("/home/user/Jingiel.mp3"), [Path("/home/user/jing2.opus"), Path("Jing3.opus")]
 module = Module2(*options)

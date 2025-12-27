@@ -69,7 +69,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else: await websocket.send(json.dumps({"data": result, "event": "skip_next"}))
         elif action == "jingle":
-            result = await get_imc("jingle", None)
+            result = await get_imc("jingle", msg.get("top", False))
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else:
                 await websocket.send(json.dumps(result))
