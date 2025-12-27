@@ -364,6 +364,12 @@
                         node.className = "item";
                         node.textContent = f;
                         node.addEventListener("click", () => {
+                            if(node.classList.contains("selected")) {
+                                node.classList.remove("selected");
+                                selectedDir = null;
+                                selectedSubFile = null;
+                                return;
+                            }
                             Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
                             node.classList.add("selected");
                             selectedDir = null;

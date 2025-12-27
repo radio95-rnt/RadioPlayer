@@ -137,10 +137,17 @@ class Module(ActiveModifier):
 
         if data.get("action") == "add_to_toplay":
             songs_to_add = data.get("songs")
+            at_top = data.get("top", False)
             if isinstance(songs_to_add, list):
                 with self.file_lock:
-                    with open(TOPLAY, "a") as f:
-                        for song_path in songs_to_add: f.write(f"{song_path}\n")
+                    if at_top:
+                        with open(TOPLAY, "r") as f: data = f.read()
+                        with open(TOPLAY, "w") as f:
+                            for song_path in songs_to_add: f.write(f"\n{song_path}\n")
+                            f.write(data)
+                    else:
+                        with open(TOPLAY, "a") as f:
+                            for song_path in songs_to_add: f.write(f"\n{song_path}\n")
                 return {"status": "ok", "message": f"{len(songs_to_add)} songs added."}
         elif data.get("action") == "get_toplay":
             with self.file_lock:
