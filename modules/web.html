@@ -118,7 +118,8 @@
                     </div>
                 </div>
                 <div style="margin-top:8px">
-                    <button id="add-to-queue-btn" class="btn primary" style="width:100%">Add Selected File to Queue</button>
+                    <button id="add-to-queue-btn" class="btn primary" style="width:50%">Add Selected File to the bottom of the Queue</button>
+                    <button id="add-to-queue2-btn" class="btn primary" style="width:50%">Add Selected File to the top of the Queue</button>
                 </div>
             </div>
         </div>
@@ -419,7 +420,7 @@
 
             document.getElementById("clear-btn").addEventListener("click", () => {ws.send(JSON.stringify({action:"clear_toplay"}))});
 
-            function addSelectedFileToQueue() {
+            function addSelectedFileToQueue(top) {
                 let fullPath = null;
 
                 if(selectedPlaylistIndex != null) {
@@ -451,13 +452,14 @@
                 }
 
                 if (fullPath && ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ action:"add_to_toplay", songs:[fullPath] }));
+                    ws.send(JSON.stringify({ action:"add_to_toplay", songs:[fullPath], on_top: top}));
                     return true;
                 }
 
                 return false;
             }
-            document.getElementById("add-to-queue-btn").addEventListener("click", addSelectedFileToQueue);
+            document.getElementById("add-to-queue-btn").addEventListener("click", addSelectedFileToQueue, false);
+            document.getElementById("add-to-queue2-btn").addEventListener("click", addSelectedFileToQueue, true);
 
             function updateControls() {
                 document.getElementById("clear-btn").disabled =
@@ -468,7 +470,7 @@
                 if (e.target.tagName === "INPUT") return;
 
                 if (e.key === "Enter") {
-                    const added = addSelectedFileToQueue();
+                    const added = addSelectedFileToQueue(false);
                     if (added) e.preventDefault();
                 }
                 if (e.key === "s") ws.send(JSON.stringify({action:"skip"}));
