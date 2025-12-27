@@ -340,6 +340,7 @@
                 const ul = document.getElementById("playlist-ul");
                 Array.from(ul.children).forEach(c => c.classList.remove("selected"));
                 Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
+                Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
                 el.classList.add("selected");
                 selectedPlaylistIndex = i;
                 updateControls()
@@ -373,6 +374,7 @@
                             }
                             Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
                             Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
+                            Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
                             node.classList.add("selected");
                             selectedDir = null;
                             selectedSubFile = null;
@@ -436,6 +438,7 @@
                 if (selectedSubFile && selectedDir) {
                     fullPath = subbasePath.replace(/\/$/, '') + '/' + selectedSubFile;
                     Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
+                    Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
                     selectedSubFile = null;
                 } 
                 // Priority 2: selected main directory file
