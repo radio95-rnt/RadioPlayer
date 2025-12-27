@@ -78,7 +78,6 @@
                 </div>
                 <div class="controls" style="margin-top:10px">
                     <button id="skip-btn" class="btn">⏭ Skip Track</button>
-                    <button id="readd-btn" class="btn">↺ Re-add Selected</button>
                     <button id="clear-btn" class="btn">✖ Clear the Queue</button>
                     <button id="skpn-btn" class="btn">⏭? Toggle skip next</button>
                     <button id="jingle-btn" class="btn">🕭 Add Jingle</button>
@@ -418,22 +417,20 @@
                 else console.error("WebSocket not connected.");
             });
 
-            document.getElementById("readd-btn").addEventListener("click", () => {
-                if(selectedPlaylistIndex == null){
-                    alert("Select a playlist item to re-add.");
-                    return;
-                }
-                const selected = playlist[selectedPlaylistIndex];
-                if(!selected) { alert("Invalid selection"); return; }
-                const path = (selected.official ? "" : "!") + selected.path;
-                ws.send(JSON.stringify({action:"add_to_toplay", songs: [path]}))
-                Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
-                selectedPlaylistIndex = null;
-            });
             document.getElementById("clear-btn").addEventListener("click", () => {ws.send(JSON.stringify({action:"clear_toplay"}))});
 
             function addSelectedFileToQueue() {
                 let fullPath = null;
+
+                if(selectedPlaylistIndex != null) {
+                    const selected = playlist[selectedPlaylistIndex];
+                    if(!selected) { alert("Invalid selection"); return; }
+                    const path = (selected.official ? "" : "!") + selected.path;
+                    ws.send(JSON.stringify({action:"add_to_toplay", songs: [path]}))
+                    Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
+                    selectedPlaylistIndex = null;
+                    return;
+                }
 
                 // Priority 1: selected subdirectory file
                 if (selectedSubFile && selectedDir) {
@@ -463,9 +460,6 @@
             document.getElementById("add-to-queue-btn").addEventListener("click", addSelectedFileToQueue);
 
             function updateControls() {
-                document.getElementById("readd-btn").disabled =
-                    selectedPlaylistIndex === null;
-
                 document.getElementById("clear-btn").disabled =
                     Queue.length === 0;
             }
