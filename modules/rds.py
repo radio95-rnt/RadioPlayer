@@ -39,7 +39,7 @@ def update_rds(track_name: str):
         has_name = False
         name = track_name.rsplit(".", 1)[0]
 
-    name = re.sub(r'^\s*\d+\s*[-.]?\s*', '', name)
+#    name = re.sub(r'^\s*\d+\s*[-.]?\s*', '', name)
 
     if " - " in name:
         count = name.count(" - ")
