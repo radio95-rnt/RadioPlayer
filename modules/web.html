@@ -17,7 +17,33 @@
             .panel{background:var(--panel); border-radius:10px; padding:12px; box-shadow: 0 6px 18px rgba(2,8,16,0.6); display:flex; flex-direction:column; overflow:hidden}
             .left{flex:1.2; min-width:420px}
             .right{flex:1; display:flex; flex-direction:column; gap:12px}
-            .frame-title{font-size:16px; color:var(--muted); margin-bottom:8px}
+            
+            /* Collapsible Header Styling */
+            .frame-title{
+                font-size:16px; 
+                color:var(--muted); 
+                margin-bottom:8px; 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center; 
+                cursor: pointer;
+                user-select: none;
+                padding: 4px 0;
+            }
+            .frame-title:hover { color: #fff; }
+            .frame-title::after {
+                content: '▼';
+                font-size: 10px;
+                transition: transform 0.2s;
+                opacity: 0.5;
+            }
+            
+            /* Collapsed States */
+            .box.collapsed { flex-grow: 0 !important; flex-shrink: 0; }
+            .box.collapsed .collapsible-content { display: none; }
+            .box.collapsed .frame-title::after { transform: rotate(-90deg); }
+            .box.collapsed .frame-title { margin-bottom: 0; }
+
             .now, .next {margin-bottom:12px}
             .now .track, .next .track {font-weight:600; font-size:14px; word-break:break-all}
             .progress-wrap{display:flex; gap:10px; align-items:center}
@@ -38,7 +64,7 @@
             .controls{display:flex; gap:8px; margin-top:8px}
             .two-col{display:flex; gap:8px; align-items:flex-start; height:100%}
             .box{display:flex; flex-direction:column; gap:8px; flex-grow: 1; overflow: hidden;}
-            .listbox{height:100%; min-height:220px; overflow:auto; border-radius:6px; background:var(--card); padding:8px; font-size:14px; scrollbar-width: none;}
+            .listbox{height:100%; min-height:100px; overflow:auto; border-radius:6px; background:var(--card); padding:8px; font-size:14px; scrollbar-width: none;}
             .listbox div.item{padding:6px; border-radius:6px; transition: background-color 0.12s ease;}
             .listbox div.item:hover{background:rgba(255,255,255,0.02); cursor:pointer}
             .listbox div.item.selected{background:rgba(62, 165, 255, 0.305)}
@@ -49,15 +75,18 @@
             .directory-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; flex-grow:1; overflow:hidden}
             #keybinds {display: flex; gap: 10px; align-items: center; white-space: nowrap; }
             #keybinds kbd {background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 6px; font-family: "Consolas", monospace; font-size: 12px; color: #e6eef6; }
+            
             @media (max-width:800px){
                 html, body{overflow: auto; height: auto}
                 .container{padding: 10px; margin: 0}
                 .layout{flex-direction: column; height: auto}
                 .left{min-width:auto}
-                .directory-grid {grid-template-columns: 1fr}
-                .listbox {min-height: 250px}
+                .directory-grid {grid-template-columns: 1fr; height: auto; overflow: visible}
+                .listbox {min-height: 200px}
                 button, .btn {padding: 10px 14px}
-                #playlist-box {display: none;}
+                /* Mobile accessibility fix: remove fixed heights so collapsed items actually shrink */
+                .box { flex-grow: 0; }
+                .panel.right { height: auto; }
             }
         </style>
     </head>
@@ -68,59 +97,65 @@
         </div>
 
         <div class="layout">
+            <!-- Left Panel -->
             <div class="panel left">
-            <div class="now">
-                <div class="frame-title">Now Playing</div>
-                <div class="track" id="now-track">Loading...</div>
-                <div class="progress-wrap" style="margin-top:8px">
-                <div class="progress-bar" title="progress"><div class="progress-fill" id="prog-fill"></div></div>
-                <div class="small" id="time-label">00:00 / 00:00 (00:00)</div>
-                </div>
-                <div class="controls" style="margin-top:10px">
-                    <button id="skip-btn" class="btn">⏭ Skip Track</button>
-                    <button id="clear-btn" class="btn">✖ Clear the Queue</button>
-                    <button id="skpn-btn" class="btn">⏭? Toggle skip next</button>
-                    <button id="jingle-btn" class="btn">🕭 Add Jingle</button>
-                    <button id="jingle2-btn" class="btn">🕭 Add Jingle (prepend)</button>
-                </div>
-            </div>
-
-            <div class="next" style="margin-top:12px">
-                <div class="frame-title">Next Track</div>
-                <div class="track" id="next-track">Loading...</div>
-            </div>
-
-            <div style="margin-top:12px; display:flex; flex-direction: column; flex-grow: 1; overflow: hidden;">
-                <div class="box" style="flex-grow: 1;">
-                    <div class="frame-title">Playlist Queue</div>
-                    <div class="list listbox" id="playlist-box">
-                        <ul class="playlist" id="playlist-ul"></ul>
+                <div class="now">
+                    <div class="frame-title" style="cursor: default; pointer-events: none;">Now Playing</div>
+                    <div class="track" id="now-track">Loading...</div>
+                    <div class="progress-wrap" style="margin-top:8px">
+                    <div class="progress-bar" title="progress"><div class="progress-fill" id="prog-fill"></div></div>
+                    <div class="small" id="time-label">00:00 / 00:00 (00:00)</div>
+                    </div>
+                    <div class="controls" style="margin-top:10px">
+                        <button id="skip-btn" class="btn">⏭ Skip</button>
+                        <button id="clear-btn" class="btn">✖ Clear Queue</button>
+                        <button id="skpn-btn" class="btn">⏭? Skip Next</button>
+                        <button id="jingle-btn" class="btn">🕭 Jingle</button>
                     </div>
                 </div>
-                <div class="box" style="margin-top: 12px; flex-shrink: 0;">
-                    <div class="frame-title">Queue</div>
-                    <div class="list listbox" id="queue-box" style="min-height: 80px; max-height: 200px;">
-                        <ul class="playlist" id="queue-ul"></ul>
+
+                <div class="next" style="margin-top:12px">
+                    <div class="frame-title" style="cursor: default; pointer-events: none;">Next Track</div>
+                    <div class="track" id="next-track">Loading...</div>
+                </div>
+
+                <div style="margin-top:12px; display:flex; flex-direction: column; flex-grow: 1; overflow: hidden; gap: 12px;">
+                    <!-- Playlist Viewer -->
+                    <div class="box" id="section-playlist">
+                        <div class="frame-title" onclick="toggleSection('section-playlist')">Playlist Viewer</div>
+                        <div class="collapsible-content flex-grow listbox" style="flex-grow:1">
+                            <div class="list" id="playlist-box" style="height: 100%;">
+                                <ul class="playlist" id="playlist-ul"></ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Queue -->
+                    <div class="box" id="section-queue" style="flex-grow: 0;">
+                        <div class="frame-title" onclick="toggleSection('section-queue')">Queue</div>
+                        <div class="collapsible-content listbox" id="queue-box" style="height: 140px;">
+                            <ul class="playlist" id="queue-ul"></ul>
+                        </div>
                     </div>
                 </div>
             </div>
-            </div>
 
+            <!-- Right Panel -->
             <div class="panel right">
                 <div class="directory-grid">
-                    <div class="box" style="padding:8px">
-                        <div class="frame-title">Directory Browser</div>
-                        <div class="listbox" id="dirs-box"></div>
+                    <div class="box" id="section-dirs">
+                        <div class="frame-title" onclick="toggleSection('section-dirs')">Directory Browser</div>
+                        <div class="collapsible-content listbox" id="dirs-box"></div>
                     </div>
 
-                    <div class="box" style="padding:8px">
-                        <div class="frame-title">Subdirectory Files</div>
-                        <div class="listbox" id="subdir-box"></div>
+                    <div class="box" id="section-subdir">
+                        <div class="frame-title" onclick="toggleSection('section-subdir')">Subdirectory Files</div>
+                        <div class="collapsible-content listbox" id="subdir-box"></div>
                     </div>
                 </div>
                 <div style="margin-top:8px; display: flex; gap: 8px;">
-                    <button id="add-to-queue-btn" class="btn primary" style="flex: 1;">Add to Bottom of Queue</button>
-                    <button id="add-to-queue2-btn" class="btn primary" style="flex: 1;">Add to Top of Queue</button>
+                    <button id="add-to-queue-btn" class="btn primary" style="flex: 1;">Add to Bottom</button>
+                    <button id="add-to-queue2-btn" class="btn primary" style="flex: 1;">Add to Top</button>
                 </div>
             </div>
         </div>
@@ -139,7 +174,6 @@
         </div>
 
         <script>
-
             let ws = null;
             let reconnectDelay = 1000;
             let playlist = [];
@@ -152,6 +186,22 @@
             let basePath = "";
             let subbasePath = "";
             let skipNext = false;
+
+            // UI Toggle Function
+            function toggleSection(id) {
+                const el = document.getElementById(id);
+                el.classList.toggle('collapsed');
+            }
+
+            // Mobile Default Setup
+            function initLayout() {
+                if (window.innerWidth <= 800) {
+                    // Collapse major sections by default on mobile
+                    document.getElementById('section-playlist').classList.add('collapsed');
+                    document.getElementById('section-dirs').classList.add('collapsed');
+                    document.getElementById('section-subdir').classList.add('collapsed');
+                }
+            }
 
             function connectWs(){
                 document.getElementById("server-status").textContent = "connecting...";
@@ -206,12 +256,11 @@
                     applySubdir(msg.data || {})
                 } else if(msg.event === "skip_next") {
                     skipNext = msg.data?.data === true;
-                    if(!skipNext && document.getElementById("skpn-btn").classList.contains("activated")) document.getElementById("skpn-btn").classList.remove("activated")
-                    else if(skipNext) document.getElementById("skpn-btn").classList.add("activated")
+                    const btn = document.getElementById("skpn-btn");
+                    if(!skipNext) btn.classList.remove("activated");
+                    else btn.classList.add("activated");
                     renderPlaylist();
                     renderQueue();
-                } else if(msg.status || msg.response || msg.error) {
-                    console.debug("ws ack", msg);
                 }
             }
 
@@ -247,7 +296,6 @@
 
             function applySubdir(payload) {
                 if(payload.dir !== selectedDir) return;
-
                 const dirsBox = document.getElementById("subdir-box");
                 dirsBox.innerHTML = "Loading...";
                 try {
@@ -407,83 +455,63 @@
             }
 
             document.getElementById("skip-btn").addEventListener("click", () => {
-                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"skip"}));
-                else console.error("WebSocket not connected.");
+                ws.send(JSON.stringify({action:"skip"}));
             });
             document.getElementById("skpn-btn").addEventListener("click", () => {
-                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"skip_next"}));
-                else console.error("WebSocket not connected.");
+                ws.send(JSON.stringify({action:"skip_next"}));
             });
             document.getElementById("jingle-btn").addEventListener("click", () => {
-                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"jingle"}));
-                else console.error("WebSocket not connected.");
+                ws.send(JSON.stringify({action:"jingle"}));
             });
-            document.getElementById("jingle2-btn").addEventListener("click", () => {
-                if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action:"jingle", top: true}));
-                else console.error("WebSocket not connected.");
+            document.getElementById("clear-btn").addEventListener("click", () => {
+                ws.send(JSON.stringify({action:"clear_toplay"}))
             });
-
-            document.getElementById("clear-btn").addEventListener("click", () => {ws.send(JSON.stringify({action:"clear_toplay"}))});
 
             function addSelectedFileToQueue(top) {
                 let fullPath = null;
-
                 if(selectedPlaylistIndex != null) {
                     const selected = playlist[selectedPlaylistIndex];
-                    if(!selected) { alert("Invalid selection"); return; }
                     const path = (selected.official ? "" : "!") + selected.path;
                     ws.send(JSON.stringify({action:"add_to_toplay", songs: [path], top: top}))
                     Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
                     selectedPlaylistIndex = null;
-                    return;
+                    return true;
                 }
-
-                // Priority 1: selected subdirectory file
                 if (selectedSubFile && selectedDir) {
                     fullPath = subbasePath.replace(/\/$/, '') + '/' + selectedSubFile;
-                    Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
-                    selectedSubFile = null;
-                } 
-                // Priority 2: selected main directory file
-                else {
+                } else {
                     const dirEls = document.getElementById("dirs-box").children;
                     const selectedItem = Array.from(dirEls).find(el => el.classList.contains("selected"));
-
                     if (selectedItem && selectedItem.dataset.type === "file") {
                         fullPath = basePath.replace(/\/$/, '') + '/' + selectedItem.textContent;
-                        Array.from(dirEls).forEach(c => c.classList.remove("selected"));
-                        selectedDir = null;
                     }
                 }
-
-                if (fullPath && ws && ws.readyState === WebSocket.OPEN) {
+                if (fullPath) {
                     ws.send(JSON.stringify({ action:"add_to_toplay", songs:[fullPath], top: top}));
                     return true;
                 }
-
                 return false;
             }
             document.getElementById("add-to-queue-btn").addEventListener("click", () => addSelectedFileToQueue(false));
             document.getElementById("add-to-queue2-btn").addEventListener("click", () => addSelectedFileToQueue(true));
 
             function updateControls() {
-                document.getElementById("clear-btn").disabled =
-                    Queue.length === 0;
+                document.getElementById("clear-btn").disabled = Queue.length === 0;
             }
 
             document.addEventListener("keydown", e => {
                 if (e.target.tagName === "INPUT") return;
-
                 if (e.key === "Enter") {
-                    const added = addSelectedFileToQueue(e.shiftKey);
-                    if (added) e.preventDefault();
+                    if (addSelectedFileToQueue(e.shiftKey)) e.preventDefault();
                 }
                 if (e.key === "s") ws.send(JSON.stringify({action:"skip"}));
                 if (e.key === "n") ws.send(JSON.stringify({action:"skip_next"}));
                 if (e.key === "j") ws.send(JSON.stringify({action:"jingle", top: e.shiftKey}));
             });
 
-            setTimeout(connectWs, 100)
+            // Start
+            initLayout();
+            setTimeout(connectWs, 100);
         </script>
     </body>
 </html>
