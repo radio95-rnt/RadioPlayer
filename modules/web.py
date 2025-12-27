@@ -48,7 +48,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             at_top = msg.get("top", False)
             if not isinstance(songs, list): await websocket.send(json.dumps({"error": "songs must be a list"}))
             else:
-                imc_q.put({"name": "activemod", "data": {"action": "add_to_toplay", "songs": songs, "at_top": at_top}})
+                imc_q.put({"name": "activemod", "data": {"action": "add_to_toplay", "songs": songs, "top": at_top}})
                 await websocket.send(json.dumps({"status": "ok", "message": f"{len(songs)} song(s) queued"}))
 
                 result = await get_imc("activemod", {"action": "get_toplay"})
