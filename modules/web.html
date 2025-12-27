@@ -90,6 +90,20 @@
                 flex-grow: 1;
             }
 
+            /* When playlist is collapsed, let the queue expand */
+            #section-playlist.collapsed + #section-queue {
+                flex: 1 1 auto !important;
+            }
+
+            /* Default behavior: playlist dominates */
+            #section-playlist {
+                flex: 3 1 0;
+            }
+
+            #section-queue {
+                flex: 1 1 0;
+            }
+
             .small{font-size:12px; color:var(--muted)}
             .muted{color:var(--muted); font-size:13px}
             .footer{display:flex; justify-content:space-between; gap:8px; align-items:center; margin-top:8px}
