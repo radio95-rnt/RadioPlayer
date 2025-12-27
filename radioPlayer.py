@@ -273,7 +273,7 @@ class RadioPlayer:
                 [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, end_time - pr.started_at) for module in self.modman.simple_modules if module]
                 if (elapsed := time.monotonic() - start) < 1 and (remaining_until_end := end_time - time.monotonic()) > 0: time.sleep(min(1 - elapsed, remaining_until_end))
 
-            prefetch(next_track)
+            if next_track: prefetch(next_track.path)
             i += 1
             if not extend: song_i += 1
 
