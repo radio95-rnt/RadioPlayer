@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from subprocess import Popen
 from dataclasses import dataclass
 from pathlib import Path
+import tinytag
 
 @dataclass
 class Track:
@@ -22,9 +23,6 @@ class Process:
     duration: float
 
 class ABC_ProcessManager(abc.ABC):
-    processes: list[Process]
-    @abc.abstractmethod
-    def _get_audio_duration(self, file_path): ...
     @abc.abstractmethod
     def play(self, track: Track) -> Process: ...
     @abc.abstractmethod
@@ -61,13 +59,13 @@ class ProcmanCommunicator(BaseIMCModule):
 
             if int(op) == 0: return {"op": 0, "arg": "pong"}
             elif int(op) == 1:
-                if arg := data.get("arg"): return {"op": 1, "arg": self.procman._get_audio_duration(arg)}
+                if arg := data.get("arg"): return {"op": 1, "arg": tinytag.TinyTag().get(arg, tags=False).duration}
                 else: return
             elif int(op) == 2:
                 self.procman.stop_all(data.get("timeout", None))
                 return {"op": 2}
             elif int(op) == 3:
-                return {"op": 3, "arg": self.procman.processes}
+                raise NotImplementedError("This feature was removed.")
             elif int(op) == 4:
                 return {"op": 4, "arg": self.procman.anything_playing()}
             elif int(op) == 5:

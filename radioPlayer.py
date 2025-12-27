@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-import os, subprocess, importlib.util, importlib.machinery, types
-import sys, signal, glob, time, traceback
-import libcache
+import os, importlib.util, importlib.machinery, types
+import sys, signal, glob, time, traceback, io
+import concurrent.futures
 from modules import *
 from threading import Lock
 
@@ -15,54 +15,6 @@ def prefetch(path):
 
 MODULES_PACKAGE = "modules"
 MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
-
-class ProcessManager(ABC_ProcessManager):
-    def __init__(self) -> None:
-        self.lock = Lock()
-        self.processes: list[Process] = []
-        self.duration_cache = libcache.Cache([])
-    def _get_audio_duration(self, file_path: Path):
-        if result := self.duration_cache.getElement(file_path.as_posix(), False): return result
-        result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', str(file_path)], capture_output=True, text=True)
-        if result.returncode == 0:
-            result = float(result.stdout.strip())
-            self.duration_cache.saveElement(file_path.as_posix(), result, (60*60*2), False, True)
-            return result
-    def play(self, track: Track) -> Process:
-        assert track.path.exists()
-        cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
-
-        duration = self._get_audio_duration(track.path.absolute())
-        if not duration: raise Exception("Failed to get file duration for", track.path)
-        if track.offset >= duration: track.offset = max(duration - 0.1, 0)
-        if track.offset > 0: cmd.extend(['-ss', str(track.offset)])
-
-        filters = []
-        if track.fade_in != 0: filters.append(f"afade=t=in:st=0:d={track.fade_in}")
-        if track.fade_out != 0: filters.append(f"afade=t=out:st={duration - track.fade_out}:d={track.fade_out}")
-        if filters: cmd.extend(['-af', ",".join(filters)])
-        cmd.append(str(track.path.absolute()))
-
-        pr = Process(Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True), track, time.monotonic(), duration - track.offset)
-        with self.lock: self.processes.append(pr)
-        return pr
-    def anything_playing(self) -> bool:
-        with self.lock:
-            self.processes = [p for p in self.processes if p.process.poll() is None]
-            return bool(self.processes)
-    def stop_all(self, timeout: float | None = None) -> None:
-        with self.lock:
-            for process in self.processes:
-                process.process.terminate()
-                try: process.process.wait(timeout)
-                except subprocess.TimeoutExpired: process.process.kill()
-            self.processes.clear()
-    def wait_all(self, timeout: float | None = None) -> None:
-        with self.lock:
-            for process in self.processes:
-                try: process.process.wait(timeout)
-                except subprocess.TimeoutExpired: process.process.terminate()
-            self.processes.clear()
 
 class PlaylistParser:
     def __init__(self, output: log95.TextIO): self.logger = log95.log95("PARSER", output=output)
@@ -99,19 +51,25 @@ class PlaylistParser:
                 if line.startswith("|"): # No file name, we're defining global arguments
                     args = line.removeprefix("|").split(";")
                     for arg in args:
-                        key, val = arg.split("=", 1)
-                        global_arguments[key] = val
+                        if "=" in arg:
+                            key, val = arg.split("=", 1)
+                            arguments[key] = val
+                        else:
+                            arguments[arg] = True
                 else:
                     line, args = line.split("|", 1)
                     args = args.split(";")
                     for arg in args:
-                        key, val = arg.split("=", 1)
-                        arguments[key] = val
+                        if "=" in arg:
+                            key, val = arg.split("=", 1)
+                            arguments[key] = val
+                        else:
+                            arguments[arg] = True
             out.append(([f for f in glob.glob(line) if Path(f).is_file()], arguments))
         return global_arguments, out
 
 class ModuleManager:
-    def __init__(self, output: log95.TextIO) -> types.NoneType:
+    def __init__(self, output: log95.TextIO) -> None:
         self.simple_modules: list[PlayerModule] = []
         self.playlist_modifier_modules: list[PlaylistModifierModule] = []
         self.playlist_advisor: PlaylistAdvisor | None = None
@@ -146,51 +104,61 @@ class ModuleManager:
                 module.__dict__['_log_out'] = self.logger.output
                 self.modules.append((spec, module, module_name))
     def start_modules(self, arg):
+        procman = None
         """Executes the module by the python interpreter"""
-        procman = ProcessManager()
-        for (spec, module, module_name) in self.modules:
+        def timed_loader(spec: importlib.machinery.ModuleSpec, module: types.ModuleType):
             assert spec.loader
-            try:
-                start = time.perf_counter()
-                if os.name == "posix":
-                    def handler(signum, frame): raise TimeoutError("Module loading timed out")
-                    signal.signal(signal.SIGALRM, handler)
-                    signal.alarm(5)
-                try: spec.loader.exec_module(module)
-                except TimeoutError: self.logger.error(f"Module {module_name} took too long to load and was skipped.")
-                finally:
-                    if os.name == "posix": signal.alarm(0)
-                if (time_took := time.perf_counter() - start) > 0.15: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
-            except Exception as e:
-                traceback.print_exc(file=self.logger.output)
-                self.logger.error(f"Failed loading {module_name} due to {e}, continuing")
-                continue
-
-            if md := getattr(module, "module", None):
-                if isinstance(md, list): self.simple_modules.extend(md)
-                else: self.simple_modules.append(md)
-            if md := getattr(module, "playlistmod", None):
-                if isinstance(md, tuple):
-                    md, index = md
-                    if isinstance(md, list): self.playlist_modifier_modules[index:index] = md
-                    else: self.playlist_modifier_modules.insert(index, md)
-                elif isinstance(md, list): self.playlist_modifier_modules.extend(md)
-                else: self.playlist_modifier_modules.append(md)
-            if md := getattr(module, "advisor", None):
-                if self.playlist_advisor: raise Exception("Multiple playlist advisors")
-                self.playlist_advisor = md
-            if md := getattr(module, "activemod", None):
-                if self.active_modifier: raise Exception("Multiple active modifiers")
-                self.active_modifier = md
-            if md := getattr(module, "procman", None):
-                if not isinstance(md, ABC_ProcessManager):
-                    self.logger.error("Modular process manager does not inherit from ABC_ProcessManager.")
+            start = time.perf_counter()
+            spec.loader.exec_module(module)
+            duration = time.perf_counter() - start
+            return duration
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for (spec, module, module_name) in self.modules:
+                try:
+                    future = executor.submit(timed_loader, spec, module)
+                    try:
+                        time_took = future.result(5)
+                        if time_took > 0.15: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
+                    except concurrent.futures.TimeoutError:
+                        self.logger.error(f"Module {module_name} timed out.")
+                        continue
+                except Exception as e:
+                    traceback.print_exc(file=self.logger.output)
+                    self.logger.error(f"Failed loading {module_name} due to {e}, continuing")
                     continue
-                if procman.anything_playing(): procman.stop_all()
-                procman = md
-        InterModuleCommunication(self.simple_modules + [self.playlist_advisor, ProcmanCommunicator(procman), self.active_modifier])
+
+                if md := getattr(module, "module", None):
+                    if isinstance(md, list): self.simple_modules.extend(md)
+                    else: self.simple_modules.append(md)
+                if md := getattr(module, "playlistmod", None):
+                    if isinstance(md, tuple):
+                        md, index = md
+                        if isinstance(md, list): self.playlist_modifier_modules[index:index] = md
+                        else: self.playlist_modifier_modules.insert(index, md)
+                    elif isinstance(md, list): self.playlist_modifier_modules.extend(md)
+                    else: self.playlist_modifier_modules.append(md)
+                if md := getattr(module, "advisor", None):
+                    if self.playlist_advisor: raise Exception("Multiple playlist advisors")
+                    self.playlist_advisor = md
+                if md := getattr(module, "activemod", None):
+                    if self.active_modifier: raise Exception("Multiple active modifiers")
+                    self.active_modifier = md
+                if md := getattr(module, "procman", None):
+                    if procman: raise Exception("Multiple procmans")
+                    if not isinstance(md, ABC_ProcessManager):
+                        self.logger.error("Modular process manager does not inherit from ABC_ProcessManager.")
+                        continue
+                    procman = md
         if self.active_modifier: self.active_modifier.arguments(arg)
+        if not self.playlist_advisor: self.logger.warning("Playlist advisor was not found. Beta mode of advisor-less is running (playlist modifiers will not work)")
+        if not procman:
+            self.logger.critical_error("Missing process mananger.")
+            raise SystemExit("Missing process mananger.")
+        InterModuleCommunication(self.simple_modules + [self.playlist_advisor, ProcmanCommunicator(procman), self.active_modifier])
         return procman
+    def advisor_advise(self, arguments: str | None):
+        if not self.playlist_advisor: return None
+        return self.playlist_advisor.advise(arguments)
 
 class RadioPlayer:
     def __init__(self, arg: str | None, output: log95.TextIO):
@@ -224,12 +192,13 @@ class RadioPlayer:
         self.logger.info("Core starting, loading modules")
         self.modman.load_modules()
         self.procman = self.modman.start_modules(self.arg)
-        if not self.modman.playlist_advisor: self.logger.warning("Playlist advisor was not found. Beta mode of advisor-less is running (playlist modifiers will not work)")
 
     def play_once(self):
         """Plays a single playlist"""
-        if self.modman.playlist_advisor:
-            if not (playlist_path := self.modman.playlist_advisor.advise(self.arg)): return
+        if not (playlist_path := self.modman.advisor_advise(self.arg)):
+            max_iterator = 1
+            playlist = None
+        else:
             try: global_args, parsed = self.parser.parse(playlist_path)
             except Exception as e:
                 self.logger.info(f"Exception ({e}) while parsing playlist, retrying in 15 seconds...");traceback.print_exc(file=self.logger.output)
@@ -237,22 +206,23 @@ class RadioPlayer:
                 return
 
             playlist: list[Track] | None = []
-            [playlist.extend(Track(Path(line).absolute(), 0, 0, True, args) for line in lns) for (lns, args) in parsed] # i can read this, i think
+            for lines, args in parsed:
+                for line in lines:
+                    playlist.append(Track(Path(line).absolute(), 0, 0, True, args))
 
-            [(playlist := module.modify(global_args, playlist) or playlist) for module in self.modman.playlist_modifier_modules if module] # yep
+            for module in filter(None, self.modman.playlist_modifier_modules): playlist = module.modify(global_args, playlist) or playlist
             assert len(playlist)
 
             prefetch(playlist[0].path)
-            [mod.on_new_playlist(playlist, global_args) for mod in self.modman.simple_modules + [self.modman.active_modifier] if mod] # one liner'd everything
+            for module in filter(None, self.modman.simple_modules + [self.modman.active_modifier]): module.on_new_playlist(playlist, global_args)
 
             max_iterator = len(playlist)
-        else:
-            max_iterator = 1
-            playlist = None
+        return self._play(playlist, max_iterator)
+
+    def _play(self, playlist: list[Track] | None, max_iterator: int):
+        assert self.procman
         return_pending = track = False
         song_i = i = 0
-        assert self.procman
-
         def get_track():
             nonlocal song_i, playlist, max_iterator
             track = None
@@ -303,6 +273,7 @@ class RadioPlayer:
                 [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, end_time - pr.started_at) for module in self.modman.simple_modules if module]
                 if (elapsed := time.monotonic() - start) < 1 and (remaining_until_end := end_time - time.monotonic()) > 0: time.sleep(min(1 - elapsed, remaining_until_end))
 
+            prefetch(next_track)
             i += 1
             if not extend: song_i += 1
 
@@ -320,16 +291,49 @@ class RadioPlayer:
             traceback.print_exc(file=self.logger.output)
             raise
 
+class RotatingLog(io.TextIOWrapper):
+    def write(self, s: str) -> int:
+        if self.tell() > 2_500_000:
+            self.truncate(0)
+            self.seek(0)
+        return super().write(s)
+
 def main():
     log_file_path = Path("/tmp/radioPlayer_log")
     log_file_path.touch()
 
-    core = RadioPlayer((" ".join(sys.argv[1:]) if len(sys.argv) > 1 else None), open(log_file_path, "w"))
-    try:
-        core.start()
-        signal.signal(signal.SIGINT, core.handle_sigint)
-        core.loop()
-    except SystemExit:
-        try: core.shutdown()
-        except BaseException: traceback.print_exc()
-        raise
+    with RotatingLog(open(log_file_path, "wb", buffering=0), "utf-8") as f:
+        core = RadioPlayer((" ".join(sys.argv[1:]) if len(sys.argv) > 1 else None), f)
+        try:
+            core.start()
+            signal.signal(signal.SIGINT, core.handle_sigint)
+            core.loop()
+        except SystemExit:
+            try: core.shutdown()
+            except BaseException: traceback.print_exc()
+            raise
+
+# This is free and unencumbered software released into the public domain.
+
+# Anyone is free to copy, modify, publish, use, compile, sell, or
+# distribute this software, either in source code form or as a compiled
+# binary, for any purpose, commercial or non-commercial, and by any
+# means.
+
+# In jurisdictions that recognize copyright laws, the author or authors
+# of this software dedicate any and all copyright interest in the
+# software to the public domain. We make this dedication for the benefit
+# of the public at large and to the detriment of our heirs and
+# successors. We intend this dedication to be an overt act of
+# relinquishment in perpetuity of all present and future rights to this
+# software under copyright law.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
+# For more information, please refer to <https://unlicense.org>
