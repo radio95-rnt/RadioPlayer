@@ -427,7 +427,7 @@
                     const selected = playlist[selectedPlaylistIndex];
                     if(!selected) { alert("Invalid selection"); return; }
                     const path = (selected.official ? "" : "!") + selected.path;
-                    ws.send(JSON.stringify({action:"add_to_toplay", songs: [path], on_top: top}))
+                    ws.send(JSON.stringify({action:"add_to_toplay", songs: [path], top: top}))
                     Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
                     selectedPlaylistIndex = null;
                     return;
@@ -452,7 +452,7 @@
                 }
 
                 if (fullPath && ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ action:"add_to_toplay", songs:[fullPath], on_top: top}));
+                    ws.send(JSON.stringify({ action:"add_to_toplay", songs:[fullPath], top: top}));
                     return true;
                 }
 
