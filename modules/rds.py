@@ -5,7 +5,7 @@ DEBUG = False
 
 name_table_path = "/home/user/mixes/name_table.txt"
 
-rds_base = "Gramy: {} - {}"
+rds_base = "ON AIR: {} - {}"
 rds_default_artist = "radio95"
 
 udp_host = ("127.0.0.1", 5000)
