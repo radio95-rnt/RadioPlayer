@@ -49,6 +49,6 @@ class Module2(PlayerModule):
         if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary)
         return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [f"!{jingle}"], "top": bool(data)})
 
-options = Path("/home/user/Jingiel.mp3"), [Path("/home/user/jing2.opus"), Path("Jing3.opus")]
+options = Path("/home/user/Jingiel.mp3"), [Path("/home/user/jing2.opus"), Path("/home/user/Jing3.opus"), Path("/home/user/jing4.opus")]
 module = Module2(*options)
 playlistmod = Module(*options)
