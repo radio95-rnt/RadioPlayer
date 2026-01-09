@@ -267,12 +267,14 @@ class RadioPlayer:
             pr = self.procman.play(track)
             [module.on_new_track(song_i, pr.track, next_track) for module in self.modman.simple_modules if module]
             end_time = pr.started_at + pr.duration + pr.track.focus_time_offset
+            self.procman.anything_playing()
 
             while end_time >= time.monotonic() and pr.process.poll() is None:
                 start = time.monotonic()
                 [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, end_time - pr.started_at) for module in self.modman.simple_modules if module]
                 if (elapsed := time.monotonic() - start) < 1 and (remaining_until_end := end_time - time.monotonic()) > 0: time.sleep(min(1 - elapsed, remaining_until_end))
 
+            self.procman.anything_playing()
             if next_track: prefetch(next_track.path)
             i += 1
             if not extend: song_i += 1

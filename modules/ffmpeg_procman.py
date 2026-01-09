@@ -28,7 +28,13 @@ class ProcessManager(ABC_ProcessManager):
         return pr
     def anything_playing(self) -> bool:
         with self.lock:
-            self.processes = [p for p in self.processes if p.process.poll() is None]
+            alive = []
+            for p in self.processes:
+                if p.process.poll() is None: alive.append(p)
+                else:
+                    try: p.process.wait(timeout=0)
+                    except subprocess.TimeoutExpired: pass
+            self.processes = alive
             return bool(self.processes)
     def stop_all(self, timeout: float | None = None) -> None:
         with self.lock:
