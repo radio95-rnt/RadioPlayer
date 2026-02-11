@@ -175,16 +175,30 @@ class PlaylistManager:
                     for line in f:
                         line = line.strip()
                         if line:
-                            # Convert to relative path
-                            abs_path = Path(line)
-                            try:
-                                rel_path = str(abs_path.relative_to(FILES_DIR))
-                            except ValueError:
-                                # If it's already relative, use as is
-                                rel_path = line
-                            
-                            self.custom_playlist_files.add(rel_path)
-                            playlists["custom"]["day"].add(rel_path)
+                            # Check if it's a directory pattern
+                            if line.endswith("/*"):
+                                # It's a directory pattern - expand it to individual files
+                                dir_path = Path(line[:-2])  # Remove /*
+                                if dir_path.exists():
+                                    for file in sorted(dir_path.glob("*")):
+                                        if file.is_file():
+                                            try:
+                                                rel_path = str(file.relative_to(FILES_DIR))
+                                                self.custom_playlist_files.add(rel_path)
+                                                playlists["custom"]["day"].add(rel_path)
+                                            except ValueError:
+                                                pass
+                            else:
+                                # Individual file
+                                abs_path = Path(line)
+                                try:
+                                    rel_path = str(abs_path.relative_to(FILES_DIR))
+                                except ValueError:
+                                    # If it's already relative, use as is
+                                    rel_path = line
+                                
+                                self.custom_playlist_files.add(rel_path)
+                                playlists["custom"]["day"].add(rel_path)
             return playlists
         else:
             # Original functionality for weekly playlists
@@ -201,14 +215,27 @@ class PlaylistManager:
                                 for line in f:
                                     line = line.strip()
                                     if line:
-                                        # Convert to relative path
-                                        abs_path = Path(line)
-                                        try:
-                                            rel_path = str(abs_path.relative_to(FILES_DIR))
-                                        except ValueError:
-                                            # If it's already relative, use as is
-                                            rel_path = line
-                                        playlists[day][period].add(rel_path)
+                                        # Check if it's a directory pattern
+                                        if line.endswith("/*"):
+                                            # It's a directory pattern - expand it to individual files
+                                            dir_path = Path(line[:-2])  # Remove /*
+                                            if dir_path.exists():
+                                                for file in sorted(dir_path.glob("*")):
+                                                    if file.is_file():
+                                                        try:
+                                                            rel_path = str(file.relative_to(FILES_DIR))
+                                                            playlists[day][period].add(rel_path)
+                                                        except ValueError:
+                                                            pass
+                                        else:
+                                            # Individual file
+                                            abs_path = Path(line)
+                                            try:
+                                                rel_path = str(abs_path.relative_to(FILES_DIR))
+                                            except ValueError:
+                                                # If it's already relative, use as is
+                                                rel_path = line
+                                            playlists[day][period].add(rel_path)
             return playlists
 
     def update_playlist_file(self, day: str, period: str, file_item: FileItem, add: bool):
@@ -232,40 +259,58 @@ class PlaylistManager:
             with open(custom_path, 'r') as f:
                 lines = f.read().splitlines()
 
-        # Get all files in this item as absolute paths
-        files_to_process = set()
-        for rel_path in file_item.all_files:
-            abs_path = str(FILES_DIR / rel_path)
-            files_to_process.add(abs_path)
-
         if add:
-            # Add new files that aren't already in the list
-            for filepath in files_to_process:
-                if filepath not in lines:
-                    lines.append(filepath)
-                # Also update the tracking set with relative path
-                try:
-                    rel_path = str(Path(filepath).relative_to(FILES_DIR))
+            if file_item.is_folder:
+                # For folders, write the directory pattern
+                folder_path = file_item.path.parent
+                dir_pattern = str(folder_path / "*")
+                
+                # Remove any individual files from this folder that might exist
+                lines = [line for line in lines if not line.startswith(str(folder_path) + "/")]
+                
+                # Add the directory pattern if not already there
+                if dir_pattern not in lines:
+                    lines.append(dir_pattern)
+                
+                # Update tracking set with all files
+                for rel_path in file_item.all_files:
                     self.custom_playlist_files.add(rel_path)
-                except ValueError:
-                    pass
+            else:
+                # For individual files, add the file path
+                abs_path = str(file_item.path)
+                if abs_path not in lines:
+                    lines.append(abs_path)
+                
+                # Update tracking set
+                for rel_path in file_item.all_files:
+                    self.custom_playlist_files.add(rel_path)
         else:
-            # Remove files
-            for filepath in files_to_process:
-                while filepath in lines:
-                    lines.remove(filepath)
-                # Also update the tracking set
-                try:
-                    rel_path = str(Path(filepath).relative_to(FILES_DIR))
+            if file_item.is_folder:
+                # Remove directory pattern
+                folder_path = file_item.path.parent
+                dir_pattern = str(folder_path / "*")
+                
+                # Remove the pattern and any individual files from this folder
+                lines = [line for line in lines if line != dir_pattern and not line.startswith(str(folder_path) + "/")]
+                
+                # Update tracking set
+                for rel_path in file_item.all_files:
                     self.custom_playlist_files.discard(rel_path)
-                except ValueError:
-                    pass
+            else:
+                # Remove individual file
+                abs_path = str(file_item.path)
+                while abs_path in lines:
+                    lines.remove(abs_path)
+                
+                # Update tracking set
+                for rel_path in file_item.all_files:
+                    self.custom_playlist_files.discard(rel_path)
 
         with open(custom_path, 'w') as f:
             f.write('\n'.join(lines) + ('\n' if lines else ''))
 
     def _update_weekly_playlist(self, day: str, period: str, file_item: FileItem, add: bool):
-        """Update a weekly playlist file (original functionality)."""
+        """Update a weekly playlist file."""
         playlist_dir = self.ensure_playlist_dir(day)
         playlist_file = playlist_dir / period
 
@@ -275,22 +320,36 @@ class PlaylistManager:
         with open(playlist_file, 'r') as f:
             lines = f.read().splitlines()
 
-        # Get all files in this item as absolute paths
-        files_to_process = set()
-        for rel_path in file_item.all_files:
-            abs_path = str(FILES_DIR / rel_path)
-            files_to_process.add(abs_path)
-
         if add:
-            # Add new files that aren't already in the list
-            for filepath in files_to_process:
-                if filepath not in lines:
-                    lines.append(filepath)
+            if file_item.is_folder:
+                # For folders, write the directory pattern
+                folder_path = file_item.path.parent
+                dir_pattern = str(folder_path / "*")
+                
+                # Remove any individual files from this folder that might exist
+                lines = [line for line in lines if not line.startswith(str(folder_path) + "/")]
+                
+                # Add the directory pattern if not already there
+                if dir_pattern not in lines:
+                    lines.append(dir_pattern)
+            else:
+                # For individual files, add the file path
+                abs_path = str(file_item.path)
+                if abs_path not in lines:
+                    lines.append(abs_path)
         else:
-            # Remove files
-            for filepath in files_to_process:
-                while filepath in lines:
-                    lines.remove(filepath)
+            if file_item.is_folder:
+                # Remove directory pattern
+                folder_path = file_item.path.parent
+                dir_pattern = str(folder_path / "*")
+                
+                # Remove the pattern and any individual files from this folder
+                lines = [line for line in lines if line != dir_pattern and not line.startswith(str(folder_path) + "/")]
+            else:
+                # Remove individual file
+                abs_path = str(file_item.path)
+                while abs_path in lines:
+                    lines.remove(abs_path)
 
         with open(playlist_file, 'w', encoding='utf-8', errors='strict') as f:
             for line in lines:
@@ -370,15 +429,32 @@ class PlaylistManager:
                 else:
                     lines = []
 
-                # Convert relative paths to absolute for file storage
-                abs_paths = [str(FILES_DIR / rel_path) for rel_path in item_rel_paths]
-
                 if is_present:
-                    for abs_path in abs_paths:
+                    if current_item.is_folder:
+                        # For folders, write the directory pattern
+                        folder_path = current_item.path.parent
+                        dir_pattern = str(folder_path / "*")
+                        
+                        # Remove any individual files from this folder
+                        lines = [line for line in lines if not line.startswith(str(folder_path) + "/")]
+                        
+                        # Add the directory pattern
+                        if dir_pattern not in lines:
+                            lines.append(dir_pattern)
+                    else:
+                        # For individual files
+                        abs_path = str(current_item.path)
                         if abs_path not in lines:
                             lines.append(abs_path)
                 else:
-                    for abs_path in abs_paths:
+                    if current_item.is_folder:
+                        # Remove directory pattern and individual files
+                        folder_path = current_item.path.parent
+                        dir_pattern = str(folder_path / "*")
+                        lines = [line for line in lines if line != dir_pattern and not line.startswith(str(folder_path) + "/")]
+                    else:
+                        # Remove individual file
+                        abs_path = str(current_item.path)
                         while abs_path in lines:
                             lines.remove(abs_path)
 
