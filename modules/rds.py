@@ -1,5 +1,5 @@
-from . import PlayerModule, log95, Track
-import socket, re
+from . import PlayerModule, _log_out, log95, Track
+import socket
 
 DEBUG = False
 
@@ -9,9 +9,6 @@ rds_base = "ON AIR: {} - {}"
 rds_default_artist = "radio95"
 
 udp_host = ("127.0.0.1", 5000)
-
-from typing import TextIO
-_log_out: TextIO
 
 logger_level = log95.log95Levels.DEBUG if DEBUG else log95.log95Levels.CRITICAL_ERROR
 assert _log_out # pyright: ignore[reportUnboundVariable]

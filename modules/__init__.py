@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import tinytag
 
+_log_out: log95.TextIO
+
 @dataclass
 class Track:
     path: Path
@@ -165,3 +167,16 @@ class InterModuleCommunication:
         """
         if not name in self.names_modules.keys(): raise ModuleNotFoundError("No such module")
         return self.names_modules[name].imc_data(source, next((k for k, v in self.names_modules.items() if v is source), None), data, False)
+
+class PlaylistParser:
+    def __init__(self) -> None:
+        pass
+    def parse(self, playlist_path: Path) -> tuple[dict[str, str], list[tuple[list[str], dict[str, str]]]]:
+        """
+        This should return the following information:
+        global arguments,
+        list of entries:
+            a entry is just a tuple of a list of strings (file paths)
+            and a dictionary of str:str consistent of the arguments which affect the files given
+        """
+        return {}, []

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os, importlib.util, importlib.machinery, types
-import sys, signal, glob, time, traceback, io
+import sys, signal, time, traceback, io
 import concurrent.futures
 from modules import *
 from threading import Lock
@@ -15,58 +15,6 @@ def prefetch(path):
 
 MODULES_PACKAGE = "modules"
 MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
-
-class PlaylistParser:
-    def __init__(self, output: log95.TextIO): self.logger = log95.log95("PARSER", output=output)
-
-    def _check_for_imports(self, path: Path, seen=None) -> list[str]:
-        if seen is None: seen = set()
-        if not path.exists():
-            self.logger.error(f"Playlist not found: {path.name}")
-            raise Exception("Playlist doesn't exist")
-        lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
-
-        out = []
-        for line in lines:
-            if line.startswith("@"):
-                target = Path(line.removeprefix("@"))
-                if target not in seen:
-                    if not target.exists():
-                        self.logger.error(f"Target {target.name} of {path.name} does not exist")
-                        continue
-                    seen.add(target)
-                    out.extend(self._check_for_imports(target, seen))
-            else: out.append(line)
-        return out
-
-    def parse(self, playlist_path: Path) -> tuple[dict[str, str], list[tuple[list[str], dict[str, str]]]]:
-        lines = self._check_for_imports(playlist_path)
-        out = []
-        global_arguments = {}
-        for line in lines:
-            arguments = {}
-            line = line.strip()
-            if not line or line.startswith(";") or line.startswith("#"): continue
-            if "|" in line:
-                if line.startswith("|"): # No file name, we're defining global arguments
-                    args = line.removeprefix("|").split(";")
-                    for arg in args:
-                        if "=" in arg:
-                            key, val = arg.split("=", 1)
-                            arguments[key] = val
-                        else:
-                            arguments[arg] = True
-                else:
-                    line, args = line.split("|", 1)
-                    args = args.split(";")
-                    for arg in args:
-                        if "=" in arg:
-                            key, val = arg.split("=", 1)
-                            arguments[key] = val
-                        else:
-                            arguments[arg] = True
-            out.append(([f for f in glob.glob(line) if Path(f).is_file()], arguments))
-        return global_arguments, out
 
 class ModuleManager:
     def __init__(self, output: log95.TextIO) -> None:
@@ -105,6 +53,7 @@ class ModuleManager:
                 self.modules.append((spec, module, module_name))
     def start_modules(self, arg):
         procman = None
+        parser = None
         """Executes the module by the python interpreter"""
         def timed_loader(spec: importlib.machinery.ModuleSpec, module: types.ModuleType):
             assert spec.loader
@@ -139,23 +88,35 @@ class ModuleManager:
                     else: self.playlist_modifier_modules.append(md)
                 if md := getattr(module, "advisor", None):
                     if self.playlist_advisor: raise Exception("Multiple playlist advisors")
+                    if not isinstance(md, PlaylistAdvisor):
+                        self.logger.error("Advisor does not inhirit from PlaylistAdvisor.")
+                        continue
                     self.playlist_advisor = md
                 if md := getattr(module, "activemod", None):
                     if self.active_modifier: raise Exception("Multiple active modifiers")
+                    if not isinstance(md, ActiveModifier):
+                        self.logger.error("Active modifier does not inhirit from ActiveModifier.")
+                        continue
                     self.active_modifier = md
                 if md := getattr(module, "procman", None):
                     if procman: raise Exception("Multiple procmans")
                     if not isinstance(md, ABC_ProcessManager):
-                        self.logger.error("Modular process manager does not inherit from ABC_ProcessManager.")
+                        self.logger.error("Process manager does not inherit from ABC_ProcessManager.")
                         continue
                     procman = md
+                if md := getattr(module, "parser", None):
+                    if parser: raise Exception("Multiple parsers")
+                    if not isinstance(md, PlaylistParser):
+                        self.logger.error("Parser does not inhirit from PlaylistParser.")
+                        continue
+                    parser = md
         if self.active_modifier: self.active_modifier.arguments(arg)
         if not self.playlist_advisor: self.logger.warning("Playlist advisor was not found. Beta mode of advisor-less is running (playlist modifiers will not work)")
         if not procman:
             self.logger.critical_error("Missing process mananger.")
             raise SystemExit("Missing process mananger.")
         InterModuleCommunication(self.simple_modules + [self.playlist_advisor, ProcmanCommunicator(procman), self.active_modifier])
-        return procman
+        return procman, parser
     def advisor_advise(self, arguments: str | None):
         if not self.playlist_advisor: return None
         return self.playlist_advisor.advise(arguments)
@@ -165,7 +126,7 @@ class RadioPlayer:
         self.exit_pending = False
         self.exit_status_code = self.intr_time = 0
         self.exit_lock = Lock()
-        self.parser = PlaylistParser(output)
+        self.parser: PlaylistParser | None = None
         self.procman: ABC_ProcessManager | None = None
         self.arg = arg
         self.logger = log95.log95("CORE", output=output)
@@ -191,11 +152,11 @@ class RadioPlayer:
         """Single functon for starting the core, returns but might exit raising an SystemExit"""
         self.logger.info("Core starting, loading modules")
         self.modman.load_modules()
-        self.procman = self.modman.start_modules(self.arg)
+        self.procman, self.parser = self.modman.start_modules(self.arg)
 
     def play_once(self):
         """Plays a single playlist"""
-        if not (playlist_path := self.modman.advisor_advise(self.arg)):
+        if not (playlist_path := self.modman.advisor_advise(self.arg)) or not self.parser:
             max_iterator = 1
             playlist = None
         else:
@@ -312,7 +273,7 @@ def main():
             core.loop()
         except SystemExit:
             try: core.shutdown()
-            except BaseException: traceback.print_exc()
+            except BaseException: traceback.print_exc(file=f)
             raise
 
 # This is free and unencumbered software released into the public domain.

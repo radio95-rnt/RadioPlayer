@@ -1,8 +1,5 @@
-from . import PlayerModule, log95, Track
+from . import PlayerModule, log95, Track, _log_out
 import os
-
-from typing import TextIO
-_log_out: TextIO
 
 assert _log_out # pyright: ignore[reportUnboundVariable]
 logger = log95.log95("Skipper", output=_log_out)
