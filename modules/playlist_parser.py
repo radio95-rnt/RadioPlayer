@@ -1,6 +1,7 @@
 import glob
-from . import log95, _log_out, Path
+from . import log95, Path
 
+_log_out: log95.TextIO
 class PlaintextParser:
     def __init__(self): self.logger = log95.log95("PARSER", output=_log_out)
 

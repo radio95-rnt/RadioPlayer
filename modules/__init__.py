@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 import tinytag
 
-_log_out: log95.TextIO
-
 @dataclass
 class Track:
     path: Path
