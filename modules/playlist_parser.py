@@ -1,8 +1,8 @@
 import glob
-from . import log95, Path
+from . import log95, Path, PlaylistParser
 
 _log_out: log95.TextIO
-class PlaintextParser:
+class PlaintextParser(PlaylistParser):
     def __init__(self): self.logger = log95.log95("PARSER", output=_log_out)
 
     def _check_for_imports(self, path: Path, seen=None) -> list[str]:
