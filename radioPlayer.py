@@ -115,6 +115,7 @@ class ModuleManager:
         if not procman:
             self.logger.critical_error("Missing process mananger.")
             raise SystemExit("Missing process mananger.")
+        if not parser: self.logger.warning("Missing parser, advisor-less will be forced.")
         InterModuleCommunication(self.simple_modules + [self.playlist_advisor, ProcmanCommunicator(procman), self.active_modifier])
         return procman, parser
     def advisor_advise(self, arguments: str | None):
