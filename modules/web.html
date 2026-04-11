@@ -491,7 +491,7 @@
 
             document.getElementById("skip-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"skip"})));
             document.getElementById("skpn-inc").addEventListener("click", () => ws.send(JSON.stringify({action:"skipc", add: 1})));
-            document.getElementById("skpn-dec").addEventListener("click", () => ws.send(JSON.stringify({action:"skipc", remove: -1}))});
+            document.getElementById("skpn-dec").addEventListener("click", () => ws.send(JSON.stringify({action:"skipc", remove: -1})));
             document.getElementById("jingle-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"jingle"})));
             document.getElementById("clear-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"clear_toplay"})));
 
