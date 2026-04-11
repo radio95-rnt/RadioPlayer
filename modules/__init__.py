@@ -159,11 +159,14 @@ class InterModuleCommunication:
         if name in self.names_modules.keys(): return False
         self.names_modules[name] = module
         return True
-    def send(self, source: BaseIMCModule, name: str, data: object) -> object:
+    def send(self, source: BaseIMCModule, name: str, data: object, aggresive: bool = True) -> object:
         """
         Sends the data to a named module, and return its response
         """
-        if not name in self.names_modules.keys(): raise ModuleNotFoundError("No such module")
+        if not name in self.names_modules.keys(): 
+            if aggresive: raise ModuleNotFoundError("No such module")
+            return None
+        
         return self.names_modules[name].imc_data(source, next((k for k, v in self.names_modules.items() if v is source), None), data, False)
 
 class PlaylistParser:

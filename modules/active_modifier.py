@@ -22,7 +22,7 @@ class Module(ActiveModifier):
         self.morning_start = self.day_end = 0
         self.file_lock = Lock()
         self.crossfade = DEFAULT_CROSSFADE
-        self.skip_next = False
+        self.skip_next = 0
     def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]):
         self.playlist = playlist
         self.originals = []
@@ -95,9 +95,9 @@ class Module(ActiveModifier):
                 self.last_track = Track(song, current_track_fade_out, current_track_fade_in, official, {}, focus_time_offset=-current_track_fade_out)
                 next_track = track
             self.limit_tracks = False
-            if self.skip_next:
-                logger.info("Skip next flag was on, skipping this song.")
-                self.skip_next = False
+            if self.skip_next > 0:
+                logger.info("Skipping...")
+                self.skip_next -= 1
                 return self.play(index, track, next_track)
             return (self.last_track, next_track), True
         elif len(self.originals):
@@ -124,9 +124,9 @@ class Module(ActiveModifier):
                     logger.warning("Skipping track as it the next day")
                     return (None, None), None
                 if last_track_duration: logger.info("Track ends at", repr(future))
-        if self.skip_next:
+        if self.skip_next > 0:
             logger.info("Skip next flag was on, skipping this song.")
-            self.skip_next = False
+            self.skip_next -= 1
             return (None, None), None
         return (self.last_track, next_track), False
 
@@ -163,8 +163,11 @@ class Module(ActiveModifier):
                         i += 1
                 with open(TOPLAY, "w") as f: f.write(first_line.strip() + "\n")
                 return {"status": "ok", "data": [first_line.strip()]}
-        elif data.get("action") == "skip_next":
-            if data.get("set", True): self.skip_next = not self.skip_next
+        elif data.get("action") == "skip_next": return {"status": "removed"}
+        elif data.get("action") == "skipc":
+            if (count := data.get("set", -1)) > -1: self.skip_next = count
+            if (count2 := data.get("add", -1)) > -1: self.skip_next += count2
+            if (count3 := data.get("remove", 1)) < -1: self.skip_next += count3
             return {"status": "ok", "data": self.skip_next}
 
 activemod = Module()

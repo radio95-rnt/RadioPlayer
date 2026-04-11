@@ -81,6 +81,7 @@ class Module(PlayerModule):
     def on_new_track(self, index: int, track: Track, next_track: Track | None):
         if track.official:
             rds_rt, rds_rtp = update_rds(track.path.name)
+            self._imc.send(self, "web", {"rt": rds_rt, "rtp": rds_rtp}, False)
             logger.info(f"RT set to '{rds_rt}'")
             logger.debug(f"{rds_rtp=}")
 

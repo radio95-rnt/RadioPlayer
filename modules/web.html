@@ -150,7 +150,11 @@
                     <div class="controls" style="margin-top:10px">
                         <button id="skip-btn" class="btn">⏭ Skip</button>
                         <button id="clear-btn" class="btn">✖ Clear Queue</button>
-                        <button id="skpn-btn" class="btn">⏭? Skip Next</button>
+                        <div style="display:flex;align-items:center;gap:4px;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:2px 4px">
+                            <button id="skpn-dec" class="btn" style="padding:4px 10px;border:none">−</button>
+                            <span style="font-size:13px;min-width:60px;text-align:center">Skip next: <b id="skpn-count">0</b></span>
+                            <button id="skpn-inc" class="btn" style="padding:4px 10px;border:none">+</button>
+                        </div>
                         <button id="jingle-btn" class="btn">🕭 Jingle</button>
                     </div>
                 </div>
@@ -208,7 +212,8 @@
             <div class="muted small" id="keybinds">
                 <b>Keys:</b>
                 <span><kbd>S</kbd> skip</span>
-                <span><kbd>N</kbd> skip next</span>
+                <span><kbd>N</kbd> +skip</span>
+                <span><kbd>M</kbd> -skip</span>
                 <span><kbd>J</kbd> jingle</span>
                 <span><kbd>ENTER</kbd> add file</span>
             </div>
@@ -226,7 +231,7 @@
             let selectedSubFile = null;
             let basePath = "";
             let subbasePath = "";
-            let skipNext = false;
+            let skipCount = 0;
 
             // UI Toggle Function
             function toggleSection(id) {
@@ -246,13 +251,13 @@
 
             function connectWs(){
                 document.getElementById("server-status").textContent = "connecting...";
-                ws = new WebSocket("ws://192.168.1.93:3001");
+                ws = new WebSocket("/ws");
 
                 ws.addEventListener("open", () => {
                     document.getElementById("server-status").textContent = "connected";
                     reconnectDelay = 1000;
                     ws.send(JSON.stringify({action:"get_toplay"}));
-                    ws.send(JSON.stringify({action:"skip_next",set:false}));
+                    ws.send(JSON.stringify({action:"skipc",set:0}));
                 });
 
                 ws.addEventListener("close", () => {
@@ -287,7 +292,7 @@
                 } else if(msg.event === "new_track"){
                     applyTrackState(msg.data);
                     ws.send(JSON.stringify({action:"get_toplay"}));
-                    ws.send(JSON.stringify({action:"skip_next",set:false}));
+                    ws.send(JSON.stringify({action:"skipc",set:0}));
                 } else if(msg.event === "progress"){
                     applyProgressState(msg.data);
                 } else if(msg.event === "toplay") {
@@ -295,11 +300,9 @@
                     renderQueue();
                 } else if(msg.event === "request_dir") {
                     applySubdir(msg.data || {})
-                } else if(msg.event === "skip_next") {
-                    skipNext = msg.data?.data === true;
-                    const btn = document.getElementById("skpn-btn");
-                    if(!skipNext) btn.classList.remove("activated");
-                    else btn.classList.add("activated");
+                } else if(msg.event === "skipc") {
+                    skipCount = msg.data?.data ?? 0;
+                    document.getElementById("skpn-count").textContent = skipCount;
                     renderPlaylist();
                     renderQueue();
                 }
@@ -396,8 +399,8 @@
                         li.classList.add("pointer");
                         currentIndex = i - 1;
                     }
-                    if(currentIndex !== null && (currentIndex+1 === i) && skipNext && Queue.length === 0) li.style.textDecoration = "line-through";
-
+                    if(currentIndex !== null && Queue.length === 0 && i > currentIndex && i <= currentIndex + skipCount)
+                        li.style.textDecoration = "line-through";
                     li.textContent = ` ${String(idx).padStart(2,'0')}: `;
                     li.textContent = li.textContent + (i === currentTrackIndex ? "▶ " : "  ") + displayPath;
                     ul.appendChild(li);
@@ -416,7 +419,7 @@
                 Queue.forEach((element, i) => {
                     const li = document.createElement("li");
                     li.textContent = element;
-                    if(i === 0 && skipNext) li.style.textDecoration = "line-through";
+                    if(i < skipCount) li.style.textDecoration = "line-through";
                     ul.appendChild(li);
                 });
                 updateControls()
@@ -498,8 +501,11 @@
             document.getElementById("skip-btn").addEventListener("click", () => {
                 ws.send(JSON.stringify({action:"skip"}));
             });
-            document.getElementById("skpn-btn").addEventListener("click", () => {
-                ws.send(JSON.stringify({action:"skip_next"}));
+            document.getElementById("skpn-inc").addEventListener("click", () => {
+                ws.send(JSON.stringify({action:"skipc", add: 1}));
+            });
+            document.getElementById("skpn-dec").addEventListener("click", () => {
+                ws.send(JSON.stringify({action:"skipc", remove: -1}));
             });
             document.getElementById("jingle-btn").addEventListener("click", () => {
                 ws.send(JSON.stringify({action:"jingle"}));
@@ -550,12 +556,11 @@
 
             document.addEventListener("keydown", e => {
                 if (e.target.tagName === "INPUT") return;
-                if (e.key === "Enter") {
-                    if (addSelectedFileToQueue(e.shiftKey)) e.preventDefault();
-                }
-                if (e.key === "s") ws.send(JSON.stringify({action:"skip"}));
-                if (e.key === "n") ws.send(JSON.stringify({action:"skip_next"}));
-                if (e.key.toLowerCase() === "j") ws.send(JSON.stringify({action:"jingle", top: e.shiftKey}));
+                if (e.key === "Enter" && addSelectedFileToQueue(e.shiftKey)) e.preventDefault();
+                else if (e.key === "s") ws.send(JSON.stringify({action:"skip"}));
+                else if (e.key === "n") ws.send(JSON.stringify({action:"skipc", add: 1}));
+                else if (e.key === "m") ws.send(JSON.stringify({action:"skipc", remove: -1}));
+                else if (e.key.toLowerCase() === "j") ws.send(JSON.stringify({action:"jingle", top: e.shiftKey}));
             });
 
             // Start

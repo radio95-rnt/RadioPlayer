@@ -104,6 +104,7 @@ class Module(PlaylistAdvisor):
             logger.info(f"Playing {current_day} night playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(night_playlist)
             self.last_playlist = night_playlist
+        if self.class_imc: self.class_imc.send(self, "web", {"playlist": str(self.last_playlist)})
         return self.last_playlist
     def new_playlist(self) -> bool:
         if self.custom_playlist and self.custom_playlist_path.exists():
