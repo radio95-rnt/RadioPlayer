@@ -109,10 +109,6 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
         else: await websocket.send(json.dumps({"error": "unknown action"}))
 
 async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
-    """
-    Reads messages from ws_q (a blocking multiprocessing.Queue) using run_in_executor
-    and broadcasts them to all connected clients.
-    """
     loop = asyncio.get_event_loop()
     while True:
         msg = await loop.run_in_executor(None, ws_q.get)
@@ -120,10 +116,8 @@ async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
         payload = json.dumps(msg)
         if clients:
             coros = []
-            for ws in list(clients):
-                coros.append(_safe_send(ws, payload, clients))
+            for ws in list(clients): coros.append(_safe_send(ws, payload, clients))
             await asyncio.gather(*coros)
-
 
 async def _safe_send(ws, payload: str, clients: set):
     try: await ws.send(payload)
@@ -132,15 +126,10 @@ async def _safe_send(ws, payload: str, clients: set):
         except Exception: pass
 
 def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
-    """
-    Entrypoint for the separate process that runs the asyncio-based websocket server.
-    """
-    # create the asyncio loop and run server
     async def runner():
         clients = set()
 
         async def handler_wrapper(websocket: ServerConnection):
-            # register client
             clients.add(websocket)
             try: await ws_handler(websocket, shared_data, imc_q, ws_q)
             finally:

@@ -255,6 +255,7 @@
                     document.getElementById("server-status").textContent = "connected";
                     reconnectDelay = 1000;
                     ws.send(JSON.stringify({action:"get_toplay"}));
+                    ws.send(JSON.stringify({action:"skipc"}));
                 });
 
                 ws.addEventListener("close", () => {
@@ -289,6 +290,7 @@
                 } else if(msg.event === "new_track"){
                     applyTrackState(msg.data);
                     ws.send(JSON.stringify({action:"get_toplay"}));
+                    ws.send(JSON.stringify({action:"skipc"}));
                 } else if(msg.event === "progress") applyProgressState(msg.data);
                 else if(msg.event === "toplay") {
                     Queue = msg.data.data || [];
