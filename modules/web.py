@@ -34,11 +34,11 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             imc_q.put({"name": name, "data": data, "key": key})
             start = time.monotonic()
             result = None
-            while time.monotonic() - start < 1.5:
+            while time.monotonic() - start < 1:
                 if key in shared_data:
                     result = shared_data.pop(key)
                     break
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.1)
             return result
 
         action = msg.get("action")
@@ -69,11 +69,11 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
         elif action == "skip_next":
             result = await get_imc("activemod", msg)
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
-            else: await websocket.send(json.dumps({"data": result, "event": "skip_next"}))
+            else: await websocket.send(json.dumps({"data": result, "event": action}))
         elif action == "skipc":
             result = await get_imc("activemod", msg)
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
-            else: await websocket.send(json.dumps({"data": result, "event": "skip_next"}))
+            else: await websocket.send(json.dumps({"data": result, "event": action}))
         elif action == "jingle":
             result = await get_imc("jingle", msg.get("top", False))
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
@@ -155,6 +155,14 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                     Headers([("Content-Type", "text/html"), ("Content-Length", f"{len(data)}")]),
                     data
                 )
+            if request.path == "/favicon.ico":
+                data = b"Not Found"
+                return Response(
+                    404,
+                    "Not Found",
+                    Headers([("Content-Length", f"{len(data)}")]),
+                    data
+                )
             if not "upgrade" in request.headers.get("Connection", "").lower():
                 return Response(
                     426,
@@ -192,6 +200,7 @@ class Module(PlayerModule):
         self.ws_process = multiprocessing.Process(target=websocket_server_process, args=(self.data, self.imc_q, self.ws_q), daemon=False)
         self.ws_process.start()
         if os.name == "posix":
+            # We have to manage the process ourselves. Linux sends signals to everyone in the process group, meaning a CTRL+C would not kill the main one, but this one would die
             try: os.setpgid(self.ws_process.pid, self.ws_process.pid)
             except Exception: pass
 
@@ -210,7 +219,6 @@ class Module(PlayerModule):
             except Exception: pass
 
     def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]) -> None:
-        # TODO: add global args to data
         api_data = []
         for track in playlist:
             api_data.append({
@@ -220,7 +228,8 @@ class Module(PlayerModule):
                 "official": track.official,
                 "args": track.args,
                 "offset": track.offset,
-                "focus_time_offset": track.focus_time_offset
+                "focus_time_offset": track.focus_time_offset,
+                "global_args": global_args
             })
         self.data["playlist"] = json.dumps(api_data)
         try: self.ws_q.put({"event": "playlist", "data": api_data})

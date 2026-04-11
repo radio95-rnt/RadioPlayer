@@ -246,7 +246,7 @@ class RadioPlayer:
             prefetch(track.path)
 
     def loop(self):
-        """Main loop of the player. This does not return and may or not raise an SystemExit"""
+        """Main loop of the player. This does not return and may or not raise a SystemExit"""
         try:
             while True:
                 self.play_once()
@@ -256,11 +256,11 @@ class RadioPlayer:
             raise
 
 class RotatingLog(io.TextIOWrapper):
-    def write(self, s: str) -> int:
+    def write(self, *args, **kwargs) -> int:
         if self.tell() > 2_500_000:
             self.truncate(0)
             self.seek(0)
-        return super().write(s)
+        return super().write(*args, **kwargs)
 
 def main():
     log_file_path = Path("/tmp/radioPlayer_log")

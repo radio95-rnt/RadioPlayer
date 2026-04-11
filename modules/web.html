@@ -52,7 +52,6 @@
             .controls{display:flex; gap:8px; margin-top:8px}
             .box{display:flex; flex-direction:column; gap:8px; flex-grow: 1; overflow: hidden;}
 
-            /* --- HIDE SCROLLBARS ON ALL LISTBOXES --- */
             .listbox{
                 height:100%;
                 min-height:100px;
@@ -235,8 +234,7 @@
 
             // UI Toggle Function
             function toggleSection(id) {
-                const el = document.getElementById(id);
-                el.classList.toggle('collapsed');
+                document.getElementById(id).classList.toggle('collapsed');
             }
 
             // Mobile Default Setup
@@ -257,7 +255,6 @@
                     document.getElementById("server-status").textContent = "connected";
                     reconnectDelay = 1000;
                     ws.send(JSON.stringify({action:"get_toplay"}));
-                    ws.send(JSON.stringify({action:"skipc",set:0}));
                 });
 
                 ws.addEventListener("close", () => {
@@ -292,15 +289,12 @@
                 } else if(msg.event === "new_track"){
                     applyTrackState(msg.data);
                     ws.send(JSON.stringify({action:"get_toplay"}));
-                    ws.send(JSON.stringify({action:"skipc",set:0}));
-                } else if(msg.event === "progress"){
-                    applyProgressState(msg.data);
-                } else if(msg.event === "toplay") {
+                } else if(msg.event === "progress") applyProgressState(msg.data);
+                else if(msg.event === "toplay") {
                     Queue = msg.data.data || [];
                     renderQueue();
-                } else if(msg.event === "request_dir") {
-                    applySubdir(msg.data || {})
-                } else if(msg.event === "skipc") {
+                } else if(msg.event === "request_dir") applySubdir(msg.data || {})
+                else if(msg.event === "skipc") {
                     skipCount = msg.data?.data ?? 0;
                     document.getElementById("skpn-count").textContent = skipCount;
                     renderPlaylist();
@@ -332,10 +326,7 @@
                 if(track.path){
                     currentTrackPath = (track.official ? "" : "!") + track.path;
                     document.getElementById("now-track").textContent = `${track.official ? "(official) " : ""}${track.path}`;
-                }
-                if(next_track.path){
-                    document.getElementById("next-track").textContent = `${next_track.official ? "(official) " : ""}${next_track.path}`;
-                }
+                } if(next_track.path) document.getElementById("next-track").textContent = `${next_track.official ? "(official) " : ""}${next_track.path}`;
             }
 
             function applySubdir(payload) {
@@ -498,21 +489,11 @@
                 ws.send(JSON.stringify({action:"request_dir", what: selectedDir}))
             }
 
-            document.getElementById("skip-btn").addEventListener("click", () => {
-                ws.send(JSON.stringify({action:"skip"}));
-            });
-            document.getElementById("skpn-inc").addEventListener("click", () => {
-                ws.send(JSON.stringify({action:"skipc", add: 1}));
-            });
-            document.getElementById("skpn-dec").addEventListener("click", () => {
-                ws.send(JSON.stringify({action:"skipc", remove: -1}));
-            });
-            document.getElementById("jingle-btn").addEventListener("click", () => {
-                ws.send(JSON.stringify({action:"jingle"}));
-            });
-            document.getElementById("clear-btn").addEventListener("click", () => {
-                ws.send(JSON.stringify({action:"clear_toplay"}))
-            });
+            document.getElementById("skip-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"skip"})));
+            document.getElementById("skpn-inc").addEventListener("click", () => ws.send(JSON.stringify({action:"skipc", add: 1})));
+            document.getElementById("skpn-dec").addEventListener("click", () => ws.send(JSON.stringify({action:"skipc", remove: -1}))});
+            document.getElementById("jingle-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"jingle"})));
+            document.getElementById("clear-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"clear_toplay"})));
 
             function addSelectedFileToQueue(top) {
                 let fullPath = null;
@@ -523,14 +504,11 @@
                     const path = (selected.official ? "" : "!") + selected.path;
                     ws.send(JSON.stringify({ action: "add_to_toplay", songs: [path], top: top }));
                     success = true;
-                } else if (selectedSubFile && selectedDir) {
-                    fullPath = subbasePath.replace(/\/$/, '') + '/' + selectedSubFile;
-                } else {
+                } else if (selectedSubFile && selectedDir) fullPath = subbasePath.replace(/\/$/, '') + '/' + selectedSubFile;
+                else {
                     const dirEls = document.getElementById("dirs-box").children;
                     const selectedItem = Array.from(dirEls).find(el => el.classList.contains("selected"));
-                    if (selectedItem && selectedItem.dataset.type === "file") {
-                        fullPath = basePath.replace(/\/$/, '') + '/' + selectedItem.textContent;
-                    }
+                    if (selectedItem && selectedItem.dataset.type === "file") fullPath = basePath.replace(/\/$/, '') + '/' + selectedItem.textContent;
                 }
 
                 if (fullPath) {
