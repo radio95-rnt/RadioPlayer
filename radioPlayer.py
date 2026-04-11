@@ -66,7 +66,7 @@ class ModuleManager:
                 try:
                     future = executor.submit(timed_loader, spec, module)
                     try:
-                        time_took = future.result(5)
+                        time_took = future.result(3)
                         if time_took > 0.15: self.logger.warning(f"{module_name} took {time_took:.1f}s to start")
                     except concurrent.futures.TimeoutError:
                         self.logger.error(f"Module {module_name} timed out.")
@@ -223,7 +223,16 @@ class RadioPlayer:
         while i < max_iterator:
             if check_conditions(): return
 
-            self.logger.info(f"Now playing: {track.path.name}")
+            if not track.path.exists():
+                self.procman.anything_playing()
+                track, next_track, extend = get_track()
+                prefetch(track.path)
+                i += 1
+                if not extend: song_i += 1
+                self.logger.warning("File does not exist:", str(track.path))
+                continue
+
+            self.logger.info("Now playing:", track.path.name)
             prefetch(track.path)
 
             pr = self.procman.play(track)

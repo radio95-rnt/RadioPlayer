@@ -14,7 +14,7 @@ _log_out: TextIO
 assert _log_out # pyright: ignore[reportUnboundVariable]
 logger = log95.log95("ADVISOR", output=_log_out)
 
-playlist_dir = Path("/home/user/playlists")
+playlist_dir = Path("/home/user/mixes/.playlist")
 
 class Time:
     @staticmethod

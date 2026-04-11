@@ -54,4 +54,4 @@ class PlaintextParser(PlaylistParser):
             out.append(([f for f in glob.glob(line) if Path(f).is_file()], arguments))
         return global_arguments, out
 
-parser = PlaintextParser()
+# parser = PlaintextParser()
