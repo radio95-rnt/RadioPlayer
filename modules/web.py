@@ -67,7 +67,11 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 await websocket.send(json.dumps({"data": result, "event": "toplay"})) # Yes, this is not an accident
                 await websocket.loop.run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
         elif action == "skip_next":
-            result = await get_imc("activemod", {"action": "skip_next", "set": msg.get("set",True)})
+            result = await get_imc("activemod", msg)
+            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
+            else: await websocket.send(json.dumps({"data": result, "event": "skip_next"}))
+        elif action == "skipc":
+            result = await get_imc("activemod", msg)
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else: await websocket.send(json.dumps({"data": result, "event": "skip_next"}))
         elif action == "jingle":
