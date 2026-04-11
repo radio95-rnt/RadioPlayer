@@ -167,7 +167,7 @@ class Module(ActiveModifier):
         elif data.get("action") == "skipc":
             if (count := data.get("set", -1)) > -1: self.skip_next = count
             if (count2 := data.get("add", -1)) > -1: self.skip_next += count2
-            if (count3 := data.get("remove", 1)) < -1: self.skip_next += count3
+            if (count3 := data.get("remove", 1)) < 0: self.skip_next += count3
             return {"status": "ok", "data": self.skip_next}
 
 activemod = Module()
