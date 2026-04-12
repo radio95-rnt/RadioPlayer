@@ -442,33 +442,37 @@
                     const dirs = payload.dirs || [];
                     dirsBox.innerHTML = "";
                     dirs.sort().forEach(f => {
-                        const node = document.createElement("div");
-                        node.className = "item";
-                        node.textContent = f;
-                        node.addEventListener("click", () => onDirClicked(f, node));
-                        dirsBox.appendChild(node);
+                        if(!f.startsWith(".")) {
+                            const node = document.createElement("div");
+                            node.className = "item";
+                            node.textContent = f;
+                            node.addEventListener("click", () => onDirClicked(f, node));
+                            dirsBox.appendChild(node);
+                        }
                     });
                     files.sort().forEach(f => {
-                        const node = document.createElement("div");
-                        node.className = "item";
-                        node.textContent = f;
-                        node.addEventListener("click", () => {
-                            if(node.classList.contains("selected")) {
-                                node.classList.remove("selected");
+                        if(!f.startsWith(".")) {
+                            const node = document.createElement("div");
+                            node.className = "item";
+                            node.textContent = f;
+                            node.addEventListener("click", () => {
+                                if(node.classList.contains("selected")) {
+                                    node.classList.remove("selected");
+                                    selectedDir = null;
+                                    selectedSubFile = null;
+                                    return;
+                                }
+                                Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
+                                Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
+                                Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
+                                node.classList.add("selected");
                                 selectedDir = null;
                                 selectedSubFile = null;
-                                return;
-                            }
-                            Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
-                            Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
-                            Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
-                            node.classList.add("selected");
-                            selectedDir = null;
-                            selectedSubFile = null;
-                            document.getElementById("subdir-box").innerHTML = "";
-                        });
-                        node.dataset.type = "file";
-                        dirsBox.appendChild(node);
+                                document.getElementById("subdir-box").innerHTML = "";
+                            });
+                            node.dataset.type = "file";
+                            dirsBox.appendChild(node);
+                        }
                     });
                 } catch(e) {
                     dirsBox.innerHTML = "Error fetching dirs: "+e.message;

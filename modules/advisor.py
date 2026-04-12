@@ -117,6 +117,11 @@ class Module(PlaylistAdvisor):
 
         if not self.last_playlist: return True
 
+        reload_state = (playlist_dir / "reload")
+        if reload_state.exists():
+            reload_state.unlink(True)
+            return True
+
         if check_if_playlist_modifed(self.last_playlist): return True
         if Time.get_playlist_modification_time(self.last_playlist) > self.last_mod_time:
             logger.info("Playlist changed on disc, reloading...")
