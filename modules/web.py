@@ -20,7 +20,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             "progress": json.loads(shared_data.get("progress", "{}")),
             "dirs": {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)}
         }
-    except Exception: initial = {"playlist": [], "track": {}, "progress": {}}
+    except Exception: initial = {"playlist": [], "track": {}, "progress": {}, "dirs": {"files": [], "dirs": [], "base": ""}}
     await websocket.send(json.dumps({"event": "state", "data": initial}))
 
     async for raw in websocket:
@@ -66,13 +66,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             else:
                 await websocket.send(json.dumps({"data": result, "event": "toplay"})) # Yes, this is not an accident
                 await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
-        elif action == "skip_next":
-            result = await get_imc("activemod", msg)
-            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
-            else:
-                await websocket.send(json.dumps({"data": result, "event": action}))
-                await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": action})  # broadcast
-        elif action == "skipc":
+        elif action == "skip_next" or action == "skipc":
             result = await get_imc("activemod", msg)
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else:
@@ -261,12 +255,12 @@ class Module(PlayerModule):
         try: self.ws_q.put(None)
         except: pass
 
-        self.ipc_thread.join(timeout=2)
-        self.ws_process.join(timeout=3)
+        self.ipc_thread.join(timeout=1)
+        self.ws_process.join(timeout=1)
 
         if self.ws_process.is_alive():
             self.ws_process.terminate()
-            self.ws_process.join(timeout=2)
+            self.ws_process.join(timeout=1)
 
         if self.ws_process.is_alive():
             self.ws_process.kill()

@@ -29,7 +29,7 @@ class PopularitySorterModule(PlaylistModifierModule):
     """
     def __init__(self) -> None:
         self.logger = log95.log95("PopSort", output=_log_out)
-        self.play_counts_file = Path(__file__, "..", "..", "play_counter").resolve()
+        self.play_counts_file = Path("/home/user/mixes/.playlist/count.txt").resolve()
 
     def modify(self, global_args: dict, playlist: list[Track]) -> list[Track]:
         self.logger.info("Applying popularity-based sorting to the playlist...")
@@ -41,23 +41,21 @@ class PopularitySorterModule(PlaylistModifierModule):
 
         sorted_by_play_count = sorted(play_counts.items(), key=lambda item: item[1], reverse=True)
 
-        SORT_LEN = 100
-        if len(playlist) >= SORT_LEN:
-            top_paths = {path for path, count in sorted_by_play_count[:SORT_LEN]}
-            least_top_paths = {path for path, count in sorted_by_play_count[-SORT_LEN:]}
-            for a,b in zip(top_paths, least_top_paths):
-                a_track = b_track = None
-                a_i = b_i = 0
-                for a_i, a_track in enumerate(playlist):
-                    if not a_track.official: continue
-                    if a_track.path == a: break
-                if not a_track: continue
-                for b_i, b_track in enumerate(playlist):
-                    if not b_track.official: continue
-                    if b_track.path == b: break
-                if not b_track: continue
-                if a_i < b_i:
-                    playlist[a_i], playlist[b_i] = playlist[b_i], playlist[a_i]
+        SORT_LEN = len(playlist) // 3
+        top_paths = {path for path, count in sorted_by_play_count[:SORT_LEN]}
+        least_top_paths = {path for path, count in sorted_by_play_count[-SORT_LEN:]}
+        for a,b in zip(top_paths, least_top_paths):
+            a_track = b_track = None
+            a_i = b_i = 0
+            for a_i, a_track in enumerate(playlist):
+                if not a_track.official: continue
+                if a_track.path == a: break
+            if not a_track: continue
+            for b_i, b_track in enumerate(playlist):
+                if not b_track.official: continue
+                if b_track.path == b: break
+            if not b_track: continue
+            if a_i < b_i: playlist[a_i], playlist[b_i] = playlist[b_i], playlist[a_i]
 
         i = 0
         while i < len(playlist) - 1:

@@ -40,8 +40,7 @@ class PlaintextParser(PlaylistParser):
                         if "=" in arg:
                             key, val = arg.split("=", 1)
                             arguments[key] = val
-                        else:
-                            arguments[arg] = True
+                        else: arguments[arg] = True
                 else:
                     line, args = line.split("|", 1)
                     args = args.split(";")
@@ -49,8 +48,7 @@ class PlaintextParser(PlaylistParser):
                         if "=" in arg:
                             key, val = arg.split("=", 1)
                             arguments[key] = val
-                        else:
-                            arguments[arg] = True
+                        else: arguments[arg] = True
             out.append(([f for f in glob.glob(line) if Path(f).is_file()], arguments))
         return global_arguments, out
 

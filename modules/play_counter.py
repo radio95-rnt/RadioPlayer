@@ -15,8 +15,8 @@ def load_dict_from_custom_format(file_path: str | Path) -> dict[str, str]:
 
 class Module(PlayerModule):
     def __init__(self) -> None:
-        self.logger = log95.log95("PlayCnt", output=_log_out)
-        self.file = Path(__file__, "..", "..", "play_counter").resolve()
+        self.logger = log95.log95("PlayCnt", output=_log_out) # That sounds bad...
+        self.file = Path("/home/user/mixes/.playlist/count.txt").resolve()
         self.counts: dict[str, int] = {}
         loaded = load_dict_from_custom_format(self.file)
         for k, v in loaded.items():

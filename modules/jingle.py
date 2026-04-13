@@ -49,6 +49,16 @@ class Module2(PlayerModule):
         if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary)
         return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [f"!{jingle}"], "top": bool(data)})
 
-options = Path("/home/user/Jingiel.mp3"), [Path("/home/user/jing2.opus"), Path("/home/user/Jing3.opus"), Path("/home/user/jing4.opus")]
-module = Module2(*options)
-playlistmod = Module(*options)
+master: Path | None = None
+jingles: list[Path] = []
+for file in Path("/home/user/mixes/.playlist/jingle").iterdir():
+    if not file.is_file(): continue
+    name, ext = file.name.rsplit('.', 1)
+    if name.lower() == "master":
+        master = file
+        continue
+    jingles.append(file)
+if not master: master = jingles.pop(0)
+
+module = Module2(master, jingles)
+playlistmod = Module(master, jingles)
