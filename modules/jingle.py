@@ -12,21 +12,32 @@ from modules import BaseIMCModule, InterModuleCommunication
 
 from . import PlaylistModifierModule, Track, Path, PlayerModule
 
+def get_jingles():
+    master: Path | None = None
+    jingles: list[Path] = []
+    for file in Path("/home/user/mixes/.playlist/jingle").iterdir():
+        if not (file.is_file() and file.exists()): continue
+        name, _ = file.name.rsplit('.', 1)
+        if name.lower() == "master":
+            master = file
+            continue
+        jingles.append(file)
+    if not master: master = jingles.pop(0)
+    return master, jingles
+
 class Module(PlaylistModifierModule):
-    def __init__(self, primary: Path, secondary: list[Path] | None = None) -> None:
-        if secondary is None: secondary = []
-        self.primary = primary.absolute()
-        assert primary.exists()
-        self.secondary = [f.absolute() for f in secondary if f.exists()]
     def modify(self, global_args: dict, playlist: list[Track]) -> list[Track] | None:
-        if int(global_args.get("no_jingle", 0)) != 0 or not self.primary: return None
+        if int(global_args.get("no_jingle", 0)) != 0: return None
+
+        primary, secondary = get_jingles()
+
         out: list[Track] = []
         last_jingiel = True
         for track in playlist:
             if not last_jingiel and (random.randint(1,3) == 1) and (track.args is None or int(track.args.get("no_jingle", 0)) == 0):
                 out.append(Track(track.path, 0, track.fade_in, True, track.args))
-                jingle = self.primary
-                if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary)
+                jingle = primary
+                if secondary and (random.randint(1,3) == 1): jingle = random.choice(secondary)
                 out.append(Track(jingle, 0, 0, False, {}))
                 last_jingiel = True
                 continue
@@ -35,30 +46,14 @@ class Module(PlaylistModifierModule):
         return out
     
 class Module2(PlayerModule):
-    def __init__(self, primary: Path, secondary: list[Path] | None = None) -> None:
-        if secondary is None: secondary = []
-        self.primary = primary.absolute()
-        assert primary.exists()
-        self.secondary = [f.absolute() for f in secondary if f.exists()]
     def imc(self, imc: InterModuleCommunication) -> None:
         super().imc(imc)
         self._imc.register(self, "jingle")
     def imc_data(self, source: BaseIMCModule, source_name: str | None, data: bool, broadcast: bool) -> object:
         if broadcast: return
-        jingle = self.primary
-        if self.secondary and (random.randint(1,3) == 1): jingle = random.choice(self.secondary)
+        jingle, secondary = get_jingles()
+        if secondary and (random.randint(1,3) == 1): jingle = random.choice(secondary)
         return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [f"!{jingle}"], "top": bool(data)})
 
-master: Path | None = None
-jingles: list[Path] = []
-for file in Path("/home/user/mixes/.playlist/jingle").iterdir():
-    if not file.is_file(): continue
-    name, ext = file.name.rsplit('.', 1)
-    if name.lower() == "master":
-        master = file
-        continue
-    jingles.append(file)
-if not master: master = jingles.pop(0)
-
-module = Module2(master, jingles)
-playlistmod = Module(master, jingles)
+module = Module2()
+playlistmod = Module()
