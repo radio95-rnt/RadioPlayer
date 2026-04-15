@@ -143,9 +143,10 @@
                     <div class="frame-title" style="cursor: default; pointer-events: none;">Now Playing</div>
                     <div class="track" id="now-track">Loading...</div>
                     <div class="progress-wrap" style="margin-top:8px">
-                    <div class="progress-bar" title="progress"><div class="progress-fill" id="prog-fill"></div></div>
-                    <div class="small" id="time-label">00:00 / 00:00 (00:00)</div>
+                        <div class="progress-bar" title="progress"><div class="progress-fill" id="prog-fill"></div></div>
+                        <div class="small" id="time-label">00:00 / 00:00 (00:00)</div>
                     </div>
+                    <div class="small" id="rds-text" style="margin-top:6px; color:var(--muted); font-family:'Consolas',monospace;"></div>
                     <div class="controls" style="margin-top:10px">
                         <button id="skip-btn" class="btn">⏭ Skip</button>
                         <button id="clear-btn" class="btn">✖ Clear Queue</button>
@@ -283,7 +284,14 @@
                     const d = msg.data || {};
                     if(d.track) applyProgressState(d.track);
                     if(d.dirs) updateDirs(d.dirs);
-                } else if(msg.event === "playlist"){
+                    if(d.rds) {
+                        const rt = (d.rds?.rt) ?? "";
+                        document.getElementById("rds-text").textContent = rt ? `RDS: ${rt}` : "";
+                    }
+                } else if (msg.event === "rds") {
+                    const rt = (msg.data?.rt) ?? "";
+                    document.getElementById("rds-text").textContent = rt ? `RDS: ${rt}` : "";
+                } else if(msg.event === "playlist") {
                     playlist = msg.data || [];
                     renderPlaylist();
                 } else if(msg.event === "new_track"){
