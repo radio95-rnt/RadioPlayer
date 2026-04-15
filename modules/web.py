@@ -16,13 +16,12 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
     try:
         initial = {
             "track": json.loads(shared_data.get("track", "{}")),
-            "progress": json.loads(shared_data.get("progress", "{}")),
             "dirs": {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)},
-            "rds": json.loads(shared_data.get("rds", "{}"))
         }
-    except Exception: initial = {"track": {}, "progress": {}, "dirs": {}, "rds": {}}
+    except Exception: initial = {"track": {}, "dirs": {}}
     await websocket.send(json.dumps({"event": "state", "data": initial}))
     await websocket.send(json.dumps({"event": "playlist", "data": json.loads(shared_data.get("playlist", "[]"))}))
+    await websocket.send(json.dumps({"event": "rds", "data": json.loads(shared_data.get("rds", "{}"))}))
 
     async for raw in websocket:
         try: msg: dict = json.loads(raw)
