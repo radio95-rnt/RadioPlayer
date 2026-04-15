@@ -220,7 +220,7 @@ class Module(PlayerModule):
     def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
         wsdata = {"event": "imc", "data": {"name": source_name, "data": data, "broadcast": broadcast}}
         if source_name == "rds": 
-            self.data[source_name] = data
+            self.data[source_name] = json.dumps(data)
             wsdata = {"event": "rds", "data": data}
         try: self.ws_q.put(wsdata)
         except Exception: pass
