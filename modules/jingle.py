@@ -25,6 +25,8 @@ def get_jingles():
     if not master: master = jingles.pop(0)
     return master, jingles
 
+def chance(one_in_n): return random.randint(1, one_in_n) == 1
+
 class Module(PlaylistModifierModule):
     def modify(self, global_args: dict, playlist: list[Track]) -> list[Track] | None:
         if int(global_args.get("no_jingle", 0)) != 0: return None
@@ -34,26 +36,26 @@ class Module(PlaylistModifierModule):
         out: list[Track] = []
         last_jingiel = True
         for track in playlist:
-            if not last_jingiel and (random.randint(1,3) == 1) and (track.args is None or int(track.args.get("no_jingle", 0)) == 0):
+            if not last_jingiel and chance(3) and (track.args is None or int(track.args.get("no_jingle", 0)) == 0):
                 out.append(Track(track.path, 0, track.fade_in, True, track.args))
                 jingle = primary
-                if secondary and (random.randint(1,3) == 1): jingle = random.choice(secondary)
+                if secondary and chance(2): jingle = random.choice(secondary)
                 out.append(Track(jingle, 0, 0, False, {}))
                 last_jingiel = True
                 continue
             out.append(Track(track.path, track.fade_out, track.fade_in, True, track.args,focus_time_offset=-track.fade_out))
             last_jingiel = False
         return out
-    
+
 class Module2(PlayerModule):
     def imc(self, imc: InterModuleCommunication) -> None:
         super().imc(imc)
-        self._imc.register(self, "jingle")
+        imc.register(self, "jingle")
     def imc_data(self, source: BaseIMCModule, source_name: str | None, data: bool, broadcast: bool) -> object:
         if broadcast: return
         jingle, secondary = get_jingles()
-        if secondary and (random.randint(1,3) == 1): jingle = random.choice(secondary)
+        if secondary and chance(2): jingle = random.choice(secondary)
         return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [f"!{jingle}"], "top": bool(data)})
 
 module = Module2()
-playlistmod = Module()
+playlistmod = Module(), 2

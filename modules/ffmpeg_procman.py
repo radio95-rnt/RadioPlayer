@@ -1,4 +1,4 @@
-from . import ABC_ProcessManager, Process, Track, Path, Popen, tinytag
+from . import ABC_ProcessManager, Process, Track, Popen, tinytag
 from threading import Lock
 import subprocess, time
 
@@ -6,13 +6,12 @@ class ProcessManager(ABC_ProcessManager):
     def __init__(self) -> None:
         self.lock = Lock()
         self.processes: list[Process] = []
-    def _get_audio_duration(self, file_path: Path):
-        return tinytag.TinyTag().get(file_path, tags=False).duration
+        self.tinytag = tinytag.TinyTag()
     def play(self, track: Track) -> Process:
         assert track.path.exists()
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
 
-        duration = self._get_audio_duration(track.path.absolute())
+        duration = self.tinytag.get(track.path.absolute(), tags=False).duration
         if not duration: raise Exception("Failed to get file duration for", track.path)
         if track.offset >= duration: track.offset = max(duration - 0.1, 0)
         if track.offset > 0: cmd.extend(['-ss', str(track.offset)])
@@ -35,7 +34,7 @@ class ProcessManager(ABC_ProcessManager):
                     try: p.process.wait(timeout=0)
                     except subprocess.TimeoutExpired: pass
             self.processes = alive
-            return bool(self.processes)
+            return bool(alive)
     def stop_all(self, timeout: float | None = None) -> None:
         with self.lock:
             for process in self.processes:

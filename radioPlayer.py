@@ -54,6 +54,7 @@ class ModuleManager:
     def start_modules(self, arg):
         procman = None
         parser = None
+        neg_modifiers = []
         """Executes the module by the python interpreter"""
         def timed_loader(spec: importlib.machinery.ModuleSpec, module: types.ModuleType):
             assert spec.loader
@@ -82,8 +83,12 @@ class ModuleManager:
                 if md := getattr(module, "playlistmod", None):
                     if isinstance(md, tuple):
                         md, index = md
-                        if isinstance(md, list): self.playlist_modifier_modules[index:index] = md
-                        else: self.playlist_modifier_modules.insert(index, md)
+                        if index > -1:
+                            if isinstance(md, list): self.playlist_modifier_modules[index:index] = md
+                            else: self.playlist_modifier_modules.insert(index, md)
+                        else:
+                            if isinstance(md, list): neg_modifiers[index:index] = md
+                            else: neg_modifiers.insert(index, md)
                     elif isinstance(md, list): self.playlist_modifier_modules.extend(md)
                     else: self.playlist_modifier_modules.append(md)
                 if md := getattr(module, "advisor", None):
@@ -116,6 +121,7 @@ class ModuleManager:
             self.logger.critical_error("Missing process mananger.")
             raise SystemExit("Missing process mananger.")
         if not parser: self.logger.warning("Missing parser, advisor-less will be forced.")
+        self.playlist_modifier_modules += neg_modifiers
         InterModuleCommunication(self.simple_modules + [self.playlist_advisor, ProcmanCommunicator(procman), self.active_modifier])
         return procman, parser
     def advisor_advise(self, arguments: str | None):
@@ -183,6 +189,7 @@ class RadioPlayer:
 
     def _play(self, playlist: list[Track] | None, max_iterator: int):
         assert self.procman
+        running = True
         return_pending = track = False
         song_i = i = 0
         def get_track():
@@ -204,7 +211,7 @@ class RadioPlayer:
             return track, next_track, extend
 
         def check_conditions():
-            nonlocal return_pending
+            nonlocal return_pending, running
             assert self.procman
             if self.exit_pending:
                 self.logger.info("Quit received, waiting for song end.")
@@ -213,18 +220,17 @@ class RadioPlayer:
             elif return_pending:
                 self.logger.info("Return reached, next song will reload the playlist.")
                 self.procman.wait_all()
-                return True
+                running = False
             if self.modman.playlist_advisor and self.modman.playlist_advisor.new_playlist():
                 self.logger.info("Reloading now...")
-                return True
-            return False
+                running = False
 
         track, next_track, extend = get_track()
-        while i < max_iterator:
-            if check_conditions(): return
+        while i < max_iterator and running:
+            check_conditions()
+            self.procman.anything_playing()
 
             if not track.path.exists():
-                self.procman.anything_playing()
                 track, next_track, extend = get_track()
                 prefetch(track.path)
                 i += 1
@@ -250,7 +256,8 @@ class RadioPlayer:
             i += 1
             if not extend: song_i += 1
 
-            if check_conditions(): return
+            check_conditions()
+            self.procman.anything_playing()
             track, next_track, extend = get_track()
             prefetch(track.path)
 
@@ -266,7 +273,7 @@ class RadioPlayer:
 
 class RotatingLog(io.TextIOWrapper):
     def write(self, *args, **kwargs) -> int:
-        if self.tell() > 2_500_000:
+        if self.tell() > 2_000_000:
             self.truncate(0)
             self.seek(0)
         return super().write(*args, **kwargs)

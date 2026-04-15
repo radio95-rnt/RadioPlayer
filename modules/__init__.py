@@ -34,18 +34,14 @@ class ABC_ProcessManager(abc.ABC):
 class BaseIMCModule:
     """This is not a module to be used but rather a placeholder IMC api to be used in other modules"""
     def imc(self, imc: 'InterModuleCommunication') -> None:
-        """
-        Receive an IMC object
-        """
+        """Receive an IMC object"""
         self._imc = imc
-    def imc_data(self, source: 'BaseIMCModule', source_name: str | None, data: object, broadcast: bool) -> object:
-        """
-        React to IMC data
-        """
-        return None
+    def imc_data(self, source: 'BaseIMCModule', source_name: str | None, data: object, broadcast: bool) -> object: """React to IMC data"""
 
 class ProcmanCommunicator(BaseIMCModule):
-    def __init__(self, procman: ABC_ProcessManager) -> None: self.procman = procman
+    def __init__(self, procman: ABC_ProcessManager) -> None: 
+        self.procman = procman
+        self.tinytag = tinytag.TinyTag()
     def imc(self, imc: 'InterModuleCommunication') -> None:
         super().imc(imc)
         self._imc.register(self, "procman")
@@ -57,7 +53,7 @@ class ProcmanCommunicator(BaseIMCModule):
 
             if int(op) == 0: return {"op": 0, "arg": "pong"}
             elif int(op) == 1:
-                if arg := data.get("arg"): return {"op": 1, "arg": tinytag.TinyTag().get(arg, tags=False).duration}
+                if arg := data.get("arg"): return {"op": 1, "arg": self.tinytag.get(arg, tags=False).duration}
                 else: return
             elif int(op) == 2:
                 self.procman.stop_all(data.get("timeout", None))
@@ -71,28 +67,21 @@ class ProcmanCommunicator(BaseIMCModule):
 
 class PlayerModule(BaseIMCModule):
     """Simple passive observer, this allows you to send the current track the your RDS encoder, or to your website"""
-    def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]) -> None:
+    def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]) -> None: 
         """This is called every new playlist"""
-        pass
     def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:
         """Called on every track including the ones added by the active modifier, you can check for that comparing the playlists[index] and the track"""
-        pass
     def progress(self, index: int, track: Track, elapsed: float, total: float, real_total: float) -> None:
         """
         Real total and total differ in that, total is how much the track lasts, but real_total will be for how long we will focus on it (crossfade)
-        Runs at a frequency around 1 Hz
+        Runs at a frequency around 1 Hz (depending on other plugins it can be rarer, but never any faster)
         Please don't put any blocking or code that takes time
         """
-        pass
-    def shutdown(self):
-        """Ran while shutting down"""
-        pass
+    def shutdown(self): """Ran while shutting down"""
 class PlaylistModifierModule:
     """Playlist modifier, this type of module allows you to shuffle, or put jingles into your playlist"""
     def modify(self, global_args: dict, playlist: list[Track]) -> list[Track] | None:
-        """
-        global_args are playlist global args (see radioPlayer_playlist_file.txt)
-        """
+        """global_args are playlist global args (see radioPlayer_playlist_file.txt)"""
         return playlist
     # No IMC, as we only run on new playlists
 class PlaylistAdvisor(BaseIMCModule):
@@ -105,9 +94,7 @@ class PlaylistAdvisor(BaseIMCModule):
         return False
 class ActiveModifier(BaseIMCModule):
     """This changes the next song to be played live, which means that this picks the next song, not the playlist, but this is affected by the playlist"""
-    def arguments(self, arguments: str | None) -> None:
-        """Called at start up with the program arguments"""
-        pass
+    def arguments(self, arguments: str | None) -> None: """Called at start up with the program arguments"""
     def play(self, index: int, track: Track | None, next_track: Track | None) -> tuple[tuple[Track | None, Track | None], bool | None]:
         """
         Returns a tuple, in the first case where a is the track and b is a bool, b corresponds to whether to extend the playlist, set to true when adding content instead of replacing it
@@ -115,9 +102,7 @@ class ActiveModifier(BaseIMCModule):
         The second track object is the next track, which is optional which is also only used for metadata and will not be taken in as data to play
         """
         return (track, None), False
-    def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]) -> None:
-        """Same behaviour as the basic module function"""
-        pass
+    def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]) -> None: """Same behaviour as the basic module function"""
 class InterModuleCommunication:
     def __init__(self, modules: Sequence[BaseIMCModule | None]) -> None:
         self.modules = modules

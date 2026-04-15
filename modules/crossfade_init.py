@@ -1,5 +1,5 @@
 from . import PlaylistModifierModule, Track
-DEFAULT_CROSSFADE = 5.0
+DEFAULT_CROSSFADE = 6.0
 class Module(PlaylistModifierModule):
     def modify(self, global_args: dict, playlist: list[Track]) -> list[Track] | None:
         out = []
@@ -10,7 +10,7 @@ class Module(PlaylistModifierModule):
                 out.append(Track(track.path, track_crossfade, track_crossfade, do_cross_fade, track.args, focus_time_offset=-track_crossfade))
             else: out.append(track)
         return out
-playlistmod = (Module(),1)
+playlistmod = Module(), 0
 
 # This is free and unencumbered software released into the public domain.
 

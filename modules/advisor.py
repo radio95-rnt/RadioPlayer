@@ -1,7 +1,7 @@
 MORNING_START = 5
 MORNING_END = 10
 DAY_START = 10
-DAY_END = 18
+DAY_END = 19
 LATE_NIGHT_START = 0
 LATE_NIGHT_END = 5
 
@@ -51,7 +51,6 @@ class Module(PlaylistAdvisor):
     def __init__(self) -> None:
         self.last_mod_time = 0
         self.last_playlist = None
-        self.class_imc = None
 
         self.custom_playlist = None
         self.custom_playlist_path = Path("/tmp/radioPlayer_list")
@@ -104,7 +103,7 @@ class Module(PlaylistAdvisor):
             logger.info(f"Playing {current_day} night playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(night_playlist)
             self.last_playlist = night_playlist
-        if self.class_imc: self.class_imc.send(self, "web", {"playlist": str(self.last_playlist)})
+        if self._imc: self._imc.send(self, "web", {"playlist": str(self.last_playlist)})
         return self.last_playlist
     def new_playlist(self) -> bool:
         if self.custom_playlist and self.custom_playlist_path.exists():
@@ -128,7 +127,7 @@ class Module(PlaylistAdvisor):
             return True
         return False
     def imc(self, imc: InterModuleCommunication) -> None:
-        self.class_imc = imc
+        self._imc = imc
         imc.register(self, "advisor")
     def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool):
         return (self.custom_playlist, MORNING_START, DAY_END)

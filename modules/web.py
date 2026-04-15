@@ -15,13 +15,14 @@ MAIN_PATH_DIR = Path("/home/user/mixes")
 async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
     try:
         initial = {
-            "playlist": json.loads(shared_data.get("playlist", "[]")),
             "track": json.loads(shared_data.get("track", "{}")),
             "progress": json.loads(shared_data.get("progress", "{}")),
-            "dirs": {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)}
+            "dirs": {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)},
+            "rds": json.loads(shared_data.get("rds", "{}"))
         }
-    except Exception: initial = {"playlist": [], "track": {}, "progress": {}, "dirs": {"files": [], "dirs": [], "base": ""}}
+    except Exception: initial = {"track": {}, "progress": {}, "dirs": {}, "rds": {}}
     await websocket.send(json.dumps({"event": "state", "data": initial}))
+    await websocket.send(json.dumps({"event": "playlist", "data": json.loads(shared_data.get("playlist", "[]"))}))
 
     async for raw in websocket:
         try: msg: dict = json.loads(raw)
@@ -33,13 +34,10 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             key = str(uuid.uuid4())
             imc_q.put({"name": name, "data": data, "key": key})
             start = time.monotonic()
-            result = None
             while time.monotonic() - start < 1:
-                if key in shared_data:
-                    result = shared_data.pop(key)
-                    break
+                if key in shared_data: return shared_data.pop(key)
                 await asyncio.sleep(0.1)
-            return result
+            return None
 
         action = msg.get("action")
         if action == "skip":
@@ -80,23 +78,6 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 result = await get_imc("activemod", {"action": "get_toplay"})
                 if result is not None:
                     await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
-        elif action == "request_state":
-            # supports requesting specific parts if provided
-            what = msg.get("what", "")
-            try:
-                if what == "playlist": payload = json.loads(shared_data.get("playlist", "[]"))
-                elif what == "track": payload = json.loads(shared_data.get("track", "{}"))
-                elif what == "progress": payload = json.loads(shared_data.get("progress", "{}"))
-                elif what == "dirs": payload = {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)}
-                else:
-                    payload = {
-                        "playlist": json.loads(shared_data.get("playlist", "[]")),
-                        "track": json.loads(shared_data.get("track", "{}")),
-                        "progress": json.loads(shared_data.get("progress", "{}")),
-                        "dirs": {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)}
-                    }
-            except Exception: payload = {}
-            await websocket.send(json.dumps({"event": "state", "data": payload}))
         elif action == "request_dir":
             what: str = msg.get("what", "")
             try:
@@ -142,20 +123,22 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                     Headers([("Content-Type", "text/html"), ("Content-Length", f"{len(data)}")]),
                     data
                 )
-            if request.path == "/favicon.ico":
-                data = b"Not Found"
+            if request.path == "/ws":
+                if not "upgrade" in request.headers.get("Connection", "").lower():
+                    return Response(
+                        426,
+                        "Upgrade Required",
+                        Headers([("Connection", "Upgrade"), ("Upgrade", "websocket")]),
+                        b"WebSocket upgrade required\n"
+                    )
+                return None
+            else:
+                data = b"Not Found\n"
                 return Response(
                     404,
                     "Not Found",
                     Headers([("Content-Length", f"{len(data)}")]),
                     data
-                )
-            if not "upgrade" in request.headers.get("Connection", "").lower():
-                return Response(
-                    426,
-                    "Upgrade Required",
-                    Headers([("Connection", "Upgrade"), ("Upgrade", "websocket")]),
-                    b"WebSocket upgrade required\n"
                 )
 
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
@@ -179,6 +162,7 @@ class Module(PlayerModule):
         self.data["playlist"] = "[]"
         self.data["track"] = "{}"
         self.data["progress"] = "{}"
+        self.data["rds"] = "{}"
 
         self.ipc_thread_running = True
         self.ipc_thread = threading.Thread(target=self._ipc_worker, daemon=True)
@@ -192,10 +176,6 @@ class Module(PlayerModule):
             except Exception: pass
 
     def _ipc_worker(self):
-        """
-        Listens for messages placed in imc_q by websocket process or other modules,
-        forwards them to the main IPC layer and stores keyed responses into shared dict.
-        """
         while self.ipc_thread_running:
             try:
                 message: dict | None = self.imc_q.get(timeout=0.5)
@@ -215,8 +195,7 @@ class Module(PlayerModule):
                 "official": track.official,
                 "args": track.args,
                 "offset": track.offset,
-                "focus_time_offset": track.focus_time_offset,
-                "global_args": global_args
+                "focus_time_offset": track.focus_time_offset
             })
         self.data["playlist"] = json.dumps(api_data)
         try: self.ws_q.put({"event": "playlist", "data": api_data})
@@ -239,9 +218,13 @@ class Module(PlayerModule):
         except Exception: pass
 
     def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
-        try: self.ws_q.put({"event": "imc", "data": {"name": source_name, "data": data, "broadcast": broadcast}})
+        wsdata = {"event": "imc", "data": {"name": source_name, "data": data, "broadcast": broadcast}}
+        if source_name == "rds": 
+            self.data[source_name] = data
+            wsdata = {"event": "rds", "data": data}
+        try: self.ws_q.put(wsdata)
         except Exception: pass
-    
+
     def imc(self, imc: InterModuleCommunication) -> None:
         self._imc = imc
         imc.register(self, "web")
@@ -258,6 +241,9 @@ class Module(PlayerModule):
         self.ipc_thread.join(timeout=1)
         self.ws_process.join(timeout=1)
 
+        self.imc_q.close()
+        self.ws_q.close()
+
         if self.ws_process.is_alive():
             self.ws_process.terminate()
             self.ws_process.join(timeout=1)
@@ -265,6 +251,9 @@ class Module(PlayerModule):
         if self.ws_process.is_alive():
             self.ws_process.kill()
             self.ws_process.join(timeout=1)
+
+        self.imc_q.join_thread()
+        self.ws_q.join_thread()
 
 module = Module()
 

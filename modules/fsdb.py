@@ -11,8 +11,7 @@ def _parse_args(text: str) -> dict[str, str]:
         if "=" in line:
             key, val = line.split("=", 1)
             args[key.strip()] = val.strip()
-        else:
-            args[line] = True
+        else: args[line] = True
     return args
 
 class FSDBParser(PlaylistParser):

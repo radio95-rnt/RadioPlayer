@@ -7,7 +7,7 @@ class Module(PlaylistModifierModule):
         if int(global_args.get("no_shuffle", 0)) == 0: random.shuffle(playlist)
         return playlist
 
-playlistmod = (Module(), 0)
+playlistmod = Module(), 1
 
 # This is free and unencumbered software released into the public domain.
 
