@@ -86,7 +86,9 @@ class Module(PlayerModule):
             self._imc.send(self, "web", {"rt": rds_rt, "rtp": rds_rtp}, False)
             logger.info(f"RT set to '{rds_rt}'")
             logger.debug(f"{rds_rtp=}")
-    def imc(self, imc: InterModuleCommunication) -> None: imc.register(self, "rds")
+    def imc(self, imc: InterModuleCommunication) -> None: 
+        self._imc = imc
+        imc.register(self, "rds")
 
 module = Module()
 
