@@ -286,11 +286,11 @@
                     if(d.dirs) updateDirs(d.dirs);
                     if(d.rds) {
                         const rt = (d.rds?.rt) ?? "";
-                        document.getElementById("rds-text").textContent = rt ? `RDS: ${rt}` : "";
+                        document.getElementById("rds-text").textContent = rt ?? "";
                     }
                 } else if (msg.event === "rds") {
                     const rt = (msg.data?.rt) ?? "";
-                    document.getElementById("rds-text").textContent = rt ? `RDS: ${rt}` : "";
+                    document.getElementById("rds-text").textContent = rt ?? "";
                 } else if(msg.event === "playlist") {
                     playlist = msg.data || [];
                     renderPlaylist();
