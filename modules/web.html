@@ -7,7 +7,7 @@
         <style>
             :root{
                 --panel:#11161c; --muted:#98a0a8; --accent:#3ea6ff; --card:#0b1014;
-                --success:#47d18b; --danger:#ff6b6b; --glass: rgba(255,255,255,0.05);
+                --success:#47d18b; --danger:#ff6b6b; --glass: rgba(255,255,255,0.1);
                 font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial;
                 font-weight: 400;
             }
@@ -30,7 +30,7 @@
             .box.collapsed .frame-title::after { transform: rotate(90deg); }
             .box.collapsed .frame-title { margin-bottom: 0; }
 
-            .now .track, .next .track {font-weight:450; font-size:14px; word-break:break-all}
+            .now .track, .next .track {font-weight:400; font-size:14px; word-break:break-all}
             .progress-wrap { display:flex; gap:10px; align-items:center}
             .progress-bar { flex:1; height:10px; background:var(--glass); border-radius:8px; overflow:hidden; position:relative }
             .progress-fill { height:100%; width:0%; background:linear-gradient(90deg,var(--accent), #2aa2ff); transition:width 0.5s linear}
@@ -38,7 +38,7 @@
             button, .btn{ background:transparent; border:1px solid rgba(255,255,255,0.06); padding:8px 12px; border-radius:8px; color:inherit; cursor:pointer; transition: background-color 0.15s ease, transform 0.15s ease; }
             button:hover, .btn:hover { background-color: var(--glass); }
             .btn.activated { background:linear-gradient(90deg, #9ed3ff46, #5bbbff2a); border-color: #5bbbff55; }
-            .btn.primary{background:linear-gradient(90deg,var(--accent), #6cc7ff); color:#001; border:none; font-weight:560}
+            .btn.primary{background:linear-gradient(90deg,var(--accent), #6cc7ff); color:#001; border:none; font-weight:600}
             .btn.primary:hover { background:linear-gradient(90deg, #3399ee, #5bbaff); }
 
             ul.playlist{list-style:none; padding:6px; margin:0; font-family: "Consolas",monospace; font-size:13px;}
@@ -66,8 +66,8 @@
             .listbox div.item:hover{background:rgba(255,255,255,0.04); cursor:pointer}
             .listbox div.item.selected{background:rgba(62, 165, 255, 0.305)}
 
-            #section-playlist { flex: 3 1 0; }
-            #section-queue { flex: 1 1 0; display: flex; flex-direction: column; }
+            #section-playlist { flex: 3 1; }
+            #section-queue { flex: 1; display: flex; flex-direction: column; }
             #section-queue .collapsible-content { flex-grow: 1; }
             #section-queue.collapsed .collapsible-content { display: none; }
             #section-playlist.collapsed + #section-queue { flex: 1 1 auto !important; }
@@ -80,17 +80,42 @@
                 gap: 12px;
                 flex-grow: 1;
                 overflow: hidden;
+                align-items: stretch;
             }
             .directory-grid > .box {
-                flex: 1 1 0;
+                flex: 1;
                 min-width: 0; /* important for overflow handling */
+            }
+            .directory-grid > .box.collapsed {
+                flex: 0 0 28px;
+                align-self: stretch;
+                overflow: hidden;
+                cursor: pointer;
+            }
+            .directory-grid > .box.collapsed .frame-title {
+                writing-mode: vertical-lr;
+                transform: rotate(180deg);
+                height: 100%;
+                margin-bottom: 0;
+                justify-content: flex-end;  /* arrow at top, text flows down */
+            }
+
+            .directory-grid > .box.collapsed .frame-title::after {
+                transform: rotate(90deg);   /* arrow still points "right" = open */
+                margin-left: 0;
+                margin-bottom: 8px;
             }
             #keybinds {display: flex; gap: 10px; align-items: center; white-space: nowrap; }
             #keybinds kbd {background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 6px; font-family: "Consolas", monospace; font-size: 12px; }
 
-            /* ── WHEP Player ── */
             #whep-section { flex-shrink: 0; }
-            #whep-section.collapsed .collapsible-content { display: none; }
+            #whep-section .collapsible-content {
+                overflow: hidden;
+                max-height: 200px;
+                transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            #whep-section.collapsed .collapsible-content { max-height: 0; }
+            #whep-section.collapsed .frame-title::after { transform: rotate(90deg); }
             .whep-row { display: flex; gap: 8px; align-items: center; }
             #whep-url-input {
                 flex: 1; font-size: 12px; font-family: "Consolas", monospace;
@@ -148,6 +173,7 @@
         <div class="container">
         <div style="display:flex;align-items:center;justify-content:space-between;">
             <h1>RadioPlayer status</h1>
+            <noscript><h1>NO SCRIPTING</h1></noscript>
         </div>
 
         <div class="layout">
@@ -197,11 +223,8 @@
                 </div>
             </div>
 
-            <!-- Right Panel -->
             <div class="panel right">
-
-                <!-- WHEP Player Section -->
-                <div class="box" id="whep-section">
+                <div id="whep-section">
                     <div class="frame-title" onclick="toggleSection('whep-section')">
                         <span style="display:flex;align-items:center;gap:8px;">
                             <span id="whep-dot" class="whep-status-dot"></span>
