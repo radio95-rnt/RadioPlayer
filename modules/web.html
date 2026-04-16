@@ -282,7 +282,7 @@
             function connectWs(){
                 const statusText = document.getElementById("server-status");
                 statusText.textContent = "connecting...";
-                ws = new WebSocket("https://radio95.tnet/ws");
+                ws = new WebSocket("/ws");
 
                 ws.addEventListener("open", () => {
                     statusText.textContent = "connected";
