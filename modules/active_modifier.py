@@ -142,10 +142,10 @@ class Module(ActiveModifier):
             if isinstance(songs_to_add, list):
                 with self.file_lock:
                     if at_top:
-                        with open(TOPLAY, "r") as f: data = f.read()
+                        with open(TOPLAY, "r") as f: d = f.read()
                         with open(TOPLAY, "w") as f:
                             for song_path in songs_to_add: f.write(f"\n{song_path}\n")
-                            f.write(data)
+                            f.write(d)
                     else:
                         with open(TOPLAY, "a") as f:
                             for song_path in songs_to_add: f.write(f"\n{song_path}\n")

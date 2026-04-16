@@ -41,14 +41,13 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
         action = msg.get("action")
         if action == "skip":
             imc_q.put({"name": "procman", "data": {"op": 2}})
-            await websocket.send(json.dumps({"status": "ok", "action": "skip_requested"}))
+            await websocket.send(json.dumps({"event": "skip"}))
         elif action == "add_to_toplay":
             songs = msg.get("songs")
             at_top = msg.get("top", False)
             if not isinstance(songs, list): await websocket.send(json.dumps({"error": "songs must be a list"}))
             else:
                 imc_q.put({"name": "activemod", "data": {"action": "add_to_toplay", "songs": songs, "top": at_top}})
-                await websocket.send(json.dumps({"status": "ok", "message": f"{len(songs)} song(s) queued"}))
 
                 result = await get_imc("activemod", {"action": "get_toplay"})
                 if result is not None:
@@ -63,7 +62,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             else:
                 await websocket.send(json.dumps({"data": result, "event": "toplay"})) # Yes, this is not an accident
                 await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
-        elif action == "skip_next" or action == "skipc":
+        elif action == "skipc":
             result = await get_imc("activemod", msg)
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else:
@@ -84,7 +83,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 payload = {"files": [i.name for i in list(dir.iterdir()) if i.is_file()], "base": str(dir), "dir": dir.name}
             except Exception: payload = {}
             await websocket.send(json.dumps({"event": "request_dir", "data": payload}))
-        else: await websocket.send(json.dumps({"error": "unknown action"}))
+        else: await websocket.send(json.dumps({"event": "error", "error": "unknown action"}))
 
 async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
     loop = asyncio.get_event_loop()
@@ -202,7 +201,7 @@ class Module(PlayerModule):
 
     def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:
         track_data = {"path": str(track.path), "fade_out": track.fade_out, "fade_in": track.fade_in, "official": track.official, "args": track.args, "offset": track.offset, "focus_time_offset": track.focus_time_offset}
-        if next_track: next_track_data = {"path": str(next_track.path), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset, "focus_time_offset": track.focus_time_offset}
+        if next_track: next_track_data = {"path": str(next_track.path), "fade_out": next_track.fade_out, "fade_in": next_track.fade_in, "official": next_track.official, "args": next_track.args, "offset": next_track.offset, "focus_time_offset": next_track.focus_time_offset}
         else: next_track_data = None
         payload = {"index": index, "track": track_data, "next_track": next_track_data}
         self.data["track"] = json.dumps(payload)

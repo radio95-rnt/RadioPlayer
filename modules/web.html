@@ -8,35 +8,34 @@
             :root{
                 --panel:#11161c; --muted:#98a0a8; --accent:#3ea6ff; --card:#0b1014;
                 --success:#47d18b; --danger:#ff6b6b; --glass: rgba(255,255,255,0.03);
-                font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+                font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial;
+                font-weight: 400;
             }
             html,body{height:100%; margin:0; background:linear-gradient(180deg,#071018,#0b1220 60%); color:#eef2f6; overflow: hidden;}
-            .container{max-width:1400px; margin:18px auto; padding:18px; display:flex; flex-direction:column; gap:12px}
+            .container{max-width:1600px; margin:16px auto; padding:16px; display:flex; flex-direction:column; gap:10px}
             h1{margin:0; font-size:22px; font-weight:700}
             .layout{display:flex; gap:14px; height:calc(100vh - 140px);}
-            .panel{background:var(--panel); border-radius:10px; padding:12px; box-shadow: 0 6px 18px rgba(2,8,16,0.6); display:flex; flex-direction:column; overflow:hidden}
+            .panel{background:var(--panel); border-radius:10px; padding:8px; box-shadow: 0 6px 18px rgba(2,8,16,0.6); display:flex; flex-direction:column; overflow:hidden}
             .left{flex:1.2; min-width:420px}
-            .right{flex:1; display:flex; flex-direction:column; gap:12px}
+            .right{flex:1; display:flex; flex-direction:column; gap:6px}
 
-            /* Collapsible Header Styling */
-            .frame-title{ font-size:16px; color:var(--muted); margin-bottom:8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; padding: 4px 0; transition: color 0.2s ease; }
+            .frame-title-nc{ font-size:16px; color:var(--muted); margin-bottom:6px; display: flex; justify-content: space-between; align-items: center; user-select: none; padding: 4px 0; transition: color 0.2s ease; }
+            .frame-title{ font-size:16px; color:var(--muted); margin-bottom:6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; padding: 4px 0; transition: color 0.2s ease; }
             .frame-title:hover { color: #fff; }
             .frame-title::after { content: '▼'; font-size: 10px; transition: transform 0.3s ease; opacity: 0.5; }
 
-            .box { transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
             .box.collapsed { flex-grow: 0 !important; flex-shrink: 0; flex-basis: auto !important; }
             .box.collapsed .collapsible-content { display: none; }
             .box.collapsed .frame-title::after { transform: rotate(90deg); }
             .box.collapsed .frame-title { margin-bottom: 0; }
 
-            .now, .next {margin-bottom:12px}
             .now .track, .next .track {font-weight:600; font-size:14px; word-break:break-all}
             .progress-wrap{display:flex; gap:10px; align-items:center}
-            .progress-bar{flex:1; height:9px; background:var(--glass); border-radius:8px; overflow:hidden; position:relative}
-            .progress-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent), #6cc7ff); transition:width 0.2s linear}
+            .progress-bar{flex:1; height:10px; background:var(--glass); border-radius:8px; overflow:hidden; position:relative}
+            .progress-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent), #6cc7ff); transition:width 0.5s linear}
 
-            button, .btn{ background:transparent; border:1px solid rgba(255,255,255,0.06); padding:8px 12px; border-radius:8px; color:inherit; cursor:pointer; transition: background-color 0.2s ease, transform 0.15s ease; }
-            button:hover, .btn:hover { background-color: var(--glass); transform: translateY(-1px); }
+            button, .btn{ background:transparent; border:1px solid rgba(255,255,255,0.06); padding:8px 12px; border-radius:8px; color:inherit; cursor:pointer; transition: background-color 0.15s ease, transform 0.15s ease; }
+            button:hover, .btn:hover { background-color: var(--glass); }
             button:active, .btn:active { transform: translateY(0); }
             .btn.activated { background:linear-gradient(90deg, #9ed3ff46, #5bbbff2a); border-color: #5bbbff55; }
             .btn.primary{background:linear-gradient(90deg,var(--accent), #6cc7ff); color:#001; border:none; font-weight:600}
@@ -49,8 +48,8 @@
             ul.playlist li.selected{background:rgba(62, 165, 255, 0.305)}
             ul.playlist li.pointer{background:rgba(255,255,255,0.04)}
 
-            .controls{display:flex; gap:8px; margin-top:8px}
-            .box{display:flex; flex-direction:column; gap:8px; flex-grow: 1; overflow: hidden;}
+            .controls{display:flex; gap:6px; margin-top:6px}
+            .box {display:flex; flex-direction:column; gap:6px; flex-grow: 1; overflow: hidden; transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1);}
 
             .listbox{
                 height:100%;
@@ -60,60 +59,76 @@
                 background:var(--card);
                 padding:8px;
                 font-size:14px;
-                scrollbar-width: none; /* For Firefox */
+                scrollbar-width: none;
             }
-            .listbox::-webkit-scrollbar {
-                display: none; /* For Chrome, Safari, and other WebKit browsers */
-            }
+            .listbox::-webkit-scrollbar { display: none; }
 
             .listbox div.item{ padding:6px; border-radius:6px; transition: background-color 0.2s ease; }
             .listbox div.item:hover{background:rgba(255,255,255,0.04); cursor:pointer}
             .listbox div.item.selected{background:rgba(62, 165, 255, 0.305)}
 
-            /* --- STICKY QUEUE IMPLEMENTATION --- */
-            #section-playlist {
-                flex: 3; /* Takes more space by default */
-                min-height: 100px;
-            }
-
-            #section-queue {
-                /* flex: 1 allows it to grow into any space left by the playlist */
-                flex: 1; 
-                min-height: 160px; /* It will be at least this tall */
-                display: flex;
-                flex-direction: column;
-            }
-
-            /* Ensure the inner listbox fills the new height */
-            #section-queue .collapsible-content {
-                flex-grow: 1;
-            }
-
-            /* When playlist is collapsed, let the queue expand */
-            #section-playlist.collapsed + #section-queue {
-                flex: 1 1 auto !important;
-            }
-
-            /* Default behavior: playlist dominates */
-            #section-playlist {
-                flex: 3 1 0;
-            }
-
-            #section-queue {
-                flex: 1 1 0;
-            }
-            #section-playlist,
-            #section-queue {
-                transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-
+            #section-playlist { flex: 3 1 0; }
+            #section-queue { flex: 1 1 0; display: flex; flex-direction: column; }
+            #section-queue .collapsible-content { flex-grow: 1; }
+            #section-queue.collapsed .collapsible-content { display: none; }
+            #section-playlist.collapsed + #section-queue { flex: 1 1 auto !important; }
 
             .small{font-size:12px; color:var(--muted)}
             .muted{color:var(--muted); font-size:13px}
             .footer{display:flex; justify-content:space-between; gap:8px; align-items:center; margin-top:8px}
-            .directory-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; flex-grow:1; overflow:hidden}
+            .directory-grid {
+                display: flex;
+                gap: 12px;
+                flex-grow: 1;
+                overflow: hidden;
+            }
+            .directory-grid > .box {
+                flex: 1 1 0;
+                min-width: 0; /* important for overflow handling */
+            }
             #keybinds {display: flex; gap: 10px; align-items: center; white-space: nowrap; }
             #keybinds kbd {background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 6px; font-family: "Consolas", monospace; font-size: 12px; }
+
+            /* ── WHEP Player ── */
+            #whep-section { flex-shrink: 0 }
+            .whep-row { display: flex; gap: 8px; align-items: center; }
+            #whep-url-input {
+                flex: 1; font-size: 12px; font-family: "Consolas", monospace;
+                background: var(--card); border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 6px; color: #eef2f6; padding: 5px 8px;
+                outline: none;
+            }
+            #whep-url-input:focus { border-color: rgba(62,166,255,0.4); }
+            .whep-status-dot {
+                width: 8px; height: 8px; border-radius: 50%;
+                background: var(--muted); flex-shrink: 0; transition: background 0.3s;
+            }
+            .whep-status-dot.connecting { background: #f0c040; }
+            .whep-status-dot.connected { background: var(--success); box-shadow: 0 0 6px rgba(71,209,139,0.5); }
+            .whep-status-dot.error { background: var(--danger); }
+            .whep-vol-row { display: flex; gap: 8px; align-items: center; }
+            #whep-vol {
+                flex: 1; -webkit-appearance: none; appearance: none;
+                height: 4px; background: rgba(255,255,255,0.12); border-radius: 4px; outline: none;
+            }
+            #whep-vol::-webkit-slider-thumb {
+                -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+                background: var(--accent); cursor: pointer;
+            }
+            #whep-vol::-moz-range-thumb {
+                width: 14px; height: 14px; border-radius: 50%;
+                background: var(--accent); border: none; cursor: pointer;
+            }
+            #whep-log {
+                font-family: "Consolas", monospace; font-size: 11px;
+                background: var(--card); border-radius: 6px;
+                padding: 6px 8px; max-height: 120px; overflow-y: auto;
+                scrollbar-width: none; line-height: 1.6;
+            }
+            #whep-log::-webkit-scrollbar { display: none; }
+            .wlog-ok { color: var(--success); }
+            .wlog-err { color: var(--danger); }
+            .wlog-info { color: var(--muted); }
 
             @media (max-width:800px){
                 html, body{overflow: auto; height: auto}
@@ -124,8 +139,6 @@
                 .listbox {min-height: 200px}
                 button, .btn {padding: 10px 14px}
                 .panel.right { height: auto; }
-
-                /* On mobile, revert to a stacking layout instead of sticky */
                 #section-playlist, #section-queue { flex: 1 1 auto; }
             }
         </style>
@@ -140,7 +153,7 @@
             <!-- Left Panel -->
             <div class="panel left">
                 <div class="now">
-                    <div class="frame-title" style="cursor: default; pointer-events: none;">Now Playing</div>
+                    <div class="frame-title-nc" style="cursor: default; pointer-events: none;">Now Playing</div>
                     <div class="track" id="now-track">Loading...</div>
                     <div class="progress-wrap" style="margin-top:8px">
                         <div class="progress-bar" title="progress"><div class="progress-fill" id="prog-fill"></div></div>
@@ -160,12 +173,11 @@
                 </div>
 
                 <div class="next" style="margin-top:12px">
-                    <div class="frame-title" style="cursor: default; pointer-events: none;">Next Track</div>
+                    <div class="frame-title-nc">Next Track</div>
                     <div class="track" id="next-track">Loading...</div>
                 </div>
 
                 <div style="margin-top:12px; display:flex; flex-direction: column; flex-grow: 1; overflow: hidden; gap: 12px;">
-                    <!-- Playlist Viewer -->
                     <div class="box" id="section-playlist">
                         <div class="frame-title" onclick="toggleSection('section-playlist')">Playlist Viewer</div>
                         <div class="collapsible-content listbox" style="flex-grow:1">
@@ -175,7 +187,6 @@
                         </div>
                     </div>
 
-                    <!-- Queue -->
                     <div class="box" id="section-queue">
                         <div class="frame-title" onclick="toggleSection('section-queue')">Queue</div>
                         <div class="collapsible-content listbox" id="queue-box" style="flex-grow: 1;">
@@ -187,6 +198,29 @@
 
             <!-- Right Panel -->
             <div class="panel right">
+
+                <!-- WHEP Player Section -->
+                <div class="box" id="whep-section">
+                    <div class="frame-title" onclick="toggleSection('whep-section')">
+                        <span style="display:flex;align-items:center;gap:8px;">
+                            <span id="whep-dot" class="whep-status-dot"></span>
+                            Live Player
+                        </span>
+                    </div>
+                    <div class="collapsible-content">
+                        <div class="whep-row">
+                            <input id="whep-url-input" type="text" value="https://batorego.flerken.pl.eu.org/webrtc/radio/whep" spellcheck="false" />
+                            <button id="whep-btn" class="btn" onclick="whepToggle()" style="white-space:nowrap;padding:6px 12px;">▶ Connect</button>
+                        </div>
+                        <div class="whep-vol-row">
+                            <span class="small">Vol</span>
+                            <input type="range" id="whep-vol" min="0" max="1" step="0.01" value="0.8" oninput="whepSetVol(this.value)" />
+                            <span class="small" id="whep-vol-out" style="min-width:30px;text-align:right">80%</span>
+                        </div>
+                        <div id="whep-log"></div>
+                    </div>
+                </div>
+
                 <div class="directory-grid">
                     <div class="box" id="section-dirs">
                         <div class="frame-title" onclick="toggleSection('section-dirs')">Directory Browser</div>
@@ -233,15 +267,12 @@
             let subbasePath = "";
             let skipCount = 0;
 
-            // UI Toggle Function
             function toggleSection(id) {
                 document.getElementById(id).classList.toggle('collapsed');
             }
 
-            // Mobile Default Setup
             function initLayout() {
                 if (window.innerWidth <= 800) {
-                    // Collapse major sections by default on mobile
                     document.getElementById('section-playlist').classList.add('collapsed');
                     document.getElementById('section-dirs').classList.add('collapsed');
                     document.getElementById('section-subdir').classList.add('collapsed');
@@ -249,33 +280,31 @@
             }
 
             function connectWs(){
-                document.getElementById("server-status").textContent = "connecting...";
-                ws = new WebSocket("/ws");
+                const statusText = document.getElementById("server-status");
+                statusText.textContent = "connecting...";
+                ws = new WebSocket("https://radio95.tnet/ws");
 
                 ws.addEventListener("open", () => {
-                    document.getElementById("server-status").textContent = "connected";
-                    reconnectDelay = 1000;
+                    statusText.textContent = "connected";
+                    reconnectDelay = 1500;
                     ws.send(JSON.stringify({action:"get_toplay"}));
                     ws.send(JSON.stringify({action:"skipc"}));
                 });
 
                 ws.addEventListener("close", () => {
-                    document.getElementById("server-status").textContent = "disconnected — reconnecting...";
+                    statusText.textContent = "disconnected — reconnecting...";
                     setTimeout(connectWs, reconnectDelay);
-                    reconnectDelay = Math.min(10000, reconnectDelay + 1000);
+                    reconnectDelay = Math.min(10000, reconnectDelay + 1500);
                 });
 
                 ws.addEventListener("error", (e) => {
-                    console.warn("WS error", e);
-                    document.getElementById("server-status").textContent = "error";
+                    console.error("WS error", e);
+                    statusText.textContent = "error";
                 });
 
                 ws.addEventListener("message", (evt) => {
-                    try {
-                        handleMessage(JSON.parse(evt.data));
-                    } catch (e) {
-                        console.warn("Bad msg", evt.data, e);
-                    }
+                    try { handleMessage(JSON.parse(evt.data)); }
+                    catch (e) { console.warn("Bad msg", evt.data, e); }
                 });
             }
 
@@ -327,7 +356,6 @@
                 document.getElementById("prog-fill").style.width = percent + "%";
                 document.getElementById("time-label").textContent = formatTime(elapsed) + " / " + formatTime(total) + ` (${formatTime(total-elapsed)})`;
                 currentTrackIndex = payload.index;
-
                 if(track.path){
                     currentTrackPath = (track.official ? "" : "!") + track.path;
                     document.getElementById("now-track").textContent = `${track.official ? "(official) " : ""}${track.path}`;
@@ -347,20 +375,14 @@
                         node.className = "item";
                         node.textContent = f;
                         node.addEventListener("click", () => {
-                            if(node.classList.contains("selected")) {
-                                node.classList.remove("selected");
-                                selectedSubFile = null;
-                                return;
-                            }
+                            if(node.classList.contains("selected")) { node.classList.remove("selected"); selectedSubFile = null; return; }
                             Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
                             Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
                             node.classList.add("selected"); selectedSubFile = f;
                         });
                         dirsBox.appendChild(node);
                     });
-                } catch(e) {
-                    dirsBox.innerHTML = "Error fetching dirs: "+e.message;
-                }
+                } catch(e) { dirsBox.innerHTML = "Error fetching dirs: "+e.message; }
             }
 
             function formatTime(s){
@@ -374,7 +396,6 @@
                 const ul = document.getElementById("playlist-ul");
                 ul.innerHTML = "";
                 let currentIndex = null;
-
                 playlist.forEach((t, i) => {
                     const li = document.createElement("li");
                     const idx = i+1;
@@ -384,29 +405,20 @@
                     li.dataset.path = path;
                     li.dataset.idx = i;
                     li.addEventListener("click", () => { selectPlaylistItem(i, li); });
-
                     const p = li.dataset.path;
                     const currentPath = currentTrackPath.replace(/^!/, "");
-                    if (p === currentPath && i === currentTrackIndex) {
-                        li.classList.add("current");
-                        currentIndex = i;
-                    }
-                    else if (i === currentTrackIndex) {
-                        li.classList.add("pointer");
-                        currentIndex = i - 1;
-                    }
+                    if (p === currentPath && i === currentTrackIndex) { li.classList.add("current"); currentIndex = i; }
+                    else if (i === currentTrackIndex) { li.classList.add("pointer"); currentIndex = i - 1; }
                     if(currentIndex !== null && Queue.length === 0 && i > currentIndex && i <= currentIndex + skipCount)
                         li.style.textDecoration = "line-through";
                     li.textContent = ` ${String(idx).padStart(2,'0')}: `;
                     li.textContent = li.textContent + (i === currentTrackIndex ? "▶ " : "  ") + displayPath;
                     ul.appendChild(li);
                 });
-
                 if(currentIndex !== null){
                     const el = ul.children[currentIndex];
                     if(el) el.scrollIntoView({block:'center', behavior: 'smooth'});
-                }
-                updateControls();
+                } updateControls();
             }
 
             function renderQueue() {
@@ -422,11 +434,7 @@
             }
 
             function selectPlaylistItem(i, el){
-                if(el.classList.contains("selected")) {
-                    el.classList.remove("selected");
-                    selectedPlaylistIndex = null;
-                    return;
-                }
+                if(el.classList.contains("selected")) { el.classList.remove("selected"); selectedPlaylistIndex = null; return; }
                 const ul = document.getElementById("playlist-ul");
                 Array.from(ul.children).forEach(c => c.classList.remove("selected"));
                 Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
@@ -459,42 +467,30 @@
                             node.className = "item";
                             node.textContent = f;
                             node.addEventListener("click", () => {
-                                if(node.classList.contains("selected")) {
-                                    node.classList.remove("selected");
-                                    selectedDir = null;
-                                    selectedSubFile = null;
-                                    return;
-                                }
+                                if(node.classList.contains("selected")) { node.classList.remove("selected"); selectedDir = null; selectedSubFile = null; return; }
                                 Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
                                 Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
                                 Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
                                 node.classList.add("selected");
-                                selectedDir = null;
-                                selectedSubFile = null;
+                                selectedDir = null; selectedSubFile = null;
                                 document.getElementById("subdir-box").innerHTML = "";
                             });
                             node.dataset.type = "file";
                             dirsBox.appendChild(node);
                         }
                     });
-                } catch(e) {
-                    dirsBox.innerHTML = "Error fetching dirs: "+e.message;
-                }
+                } catch(e) { dirsBox.innerHTML = "Error fetching dirs: "+e.message; }
             }
 
             function onDirClicked(name, node){
                 if(node.classList.contains("selected")) {
-                    node.classList.remove("selected");
-                    selectedDir = null;
-                    selectedSubFile = null;
-                    document.getElementById("subdir-box").innerHTML = "";
-                    return;
+                    node.classList.remove("selected"); selectedDir = null; selectedSubFile = null;
+                    document.getElementById("subdir-box").innerHTML = ""; return;
                 }
                 Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
                 Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
                 node.classList.add("selected");
-                selectedDir = name;
-                selectedSubFile = null;
+                selectedDir = name; selectedSubFile = null;
                 ws.send(JSON.stringify({action:"request_dir", what: selectedDir}))
             }
 
@@ -507,7 +503,6 @@
             function addSelectedFileToQueue(top) {
                 let fullPath = null;
                 let success = false;
-
                 if (selectedPlaylistIndex != null) {
                     const selected = playlist[selectedPlaylistIndex];
                     const path = (selected.official ? "" : "!") + selected.path;
@@ -519,21 +514,14 @@
                     const selectedItem = Array.from(dirEls).find(el => el.classList.contains("selected"));
                     if (selectedItem && selectedItem.dataset.type === "file") fullPath = basePath.replace(/\/$/, '') + '/' + selectedItem.textContent;
                 }
-
-                if (fullPath) {
-                    ws.send(JSON.stringify({ action: "add_to_toplay", songs: [fullPath], top: top }));
-                    success = true;
-                }
-
+                if (fullPath) { ws.send(JSON.stringify({ action: "add_to_toplay", songs: [fullPath], top: top })); success = true; }
                 Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
                 Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
                 Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
-
-                selectedPlaylistIndex = null;
-                selectedSubFile = null;
-
+                selectedPlaylistIndex = null; selectedSubFile = null;
                 return success;
             }
+
             document.getElementById("add-to-queue-btn").addEventListener("click", () => addSelectedFileToQueue(false));
             document.getElementById("add-to-queue2-btn").addEventListener("click", () => addSelectedFileToQueue(true));
 
@@ -549,6 +537,108 @@
                 else if (e.key === "m") ws.send(JSON.stringify({action:"skipc", remove: -1}));
                 else if (e.key.toLowerCase() === "j") ws.send(JSON.stringify({action:"jingle", top: e.shiftKey}));
             });
+
+            /* ── WHEP Player logic ── */
+            let whepPc = null;
+            let whepAudio = null;
+            let whepConnected = false;
+
+            function whepLog(msg, type = 'info') {
+                const el = document.getElementById('whep-log');
+                const line = document.createElement('div');
+                line.className = 'wlog-' + type;
+                const ts = new Date().toLocaleTimeString("pl-PL");
+                line.textContent = `[${ts}] ${msg}`;
+                el.appendChild(line);
+                el.scrollTop = el.scrollHeight;
+                // Keep log short
+                while (el.children.length > 30) el.removeChild(el.firstChild);
+            }
+
+            function whepSetDot(state) {
+                const dot = document.getElementById('whep-dot');
+                dot.className = 'whep-status-dot' + (state !== 'idle' ? ' ' + state : '');
+                const btn = document.getElementById('whep-btn');
+                if (state === 'connected' || state === 'connecting') {
+                    btn.textContent = '⏹ Disconnect';
+                    btn.classList.add('activated');
+                } else {
+                    btn.textContent = '▶ Connect';
+                    btn.classList.remove('activated');
+                }
+            }
+
+            function whepSetVol(v) {
+                document.getElementById('whep-vol-out').textContent = Math.round(v * 100) + '%';
+                if (whepAudio) whepAudio.volume = parseFloat(v);
+            }
+
+            function whepToggle() {
+                if (whepConnected || whepPc) { whepDisconnect(); return; }
+                whepConnect();
+            }
+
+            function whepDisconnect() {
+                whepConnected = false;
+                if (whepPc) { try { whepPc.close(); } catch(e){} whepPc = null; }
+                if (whepAudio) { whepAudio.pause(); whepAudio.srcObject = null; whepAudio = null; }
+                whepSetDot('idle');
+                whepLog('Disconnected');
+            }
+
+            async function whepConnect() {
+                const url = document.getElementById('whep-url-input').value.trim();
+                if (!url) return;
+                whepSetDot('connecting');
+                whepLog('Creating peer connection…');
+                try {
+                    whepPc = new RTCPeerConnection();
+                    whepPc.ontrack = (e) => {
+                        whepLog('Track received, starting playback', 'ok');
+                        whepAudio = new Audio();
+                        whepAudio.srcObject = e.streams[0];
+                        whepAudio.volume = parseFloat(document.getElementById('whep-vol').value);
+                        whepAudio.play().then(() => {
+                            whepLog('Audio playing', 'ok');
+                            whepConnected = true;
+                            whepSetDot('connected');
+                        }).catch(() => {
+                            whepLog('Autoplay blocked — click anywhere to resume', 'err');
+                            document.addEventListener('click', () => whepAudio && whepAudio.play(), { once: true });
+                        });
+                    };
+                    whepPc.onconnectionstatechange = () => {
+                        whepLog('State: ' + whepPc.connectionState);
+                        if (whepPc.connectionState === 'failed' || whepPc.connectionState === 'disconnected') {
+                            whepLog('Connection lost', 'err');
+                            whepDisconnect();
+                            whepSetDot('error');
+                        }
+                    };
+                    whepPc.oniceconnectionstatechange = () => whepLog('ICE: ' + whepPc.iceConnectionState);
+                    whepPc.addTransceiver('audio', { direction: 'recvonly' });
+                    const offer = await whepPc.createOffer();
+                    offer.sdp = offer.sdp
+                        .replace(/useinbandfec=1/g, 'useinbandfec=1;stereo=1;sprop-stereo=1')
+                        .replace(/minptime=10/g, 'minptime=10;ptime=10;maxptime=10');
+                    await whepPc.setLocalDescription(offer);
+                    whepLog('Sending offer to ' + url);
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/sdp', 'Accept': 'application/sdp' },
+                        body: whepPc.localDescription.sdp
+                    });
+                    if (!resp.ok) throw new Error(`Server returned ${resp.status} ${resp.statusText}`);
+                    const answerSdp = await resp.text();
+                    whepLog(`Got SDP answer (${answerSdp.length} bytes)`, 'ok');
+                    await whepPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+                    whepLog('Waiting for ICE + track…');
+                } catch(err) {
+                    whepLog('Error: ' + err.message, 'err');
+                    whepDisconnect();
+                    whepSetDot('error');
+                }
+            }
 
             // Start
             initLayout();

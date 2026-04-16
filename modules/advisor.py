@@ -130,6 +130,7 @@ class Module(PlaylistAdvisor):
         self._imc = imc
         imc.register(self, "advisor")
     def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool):
+        if broadcast: return
         return (self.custom_playlist, MORNING_START, DAY_END)
 
 advisor = Module()
