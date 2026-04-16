@@ -113,12 +113,20 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                 await websocket.close(1001, "")
                 clients.discard(websocket)
         async def process_request(websocket: ServerConnection, request: Request):
-            if request.path == "/" and (file := Path(__file__, "..", "web.html").resolve()).exists():
+            if request.path == "/" and (file := Path(__file__, "..", "web.html")).exists():
                 data = file.read_bytes()
                 return Response(
                     200,
                     "OK",
                     Headers([("Content-Type", "text/html"), ("Content-Length", f"{len(data)}")]),
+                    data
+                )
+            if request.path == "/web.js" and (file := Path(__file__, "..", "web.js")).exists():
+                data = file.read_bytes()
+                return Response(
+                    200,
+                    "OK",
+                    Headers([("Content-Type", "text/javascript"), ("Content-Length", f"{len(data)}")]),
                     data
                 )
             if request.path == "/ws":
