@@ -21,6 +21,7 @@ function initLayout() {
         document.getElementById('section-dirs').classList.add('collapsed');
         document.getElementById('section-subdir').classList.add('collapsed');
     }
+    if(window.location.protocol === "file:") document.getElementById("whep-url-input").value = "https://webrtc.terminal.tnet/radio/whep"
 }
 
 function connectWs(){
