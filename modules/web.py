@@ -134,7 +134,7 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                     )
                 return None
             else:
-                if request.path == "/" and (file := Path(__file__, "..", "index.html").resolve()).exists():
+                if request.path == "/" and (file := Path(__file__, "..", "web", "index.html").resolve()).exists():
                     data = file.read_bytes()
                     return Response(
                         200,
@@ -142,7 +142,7 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                         Headers([("Content-Type", "text/html; charset=utf-8"), ("Content-Length", f"{len(data)}")]),
                         data
                     )
-                elif (file := Path(__file__, "..", request.path.removeprefix("/").strip()).resolve()).exists():
+                elif (file := Path(__file__, "..", "web", request.path.removeprefix("/").strip()).resolve()).exists():
                     data = file.read_bytes()
                     return Response(
                         200,
