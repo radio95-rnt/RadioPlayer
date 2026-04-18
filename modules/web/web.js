@@ -357,6 +357,7 @@ async function whepConnect() {
             url: url,
 
             onTrack: (evt) => {
+                if(evt.track.kind !== "audio") return;
                 whepLog('Track received, starting playback', 'ok');
 
                 whepAudio = new Audio();
@@ -386,8 +387,6 @@ async function whepConnect() {
                 }
             }
         });
-
-        await whepReader.start();
 
         whepLog('Reader started, waiting for media…');
 
