@@ -255,14 +255,18 @@ document.getElementById("jingle-btn").addEventListener("contextmenu", (e) => {
     e.preventDefault();
     ws.send(JSON.stringify({action:"jingle", top: true}));
 });
-document.getElementById("clear-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"clear_toplay"})));
-
 document.getElementById("skipidx-btn").addEventListener("click", () => {
     if (selectedPlaylistIndex == null) return;
     const action = skipped_idx.includes(selectedPlaylistIndex)
         ? { action: "skipi", remove: selectedPlaylistIndex }
         : { action: "skipi", add: selectedPlaylistIndex };
     ws.send(JSON.stringify(action));
+});
+
+document.getElementById("queue-title").addEventListener("click", () => toggleSection("section-queue"));
+document.getElementById("clear-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    ws.send(JSON.stringify({action:"clear_toplay"}));
 });
 
 function addSelectedFileToQueue(top) {
