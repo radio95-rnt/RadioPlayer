@@ -71,14 +71,12 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             result = await get_imc("activemod", {"action": "clear_toplay"})
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else:
-                await websocket.send(json.dumps({"data": result, "event": "toplay"})) # Yes, this is not an accident
                 await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
-        elif action == "skipc":
+        elif action == "skipc" or action == "skipi":
             result = await get_imc("activemod", msg)
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else:
-                await websocket.send(json.dumps({"data": result, "event": action}))
-                await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": action})  # broadcast
+                await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": action})
         elif action == "jingle":
             result = await get_imc("jingle", msg.get("top", False))
             if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))

@@ -23,6 +23,7 @@ class Module(ActiveModifier):
         self.file_lock = Lock()
         self.crossfade = DEFAULT_CROSSFADE
         self.skip_next = 0
+        self.skip_indexes = set()
     def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]):
         self.playlist = playlist
         self.originals = []
@@ -61,12 +62,6 @@ class Module(ActiveModifier):
             else:
                 if (index - 1) >= 0: last_track_fade_out = self.playlist[index - 1].fade_out
                 else: last_track_fade_out = 0.0
-
-            if len(songs) != 0: next_track_fade_in = self.crossfade
-            else:
-                if index + 1 < len(self.playlist) and next_track: next_track_fade_in = next_track.fade_in
-                elif not next_track: next_track_fade_in = 0.0
-                else: next_track_fade_in = self.crossfade
 
             if not self.originals or self.originals[-1] != track: self.originals.append(track)
 
@@ -163,13 +158,18 @@ class Module(ActiveModifier):
                         i += 1
                 with open(TOPLAY, "w") as f: f.write(first_line.strip() + "\n")
                 return {"status": "ok", "data": [first_line.strip()]}
-        elif data.get("action") == "skip_next": return {"status": "removed"}
         elif data.get("action") == "skipc":
             if (count := data.get("set", -1)) > -1: self.skip_next = count
-            if (count2 := data.get("add", -1)) > -1: self.skip_next += count2
+            if (count2 := data.get("add", None)): self.skip_next += count2
             if (count3 := data.get("remove", 1)) < 0: self.skip_next += count3
             self.skip_next = max(self.skip_next, 0)
             return {"status": "ok", "data": self.skip_next}
+        elif data.get("action") == "skipi":
+            idx = data.get("target")
+            if not idx or not isinstance(idx, int): return {"status": "data", "data": list(self.skip_indexes)}
+            self.skip_indexes.add(idx)
+            return {"status": "ok", "data": list(self.skip_indexes)}
+
 
 activemod = Module()
 

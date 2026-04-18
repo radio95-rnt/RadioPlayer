@@ -10,6 +10,8 @@ let selectedSubFile = null;
 let basePath = "";
 let subbasePath = "";
 let skipCount = 0;
+let indexDigits = 1;
+let skipped_idx = [];
 
 function toggleSection(id) {
     document.getElementById(id).classList.toggle('collapsed');
@@ -24,7 +26,7 @@ function initLayout() {
     if(window.location.protocol === "file:") document.getElementById("whep-url-input").value = "https://webrtc.terminal.tnet/radio/whep"
 }
 
-function connectWs(){
+function connectWs() {
     const statusText = document.getElementById("server-status");
     statusText.textContent = "connecting...";
 
@@ -37,6 +39,7 @@ function connectWs(){
         reconnectDelay = 1500;
         ws.send(JSON.stringify({action:"get_toplay"}));
         ws.send(JSON.stringify({action:"skipc"}));
+        ws.send(JSON.stringify({action:"skipi"}));
     });
 
     ws.addEventListener("close", () => {
@@ -71,6 +74,7 @@ function handleMessage(msg){
         applyTrackState(msg.data);
         ws.send(JSON.stringify({action:"get_toplay"}));
         ws.send(JSON.stringify({action:"skipc"}));
+        ws.send(JSON.stringify({action:"skipi"}));
     } else if(msg.event === "progress") applyProgressState(msg.data);
     else if(msg.event === "toplay") {
         Queue = msg.data.data || [];
@@ -81,15 +85,18 @@ function handleMessage(msg){
         document.getElementById("skpn-count").textContent = skipCount;
         renderPlaylist();
         renderQueue();
+    } else if(msg.event === "skipi") {
+        skipped_idx = msg.data?.data ?? skipped_idx;
+        renderPlaylist();
     }
 }
 
-function applyTrackState(payload){
+function applyTrackState(payload) {
     const track = payload.track || {};
     const next = payload.next_track || {};
     currentTrackPath = track.path;
     currentTrackIndex = payload.index;
-    document.getElementById("now-track").textContent = (track.official ? "(official) " : "(unofficial) ") + track.path.replace(basePath, "").slice(1);;
+    document.getElementById("now-track").textContent = `${String(currentTrackIndex).padStart(indexDigits,'0')}: ` + (track.official ? "(official) " : "(unofficial) ") + track.path.replace(basePath, "").slice(1);;
     document.getElementById("next-track").textContent = (next.official ? "(official) " : "(unofficial) ") + next.path.replace(basePath, "").slice(1);
     renderPlaylist();
 }
@@ -106,7 +113,7 @@ function applyProgressState(payload) {
     currentTrackIndex = payload.index;
     if(track.path){
         currentTrackPath = track.path;
-        document.getElementById("now-track").textContent = (track.official ? "(official) " : "(unofficial) ") + track.path.replace(basePath, "").slice(1);
+        document.getElementById("now-track").textContent = `${String(currentTrackIndex).padStart(indexDigits,'0')}: ` + (track.official ? "(official) " : "(unofficial) ") + track.path.replace(basePath, "").slice(1);
     } if(next_track.path) document.getElementById("next-track").textContent = `${next_track.official ? "(official)" : "(unofficial)"} ${next_track.path.replace(basePath, "").slice(1)}`;
 }
 
@@ -144,7 +151,7 @@ function renderPlaylist() {
     const ul = document.getElementById("playlist-ul");
     ul.innerHTML = "";
     let currentIndex = null;
-    const digits = playlist.length.toString().length
+    indexDigits = playlist.length.toString().length
     playlist.forEach((t, i) => {
         const li = document.createElement("li");
         const path = t.path || "<no path>";
@@ -155,11 +162,11 @@ function renderPlaylist() {
         li.addEventListener("click", () => { selectPlaylistItem(i, li); });
         if (path === currentTrackPath && i === currentTrackIndex) { li.classList.add("current"); currentIndex = i; }
         else if (i === currentTrackIndex) { li.classList.add("pointer"); currentIndex = i - 1; }
-        if(currentIndex !== null && Queue.length === 0 && i > currentIndex && i <= currentIndex + skipCount)
-            li.style.textDecoration = "line-through";
-        li.textContent = ` ${String(i).padStart(digits,'0')}: `;
+        if(currentIndex !== null && Queue.length === 0 && i > currentIndex && i <= currentIndex + skipCount) li.style.textDecoration = "line-through";
+        li.textContent = ` ${String(i).padStart(indexDigits,'0')}: `;
         li.textContent = (i === currentTrackIndex ? "▶ " : "  ") + li.textContent + displayPath;
         ul.appendChild(li);
+        if(skipped_idx.includes(i)) li.style.textDecoration = "line-through";
     });
     if(currentIndex !== null){
         const el = ul.children[currentIndex];
