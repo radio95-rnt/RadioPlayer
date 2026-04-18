@@ -295,15 +295,15 @@ function updateControls() {
 
     const btn = document.getElementById("skipidx-btn");
     if (selectedPlaylistIndex == null) {
-        btn.textContent = "⏭+ Skip idx";
+        btn.textContent = "⏭+ Skip in playlist";
         btn.disabled = true;
         btn.classList.remove("activated");
     } else if (skipped_idx.includes(selectedPlaylistIndex)) {
-        btn.textContent = "✓ Unskip idx";
+        btn.textContent = "✓ Unskip in playlist";
         btn.disabled = false;
         btn.classList.add("activated");
     } else {
-        btn.textContent = "⏭+ Skip idx";
+        btn.textContent = "⏭+ Skip in playlist";
         btn.disabled = false;
         btn.classList.remove("activated");
     }
