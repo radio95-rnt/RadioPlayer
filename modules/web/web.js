@@ -257,6 +257,14 @@ document.getElementById("jingle-btn").addEventListener("contextmenu", (e) => {
 });
 document.getElementById("clear-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"clear_toplay"})));
 
+document.getElementById("skipidx-btn").addEventListener("click", () => {
+    if (selectedPlaylistIndex == null) return;
+    const action = skipped_idx.includes(selectedPlaylistIndex)
+        ? { action: "skipi", remove: selectedPlaylistIndex }
+        : { action: "skipi", add: selectedPlaylistIndex };
+    ws.send(JSON.stringify(action));
+});
+
 function addSelectedFileToQueue(top) {
     let fullPath = null;
     let success = false;
@@ -284,6 +292,21 @@ document.getElementById("add-to-queue2-btn").addEventListener("click", () => add
 
 function updateControls() {
     document.getElementById("clear-btn").disabled = Queue.length === 0;
+
+    const btn = document.getElementById("skipidx-btn");
+    if (selectedPlaylistIndex == null) {
+        btn.textContent = "⏭+ Skip idx";
+        btn.disabled = true;
+        btn.classList.remove("activated");
+    } else if (skipped_idx.includes(selectedPlaylistIndex)) {
+        btn.textContent = "✓ Unskip idx";
+        btn.disabled = false;
+        btn.classList.add("activated");
+    } else {
+        btn.textContent = "⏭+ Skip idx";
+        btn.disabled = false;
+        btn.classList.remove("activated");
+    }
 }
 
 document.addEventListener("keydown", e => {

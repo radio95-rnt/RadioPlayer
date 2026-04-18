@@ -173,11 +173,9 @@ class Module(ActiveModifier):
             self.skip_next = max(self.skip_next, 0)
             return {"status": "ok", "data": self.skip_next}
         elif data.get("action") == "skipi":
-            idx = data.get("target")
-            if not idx or not isinstance(idx, int): return {"status": "data", "data": list(self.skip_indexes)}
-            self.skip_indexes.add(idx)
+            if (add := data.get("add")) and isinstance(add, int): self.skip_indexes.add(add)
+            if (remove := data.get("remove")) is not None and isinstance(remove, int) and remove in self.skip_indexes: self.skip_indexes.remove(remove)
             return {"status": "ok", "data": list(self.skip_indexes)}
-
 
 activemod = Module()
 
