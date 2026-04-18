@@ -94,6 +94,10 @@ class Module(ActiveModifier):
                 logger.info("Skipping...")
                 self.skip_next -= 1
                 return self.play(index, track, next_track)
+            if index in self.skip_indexes:
+                self.skip_indexes.remove(index)
+                logger.info("Skipping...")
+                return self.play(index, track, next_track)
             return (self.last_track, next_track), True
         elif len(self.originals):
             self.last_track = self.originals.pop(0)
@@ -120,8 +124,12 @@ class Module(ActiveModifier):
                     return (None, None), None
                 if last_track_duration: logger.info("Track ends at", repr(future))
         if self.skip_next > 0:
-            logger.info("Skip next flag was on, skipping this song.")
+            logger.info("Skip next was more than 0, skipping this song.")
             self.skip_next -= 1
+            return (None, None), None
+        if index in self.skip_indexes:
+            self.skip_indexes.remove(index)
+            logger.info("Skipping...")
             return (None, None), None
         return (self.last_track, next_track), False
 
