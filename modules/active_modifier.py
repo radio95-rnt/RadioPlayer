@@ -95,7 +95,6 @@ class Module(ActiveModifier):
                 self.skip_next -= 1
                 return self.play(index, track, next_track)
             if index in self.skip_indexes:
-                self.skip_indexes.remove(index)
                 logger.info("Skipping...")
                 return self.play(index, track, next_track)
             return (self.last_track, next_track), True
@@ -128,7 +127,6 @@ class Module(ActiveModifier):
             self.skip_next -= 1
             return (None, None), None
         if index in self.skip_indexes:
-            self.skip_indexes.remove(index)
             logger.info("Skipping...")
             return (None, None), None
         return (self.last_track, next_track), False
