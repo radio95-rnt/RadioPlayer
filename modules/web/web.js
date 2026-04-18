@@ -288,7 +288,7 @@ document.addEventListener("keydown", e => {
     else if (e.key.toLowerCase() === "j") ws.send(JSON.stringify({action:"jingle", top: e.shiftKey}));
 });
 
-let whepPc = null;
+let whepReader = null;
 let whepAudio = null;
 let whepConnected = false;
 
@@ -323,14 +323,24 @@ function whepSetVol(v) {
 }
 
 function whepToggle() {
-    if (whepConnected || whepPc) { whepDisconnect(); return; }
+    if (whepConnected) { whepDisconnect(); return; }
     whepConnect();
 }
 
 function whepDisconnect() {
     whepConnected = false;
-    if (whepPc) { try { whepPc.close(); } catch(e){} whepPc = null; }
-    if (whepAudio) { whepAudio.pause(); whepAudio.srcObject = null; whepAudio = null; }
+
+    if (whepReader) {
+        try { whepReader.stop(); } catch(e){}
+        whepReader = null;
+    }
+
+    if (whepAudio) {
+        whepAudio.pause();
+        whepAudio.srcObject = null;
+        whepAudio = null;
+    }
+
     whepSetDot('idle');
     whepLog('Disconnected');
 }
@@ -338,51 +348,50 @@ function whepDisconnect() {
 async function whepConnect() {
     const url = document.getElementById('whep-url-input').value.trim();
     if (!url) return;
+
     whepSetDot('connecting');
-    whepLog('Creating peer connection…');
+    whepLog('Starting MediaMTX reader…');
+
     try {
-        whepPc = new RTCPeerConnection();
-        whepPc.ontrack = (e) => {
-            whepLog('Track received, starting playback', 'ok');
-            whepAudio = new Audio();
-            whepAudio.srcObject = e.streams[0];
-            whepAudio.volume = parseFloat(document.getElementById('whep-vol').value);
-            whepAudio.play().then(() => {
-                whepLog('Audio playing', 'ok');
-                whepConnected = true;
-                whepSetDot('connected');
-            }).catch(() => {
-                whepLog('Autoplay blocked — click anywhere to resume', 'err');
-                document.addEventListener('click', () => whepAudio && whepAudio.play(), { once: true });
-            });
-        };
-        whepPc.onconnectionstatechange = () => {
-            whepLog('State: ' + whepPc.connectionState);
-            if (whepPc.connectionState === 'failed' || whepPc.connectionState === 'disconnected') {
-                whepLog('Connection lost', 'err');
+        whepReader = new MediaMTXReader({
+            url: url,
+
+            onTrack: (evt) => {
+                whepLog('Track received, starting playback', 'ok');
+
+                whepAudio = new Audio();
+                whepAudio.srcObject = evt.streams[0];
+                whepAudio.volume = parseFloat(document.getElementById('whep-vol').value);
+
+                whepAudio.play().then(() => {
+                    whepLog('Audio playing', 'ok');
+                    whepConnected = true;
+                    whepSetDot('connected');
+                }).catch(() => {
+                    whepLog('Autoplay blocked — click anywhere', 'err');
+                    document.addEventListener('click', () => whepAudio?.play(), { once: true });
+                });
+            },
+
+            onError: (err) => {
+                whepLog('Error: ' + err, 'err');
                 whepDisconnect();
                 whepSetDot('error');
+            },
+
+            onStateChange: (state) => {
+                whepLog('State: ' + state);
+                if (state === 'closed') {
+                    whepDisconnect();
+                }
             }
-        };
-        whepPc.oniceconnectionstatechange = () => whepLog('ICE: ' + whepPc.iceConnectionState);
-        whepPc.addTransceiver('audio', { direction: 'recvonly' });
-        const offer = await whepPc.createOffer();
-        offer.sdp = offer.sdp
-            .replace(/useinbandfec=1/g, 'useinbandfec=1;stereo=1;sprop-stereo=1')
-            .replace(/minptime=10/g, 'minptime=10;ptime=10;maxptime=10');
-        await whepPc.setLocalDescription(offer);
-        whepLog('Sending offer to ' + url);
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/sdp', 'Accept': 'application/sdp' },
-            body: whepPc.localDescription.sdp
         });
-        if (!resp.ok) throw new Error(`Server returned ${resp.status} ${resp.statusText}`);
-        const answerSdp = await resp.text();
-        whepLog(`Got SDP answer (${answerSdp.length} bytes)`, 'ok');
-        await whepPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-        whepLog('Waiting for ICE + track…');
-    } catch(err) {
+
+        await whepReader.start();
+
+        whepLog('Reader started, waiting for media…');
+
+    } catch (err) {
         whepLog('Error: ' + err.message, 'err');
         whepDisconnect();
         whepSetDot('error');
