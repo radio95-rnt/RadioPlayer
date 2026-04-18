@@ -158,7 +158,7 @@ function renderPlaylist() {
         if(currentIndex !== null && Queue.length === 0 && i > currentIndex && i <= currentIndex + skipCount)
             li.style.textDecoration = "line-through";
         li.textContent = ` ${String(i).padStart(digits,'0')}: `;
-        li.textContent = li.textContent + (i === currentTrackIndex ? "▶ " : "  ") + displayPath;
+        li.textContent = (i === currentTrackIndex ? "▶ " : "  ") + li.textContent + displayPath;
         ul.appendChild(li);
     });
     if(currentIndex !== null){
@@ -172,7 +172,7 @@ function renderQueue() {
     ul.innerHTML = "";
     Queue.forEach((element, i) => {
         const li = document.createElement("li");
-        li.textContent = element;
+        li.textContent = element.replace(basePath, "").slice(1);
         if(i < skipCount) li.style.textDecoration = "line-through";
         ul.appendChild(li);
     });
@@ -382,9 +382,7 @@ async function whepConnect() {
 
             onStateChange: (state) => {
                 whepLog('State: ' + state);
-                if (state === 'closed') {
-                    whepDisconnect();
-                }
+                if (state === 'closed') whepDisconnect();
             }
         });
 
