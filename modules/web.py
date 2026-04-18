@@ -124,22 +124,6 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                 await websocket.close(1001, "")
                 clients.discard(websocket)
         async def process_request(websocket: ServerConnection, request: Request):
-            if request.path == "/" and (file := Path(__file__, "..", "index.html").resolve()).exists():
-                data = file.read_bytes()
-                return Response(
-                    200,
-                    "OK",
-                    Headers([("Content-Type", "text/html; charset=utf-8"), ("Content-Length", f"{len(data)}")]),
-                    data
-                )
-            if (file := Path(__file__, "..", request.path.removeprefix("/").strip()).resolve()).exists():
-                data = file.read_bytes()
-                return Response(
-                    200,
-                    "OK",
-                    Headers([("Content-Type", get_content_type(file.name)), ("Content-Length", f"{len(data)}")]),
-                    data
-                )
             if request.path == "/ws":
                 if not "upgrade" in request.headers.get("Connection", "").lower():
                     return Response(
@@ -150,13 +134,30 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                     )
                 return None
             else:
-                data = b"Not Found\n"
-                return Response(
-                    404,
-                    "Not Found",
-                    Headers([("Content-Length", f"{len(data)}")]),
-                    data
-                )
+                if request.path == "/" and (file := Path(__file__, "..", "index.html").resolve()).exists():
+                    data = file.read_bytes()
+                    return Response(
+                        200,
+                        "OK",
+                        Headers([("Content-Type", "text/html; charset=utf-8"), ("Content-Length", f"{len(data)}")]),
+                        data
+                    )
+                elif (file := Path(__file__, "..", request.path.removeprefix("/").strip()).resolve()).exists():
+                    data = file.read_bytes()
+                    return Response(
+                        200,
+                        "OK",
+                        Headers([("Content-Type", get_content_type(file.name)), ("Content-Length", f"{len(data)}")]),
+                        data
+                    )
+                else:
+                    data = b"Not Found\n"
+                    return Response(
+                        404,
+                        "Not Found",
+                        Headers([("Content-Length", f"{len(data)}")]),
+                        data
+                    )
 
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
