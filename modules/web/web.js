@@ -353,7 +353,7 @@ async function whepConnect() {
     whepLog('Starting MediaMTX reader…');
 
     try {
-        whepReader = new MediaMTXReader({
+        whepReader = new MediaMTXWebRTCReader({
             url: url,
 
             onTrack: (evt) => {
