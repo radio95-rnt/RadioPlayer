@@ -26,7 +26,8 @@ class Module(ActiveModifier):
         self.skip_indexes = set()
     def on_new_playlist(self, playlist: list[Track], global_args: dict[str, str]):
         self.playlist = playlist
-        self.originals = []
+        self.originals.clear()
+        self.skip_indexes.clear()
         self.crossfade = float(global_args.get("crossfade", DEFAULT_CROSSFADE))
 
         if not self._imc: return

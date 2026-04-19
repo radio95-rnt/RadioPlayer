@@ -445,7 +445,7 @@ class MediaMTXWebRTCReader {
     });
 
     const direction = 'recvonly';
-    this.pc.addTransceiver('video', { direction });
+    // this.pc.addTransceiver('video', { direction });
     this.pc.addTransceiver('audio', { direction });
 
     // using data channels requires creating a data channel locally

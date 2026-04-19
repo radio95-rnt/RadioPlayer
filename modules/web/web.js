@@ -10,11 +10,16 @@ let selectedSubFile = null;
 let basePath = "";
 let subbasePath = "";
 let skipCount = 0;
+let skipCountToRender = 0;
 let indexDigits = 1;
 let skipped_idx = [];
 
 function toggleSection(id) {
     document.getElementById(id).classList.toggle('collapsed');
+}
+
+function tnet() {
+    return window.location.protocol === "file:" || window.location.hostname.includes("tnet")
 }
 
 function initLayout() {
@@ -23,7 +28,7 @@ function initLayout() {
         document.getElementById('section-dirs').classList.add('collapsed');
         document.getElementById('section-subdir').classList.add('collapsed');
     }
-    if(window.location.protocol === "file:") document.getElementById("whep-url-input").value = "https://webrtc.terminal.tnet/radio/whep"
+    if(tnet()) document.getElementById("whep-url-input").value = "https://webrtc.terminal.tnet/radio/whep"
 }
 
 function connectWs() {
@@ -31,7 +36,7 @@ function connectWs() {
     statusText.textContent = "connecting...";
 
     let url = "/ws";
-    if(window.location.protocol === "file:") url = "https://radio95.tnet/ws"
+    if(tnet()) url = "https://radio95.tnet/ws"
     ws = new WebSocket(url);
 
     ws.addEventListener("open", () => {
@@ -59,7 +64,13 @@ function connectWs() {
     });
 }
 
-function handleMessage(msg){
+function RenderPlaylistQueue() {
+    skipCountToRender = skipCount;
+    renderQueue()
+    renderPlaylist()
+}
+
+function handleMessage(msg) {
     if(msg.event === "state"){
         const d = msg.data || {};
         if(d.dirs) updateDirs(d.dirs);
@@ -69,7 +80,7 @@ function handleMessage(msg){
         document.getElementById("rds-text").textContent = rt ?? "";
     } else if(msg.event === "playlist") {
         playlist = msg.data || [];
-        renderPlaylist();
+        RenderPlaylistQueue()
     } else if(msg.event === "new_track"){
         applyTrackState(msg.data);
         ws.send(JSON.stringify({action:"get_toplay"}));
@@ -78,16 +89,15 @@ function handleMessage(msg){
     } else if(msg.event === "progress") applyProgressState(msg.data);
     else if(msg.event === "toplay") {
         Queue = msg.data.data || [];
-        renderQueue();
+        RenderPlaylistQueue();
     } else if(msg.event === "request_dir") applySubdir(msg.data || {})
     else if(msg.event === "skipc") {
         skipCount = msg.data?.data ?? 0;
         document.getElementById("skpn-count").textContent = skipCount;
-        renderPlaylist();
-        renderQueue();
+        RenderPlaylistQueue();
     } else if(msg.event === "skipi") {
         skipped_idx = msg.data?.data ?? skipped_idx;
-        renderPlaylist();
+        RenderPlaylistQueue();
     }
 }
 
@@ -98,7 +108,7 @@ function applyTrackState(payload) {
     currentTrackIndex = payload.index;
     document.getElementById("now-track").textContent = `${String(currentTrackIndex).padStart(indexDigits,'0')}: ` + (track.official ? "(official) " : "(unofficial) ") + track.path.replace(basePath, "").slice(1);;
     document.getElementById("next-track").textContent = (next.official ? "(official) " : "(unofficial) ") + next.path.replace(basePath, "").slice(1);
-    renderPlaylist();
+    RenderPlaylistQueue();
 }
 
 function applyProgressState(payload) {
@@ -140,9 +150,12 @@ function applySubdir(payload) {
     } catch(e) { dirsBox.innerHTML = "Error fetching dirs: "+e.message; }
 }
 
-function formatTime(s){
-    s = Number(s||0);
-    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
+function formatTime(s) {
+    s = Number(s || 0);
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = Math.floor(s % 60);
+
     if(h != 0) return [h,m,sec].map(x => String(x).padStart(2,'0')).join(":");
     else return [m,sec].map(x => String(x).padStart(2,'0')).join(":");
 }
@@ -162,15 +175,17 @@ function renderPlaylist() {
         li.addEventListener("click", () => { selectPlaylistItem(i, li); });
         if (path === currentTrackPath && i === currentTrackIndex) { li.classList.add("current"); currentIndex = i; }
         else if (i === currentTrackIndex) { li.classList.add("pointer"); currentIndex = i - 1; }
-        if(currentIndex !== null && Queue.length === 0 && i > currentIndex && i <= currentIndex + skipCount) li.style.textDecoration = "line-through";
+        if(skipCountToRender > 0 && i > currentTrackIndex) {
+            li.style.textDecoration = "line-through";
+            skipCountToRender--;
+        }
         li.textContent = ` ${String(i).padStart(indexDigits,'0')}: `;
         li.textContent = (i === currentTrackIndex ? "▶ " : "  ") + li.textContent + displayPath;
         ul.appendChild(li);
         if(skipped_idx.includes(i)) li.style.textDecoration = "line-through";
     });
     if(currentIndex !== null){
-        const el = ul.children[currentIndex];
-        if(el) el.scrollIntoView({block:'center', behavior: 'smooth'});
+        ul.children[currentIndex]?.scrollIntoView({block:'center', behavior: 'smooth'});
     } updateControls();
 }
 
@@ -180,7 +195,10 @@ function renderQueue() {
     Queue.forEach((element, i) => {
         const li = document.createElement("li");
         li.textContent = element.replace(basePath, "").slice(1);
-        if(i < skipCount) li.style.textDecoration = "line-through";
+        if(skipCountToRender > 0) {
+            li.style.textDecoration = "line-through";
+            skipCountToRender--;
+        }
         ul.appendChild(li);
     });
     updateControls()
@@ -357,8 +375,8 @@ function whepSetVol(v) {
 }
 
 function whepToggle() {
-    if (whepConnected) { whepDisconnect(); return; }
-    whepConnect();
+    if(whepConnected) whepDisconnect();
+    else whepConnect();
 }
 
 function whepDisconnect() {
@@ -429,6 +447,5 @@ async function whepConnect() {
     }
 }
 
-// Start
 initLayout();
 setTimeout(connectWs, 100);

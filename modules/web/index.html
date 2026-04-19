@@ -42,7 +42,7 @@
             .btn.primary:hover { background:linear-gradient(90deg, #3399ee, #5bbaff); }
 
             ul.playlist{list-style:none; padding:6px; margin:0; font-family: "Consolas",monospace; font-size:13px;}
-            ul.playlist li{ padding:4px 6px; border-radius:6px; display:flex; justify-content:space-between; gap:8px; transition: background-color 0.2s ease, transform 0.15s ease; }
+            ul.playlist li{ padding:4px 6px; border-radius:6px; display:flex; justify-content:space -between; gap:8px; transition: background-color 0.2s ease, transform 0.15s ease; }
             ul.playlist li:hover{ background:rgba(255,255,255,0.04); }
             ul.playlist li.current{background:rgba(62,166,255,0.08)}
             ul.playlist li.selected{background:rgba(62, 165, 255, 0.305)}
@@ -52,13 +52,11 @@
 
             .listbox{
                 height:100%;
-                min-height:100px;
                 overflow:auto;
                 border-radius:6px;
                 background:var(--card);
                 padding:8px;
                 font-size:14px;
-                scrollbar-width: none;
             }
             .listbox::-webkit-scrollbar { display: none; }
 
@@ -66,14 +64,13 @@
             .listbox div.item:hover{background:rgba(255,255,255,0.04); cursor:pointer}
             .listbox div.item.selected{background:rgba(62, 165, 255, 0.305)}
 
-            #section-playlist { flex: 2 1; }
+            #section-playlist { flex: 2 1; overflow: hidden;}
             #section-queue { flex: 1; display: flex; flex-direction: column; }
             #section-queue .collapsible-content { flex-grow: 1; }
             #section-queue.collapsed .collapsible-content { display: none; }
             #section-playlist.collapsed + #section-queue { flex: 1 1 auto !important; }
 
             .small{font-size:12px; color:var(--muted)}
-            .muted{color:var(--muted); font-size:13px}
             .footer{display:flex; justify-content:space-between; gap:5px; align-items:center; margin-top:8px; background:var(--panel); border-radius:10px; padding:8px; box-shadow: 0 8px 18px rgba(2,8,16,0.6);}
             .directory-grid {
                 display: flex;
@@ -114,7 +111,7 @@
             #whep-section .collapsible-content {
                 overflow: hidden;
                 max-height: 200px;
-                transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                transition: max-height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             }
             #whep-section.collapsed .collapsible-content { max-height: 0; }
             #whep-section.collapsed .frame-title::after { transform: rotate(90deg); }
@@ -164,7 +161,6 @@
                 .layout{flex-direction: column; height: auto}
                 .left{min-width:auto}
                 .directory-grid {grid-template-columns: 1fr; height: auto; overflow: visible}
-                .listbox {min-height: 200px}
                 button, .btn {padding: 10px 14px}
                 .panel.right { height: auto; }
                 #section-playlist, #section-queue { flex: 1 1 auto; }
@@ -176,12 +172,13 @@
     <body>
         <div class="container">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-            <h1>RadioPlayer status</h1>
-            <noscript><h1>NO SCRIPTING</h1></noscript>
+            <div>
+                <h1>RadioPlayer status</h1>
+                <noscript><h1> - NO SCRIPTING - </h1></noscript>
+            </div>
         </div>
 
         <div class="layout">
-            <!-- Left Panel -->
             <div class="panel left">
                 <div class="now">
                     <div class="frame-title-nc" style="cursor: default; pointer-events: none;">Now Playing</div>
@@ -211,10 +208,8 @@
                 <div style="margin-top:12px; display:flex; flex-direction: column; flex-grow: 1; overflow: hidden; gap: 12px;">
                     <div class="box" id="section-playlist">
                         <div class="frame-title" onclick="toggleSection('section-playlist')">Playlist Viewer</div>
-                        <div class="collapsible-content listbox" style="flex-grow:1">
-                            <div class="listbox" id="playlist-box" style="height: 100%;">
-                                <ul class="playlist" id="playlist-ul"></ul>
-                            </div>
+                        <div class="collapsible-content listbox" id="playlist-box" style="height: 100%; flex-grow:1">
+                            <ul class="playlist" id="playlist-ul"></ul>
                         </div>
                     </div>
 
@@ -266,10 +261,9 @@
             </div>
         </div>
 
-        <div class="footer muted">
+        <div class="footer small">
             <div>Server: <span id="server-status">connecting...</span></div>
             <div class="small" id="keybinds">
-                <b>Keys:</b>
                 <span><kbd>S</kbd> skip</span>
                 <span><kbd>N</kbd> +skip</span>
                 <span><kbd>M</kbd> -skip</span>
