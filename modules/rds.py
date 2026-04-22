@@ -2,6 +2,24 @@ from modules import InterModuleCommunication
 
 from . import PlayerModule, log95, Track
 import socket
+import uecp.frame
+import uecp.commands
+
+@uecp.commands.UECPCommand.register_type
+class ASCII(uecp.commands.UECPCommand):
+    ELEMENT_CODE = 0x2D
+
+    @classmethod
+    def create_from(cls, data: bytes | list[int]):
+        raise NotImplementedError()
+
+    def __init__(self, data: bytes) -> None:
+        self.data = data
+
+    def encode(self) -> list[int]:
+        return [
+            self.ELEMENT_CODE,
+            2+len(self.data)] + list(b"95") + list(self.data)
 
 DEBUG = False
 
@@ -71,7 +89,11 @@ def update_rds(track_name: str):
     try:
         f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         f.settimeout(1.0)
-        data = f"TEXT={prt}\r\nRTP={rtp}\r\n".encode()
+        uecp_frame = uecp.frame.UECPFrame()
+        uecp_frame.add_command(uecp.commands.RadioTextSetCommand(prt, 4, True))
+        uecp_frame.add_command(ASCII(f"RTP={rtp}\r\n".encode()))
+
+        data = uecp_frame.encode()
         f.sendto(data, udp_host)
         logger.debug("Sending", str(data))
         f.close()

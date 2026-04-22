@@ -1,104 +1,147 @@
 let ws = null;
 let reconnectDelay = 1000;
 let playlist = [];
-let Queue = [];
+let queue = [];
 let currentTrackPath = "";
 let currentTrackIndex = 0;
 let selectedPlaylistIndex = null;
 let selectedDir = null;
 let selectedSubFile = null;
 let basePath = "";
-let subbasePath = "";
+let subBasePath = "";
 let skipCount = 0;
 let skipCountToRender = 0;
 let indexDigits = 1;
-let skipped_idx = [];
+let skippedIndices = [];
 
 function toggleSection(id) {
-    document.getElementById(id).classList.toggle('collapsed');
+    document.getElementById(id).classList.toggle("collapsed");
 }
 
-function tnet() {
-    return window.location.protocol === "file:" || window.location.hostname.includes("tnet")
+function isTnet() {
+    return window.location.protocol === "file:" || window.location.hostname.includes("tnet");
 }
+
+function formatTime(s) {
+    s = Number(s || 0);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = Math.floor(s % 60);
+    const parts = h ? [h, m, sec] : [m, sec];
+    return parts.map(x => String(x).padStart(2, "0")).join(":");
+}
+
+function clearListSelections(...ids) {
+    for (const id of ids) {
+        Array.from(document.getElementById(id).children).forEach(c => c.classList.remove("selected"));
+    }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
 
 function initLayout() {
     if (window.innerWidth <= 800) {
-        document.getElementById('section-playlist').classList.add('collapsed');
-        document.getElementById('section-dirs').classList.add('collapsed');
-        document.getElementById('section-subdir').classList.add('collapsed');
+        ["section-playlist", "section-dirs", "section-subdir"].forEach(id =>
+            document.getElementById(id).classList.add("collapsed")
+        );
     }
-    if(tnet()) document.getElementById("whep-url-input").value = "https://webrtc.terminal.tnet/radio/whep"
+    if (isTnet()) {
+        document.getElementById("whep-url-input").value = "https://webrtc.terminal.tnet/radio/whep";
+    }
 }
 
-function connectWs() {
-    const statusText = document.getElementById("server-status");
-    statusText.textContent = "connecting...";
+// ─── WebSocket ───────────────────────────────────────────────────────────────
 
-    let url = "/ws";
-    if(tnet()) url = "https://radio95.tnet/ws"
-    ws = new WebSocket(url);
+function connectWs() {
+    const statusEl = document.getElementById("server-status");
+    statusEl.textContent = "connecting...";
+
+    ws = new WebSocket(isTnet() ? "https://radio95.tnet/ws" : "/ws");
 
     ws.addEventListener("open", () => {
-        statusText.textContent = "connected";
+        statusEl.textContent = "connected";
         reconnectDelay = 1500;
-        ws.send(JSON.stringify({action:"get_toplay"}));
-        ws.send(JSON.stringify({action:"skipc"}));
-        ws.send(JSON.stringify({action:"skipi"}));
+        ws.send(JSON.stringify({ action: "get_toplay" }));
+        ws.send(JSON.stringify({ action: "skipc" }));
+        ws.send(JSON.stringify({ action: "skipi" }));
     });
 
     ws.addEventListener("close", () => {
-        statusText.textContent = "disconnected — reconnecting...";
+        statusEl.textContent = "disconnected — reconnecting...";
         setTimeout(connectWs, reconnectDelay);
         reconnectDelay = Math.min(10000, reconnectDelay + 1500);
     });
 
-    ws.addEventListener("error", (e) => {
+    ws.addEventListener("error", e => {
         console.error("WS error", e);
-        statusText.textContent = "error";
+        statusEl.textContent = "error";
     });
 
-    ws.addEventListener("message", (evt) => {
-        try { handleMessage(JSON.parse(evt.data)); }
-        catch (e) { console.warn("Bad msg", evt.data, e); }
+    ws.addEventListener("message", evt => {
+        handleMessage(JSON.parse(evt.data));
     });
 }
 
-function RenderPlaylistQueue() {
-    skipCountToRender = skipCount;
-    renderQueue()
-    renderPlaylist()
+function wsSend(obj) {
+    ws.send(JSON.stringify(obj));
 }
+
+// ─── Message Handling ────────────────────────────────────────────────────────
 
 function handleMessage(msg) {
-    if(msg.event === "state"){
-        const d = msg.data || {};
-        if(d.dirs) updateDirs(d.dirs);
-        if(d.track) applyProgressState(d.track);
-    } else if (msg.event === "rds") {
-        const rt = (msg.data?.rt) ?? "";
-        document.getElementById("rds-text").textContent = rt ?? "";
-    } else if(msg.event === "playlist") {
-        playlist = msg.data || [];
-        RenderPlaylistQueue()
-    } else if(msg.event === "new_track"){
-        applyTrackState(msg.data);
-        ws.send(JSON.stringify({action:"get_toplay"}));
-        ws.send(JSON.stringify({action:"skipc"}));
-        ws.send(JSON.stringify({action:"skipi"}));
-    } else if(msg.event === "progress") applyProgressState(msg.data);
-    else if(msg.event === "toplay") {
-        Queue = msg.data.data || [];
-        RenderPlaylistQueue();
-    } else if(msg.event === "request_dir") applySubdir(msg.data || {})
-    else if(msg.event === "skipc") {
-        skipCount = msg.data?.data ?? 0;
-        document.getElementById("skpn-count").textContent = skipCount;
-        RenderPlaylistQueue();
-    } else if(msg.event === "skipi") {
-        skipped_idx = msg.data?.data ?? skipped_idx;
-        RenderPlaylistQueue();
+    switch (msg.event) {
+        case "state": {
+            const d = msg.data || {};
+            if (d.dirs) updateDirs(d.dirs);
+            if (d.track) applyProgressState(d.track);
+            break;
+        }
+        case "rds":
+            document.getElementById("rds-text").textContent = msg.data?.rt ?? "";
+            break;
+        case "playlist":
+            playlist = msg.data || [];
+            renderAll();
+            break;
+        case "new_track":
+            applyTrackState(msg.data);
+            wsSend({ action: "get_toplay" });
+            wsSend({ action: "skipc" });
+            wsSend({ action: "skipi" });
+            break;
+        case "progress":
+            applyProgressState(msg.data);
+            break;
+        case "toplay":
+            queue = msg.data.data || [];
+            renderAll();
+            break;
+        case "request_dir":
+            applySubdir(msg.data || {});
+            break;
+        case "skipc":
+            skipCount = msg.data?.data ?? 0;
+            document.getElementById("skpn-count").textContent = skipCount;
+            renderAll();
+            break;
+        case "skipi":
+            skippedIndices = msg.data?.data ?? skippedIndices;
+            renderAll();
+            break;
     }
+}
+
+function renderAll() {
+    skipCountToRender = skipCount;
+    renderQueue();
+    renderPlaylist();
+}
+
+// ─── Track State ─────────────────────────────────────────────────────────────
+
+function trackLabel(track, index) {
+    const prefix = track.official ? "(official) " : "(unofficial) ";
+    return prefix + track.path.replace(basePath, "").slice(1);
 }
 
 function applyTrackState(payload) {
@@ -106,221 +149,239 @@ function applyTrackState(payload) {
     const next = payload.next_track || {};
     currentTrackPath = track.path;
     currentTrackIndex = payload.index;
-    document.getElementById("now-track").textContent = `${String(currentTrackIndex).padStart(indexDigits,'0')}: ` + (track.official ? "(official) " : "(unofficial) ") + track.path.replace(basePath, "").slice(1);;
-    document.getElementById("next-track").textContent = (next.official ? "(official) " : "(unofficial) ") + next.path.replace(basePath, "").slice(1);
-    RenderPlaylistQueue();
+    indexDigits = playlist.length.toString().length;
+    document.getElementById("now-track").textContent =
+        `${String(currentTrackIndex).padStart(indexDigits, "0")}: ${trackLabel(track)}`;
+    document.getElementById("next-track").textContent = trackLabel(next);
+    renderAll();
 }
 
 function applyProgressState(payload) {
     const track = payload.track || {};
-    const next_track = payload.next_track || {};
+    const next = payload.next_track || {};
     const elapsed = Number(payload.elapsed || 0);
     const total = Number(payload.total || payload.real_total || 1) || 1;
-    const realtotal = Number(payload.real_total || payload.total || 1) || 1;
-    const percent = Math.max(0, Math.min(100, (elapsed/realtotal)*100));
+    const realTotal = Number(payload.real_total || payload.total || 1) || 1;
+    const percent = Math.max(0, Math.min(100, (elapsed / realTotal) * 100));
+
     document.getElementById("prog-fill").style.width = percent + "%";
-    document.getElementById("time-label").textContent = formatTime(elapsed) + " / " + formatTime(total) + ` (${formatTime(total-elapsed)})`;
+    document.getElementById("time-label").textContent =
+        `${formatTime(elapsed)} / ${formatTime(total)} (${formatTime(total - elapsed)})`;
+
     currentTrackIndex = payload.index;
-    if(track.path){
+    if (track.path) {
         currentTrackPath = track.path;
-        document.getElementById("now-track").textContent = `${String(currentTrackIndex).padStart(indexDigits,'0')}: ` + (track.official ? "(official) " : "(unofficial) ") + track.path.replace(basePath, "").slice(1);
-    } if(next_track.path) document.getElementById("next-track").textContent = `${next_track.official ? "(official)" : "(unofficial)"} ${next_track.path.replace(basePath, "").slice(1)}`;
+        document.getElementById("now-track").textContent =
+            `${String(currentTrackIndex).padStart(indexDigits, "0")}: ${trackLabel(track)}`;
+    }
+    if (next.path) {
+        document.getElementById("next-track").textContent =
+            `${next.official ? "(official)" : "(unofficial)"} ${next.path.replace(basePath, "").slice(1)}`;
+    }
 }
 
-function applySubdir(payload) {
-    if(payload.dir !== selectedDir) return;
-    const dirsBox = document.getElementById("subdir-box");
-    dirsBox.innerHTML = "Loading...";
-    try {
-        subbasePath = payload.base || "";
-        const files = payload.files || [];
-        dirsBox.innerHTML = "";
-        files.sort().forEach(f => {
-            const node = document.createElement("div");
-            node.className = "item";
-            node.textContent = f;
-            node.addEventListener("click", () => {
-                if(node.classList.contains("selected")) { node.classList.remove("selected"); selectedSubFile = null; return; }
-                Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
-                Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
-                node.classList.add("selected"); selectedSubFile = f;
-            });
-            dirsBox.appendChild(node);
-        });
-    } catch(e) { dirsBox.innerHTML = "Error fetching dirs: "+e.message; }
-}
-
-function formatTime(s) {
-    s = Number(s || 0);
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = Math.floor(s % 60);
-
-    if(h != 0) return [h,m,sec].map(x => String(x).padStart(2,'0')).join(":");
-    else return [m,sec].map(x => String(x).padStart(2,'0')).join(":");
-}
+// ─── Rendering ───────────────────────────────────────────────────────────────
 
 function renderPlaylist() {
     const ul = document.getElementById("playlist-ul");
     ul.innerHTML = "";
+    indexDigits = playlist.length.toString().length;
     let currentIndex = null;
-    indexDigits = playlist.length.toString().length
+
     playlist.forEach((t, i) => {
         const li = document.createElement("li");
         const path = t.path || "<no path>";
-        const official = t.official || false;
-        const displayPath = (official ? "(official) " : "(unofficial) ") + path.replace(basePath, "").slice(1);
+        const displayPath = (t.official ? "(official) " : "(unofficial) ") + path.replace(basePath, "").slice(1);
         li.dataset.path = path;
         li.dataset.idx = i;
-        li.addEventListener("click", () => { selectPlaylistItem(i, li); });
-        if (path === currentTrackPath && i === currentTrackIndex) { li.classList.add("current"); currentIndex = i; }
-        else if (i === currentTrackIndex) { li.classList.add("pointer"); currentIndex = i - 1; }
-        if(skipCountToRender > 0 && i > currentTrackIndex) {
+        li.addEventListener("click", () => selectPlaylistItem(i, li));
+
+        if (path === currentTrackPath && i === currentTrackIndex) {
+            li.classList.add("current");
+            currentIndex = i;
+        } else if (i === currentTrackIndex) {
+            li.classList.add("pointer");
+            currentIndex = i - 1;
+        }
+
+        if (skipCountToRender > 0 && i > currentTrackIndex) {
             li.style.textDecoration = "line-through";
             skipCountToRender--;
         }
-        li.textContent = ` ${String(i).padStart(indexDigits,'0')}: `;
-        li.textContent = (i === currentTrackIndex ? "▶ " : "  ") + li.textContent + displayPath;
+        if (skippedIndices.includes(i)) {
+            li.style.textDecoration = "line-through";
+        }
+
+        li.textContent = `${i === currentTrackIndex ? "▶ " : "  "}${String(i).padStart(indexDigits, "0")}: ${displayPath}`;
         ul.appendChild(li);
-        if(skipped_idx.includes(i)) li.style.textDecoration = "line-through";
     });
-    if(currentIndex !== null){
-        ul.children[currentIndex]?.scrollIntoView({block:'center', behavior: 'smooth'});
-    } updateControls();
+
+    if (currentIndex !== null) {
+        ul.children[currentIndex]?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    updateControls();
 }
 
 function renderQueue() {
     const ul = document.getElementById("queue-ul");
     ul.innerHTML = "";
-    Queue.forEach((element, i) => {
+    queue.forEach(path => {
         const li = document.createElement("li");
-        li.textContent = element.replace(basePath, "").slice(1);
-        if(skipCountToRender > 0) {
+        li.textContent = path.replace(basePath, "").slice(1);
+        if (skipCountToRender > 0) {
             li.style.textDecoration = "line-through";
             skipCountToRender--;
         }
         ul.appendChild(li);
     });
-    updateControls()
+    updateControls();
 }
 
-function selectPlaylistItem(i, el){
-    if(el.classList.contains("selected")) { el.classList.remove("selected"); selectedPlaylistIndex = null; return; }
-    const ul = document.getElementById("playlist-ul");
-    Array.from(ul.children).forEach(c => c.classList.remove("selected"));
-    Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
-    Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
+function updateDirs(payload) {
+    const box = document.getElementById("dirs-box");
+    box.innerHTML = "";
+    basePath = payload.base || "";
+
+    const addItem = (name, onClick) => {
+        const node = document.createElement("div");
+        node.className = "item";
+        node.textContent = name;
+        node.addEventListener("click", () => onClick(node));
+        box.appendChild(node);
+    };
+
+    (payload.dirs || []).sort().forEach(name => {
+        if (!name.startsWith(".")) addItem(name, node => onDirClicked(name, node));
+    });
+
+    (payload.files || []).sort().forEach(name => {
+        if (!name.startsWith(".")) {
+            addItem(name, node => {
+                if (node.classList.contains("selected")) {
+                    node.classList.remove("selected");
+                    selectedDir = null;
+                    selectedSubFile = null;
+                    return;
+                }
+                clearListSelections("playlist-ul", "subdir-box");
+                Array.from(box.children).forEach(c => c.classList.remove("selected"));
+                node.classList.add("selected");
+                node.dataset.type = "file";
+                selectedDir = null;
+                selectedSubFile = null;
+                document.getElementById("subdir-box").innerHTML = "";
+            });
+        }
+    });
+}
+
+function onDirClicked(name, node) {
+    if (node.classList.contains("selected")) {
+        node.classList.remove("selected");
+        selectedDir = null;
+        selectedSubFile = null;
+        document.getElementById("subdir-box").innerHTML = "";
+        return;
+    }
+    clearListSelections("dirs-box", "playlist-ul");
+    node.classList.add("selected");
+    selectedDir = name;
+    selectedSubFile = null;
+    wsSend({ action: "request_dir", what: selectedDir });
+}
+
+function applySubdir(payload) {
+    if (payload.dir !== selectedDir) return;
+    const box = document.getElementById("subdir-box");
+    box.innerHTML = "";
+    subBasePath = payload.base || "";
+
+    (payload.files || []).sort().forEach(f => {
+        const node = document.createElement("div");
+        node.className = "item";
+        node.textContent = f;
+        node.addEventListener("click", () => {
+            if (node.classList.contains("selected")) {
+                node.classList.remove("selected");
+                selectedSubFile = null;
+                return;
+            }
+            clearListSelections("subdir-box", "playlist-ul");
+            Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
+
+            // Re-select the parent dir node
+            Array.from(document.getElementById("dirs-box").children).forEach(c => {
+                if (c.textContent === selectedDir) c.classList.add("selected");
+            });
+
+            node.classList.add("selected");
+            selectedSubFile = f;
+        });
+        box.appendChild(node);
+    });
+}
+
+// ─── Playlist Selection ──────────────────────────────────────────────────────
+
+function selectPlaylistItem(i, el) {
+    if (el.classList.contains("selected")) {
+        el.classList.remove("selected");
+        selectedPlaylistIndex = null;
+        updateControls();
+        return;
+    }
+    clearListSelections("playlist-ul", "dirs-box", "subdir-box");
     el.classList.add("selected");
     selectedPlaylistIndex = i;
-    updateControls()
+    updateControls();
 }
 
-async function updateDirs(payload){
-    const dirsBox = document.getElementById("dirs-box");
-    dirsBox.innerHTML = "Loading...";
-    try {
-        basePath = payload.base || "";
-        const files = payload.files || [];
-        const dirs = payload.dirs || [];
-        dirsBox.innerHTML = "";
-        dirs.sort().forEach(f => {
-            if(!f.startsWith(".")) {
-                const node = document.createElement("div");
-                node.className = "item";
-                node.textContent = f;
-                node.addEventListener("click", () => onDirClicked(f, node));
-                dirsBox.appendChild(node);
-            }
-        });
-        files.sort().forEach(f => {
-            if(!f.startsWith(".")) {
-                const node = document.createElement("div");
-                node.className = "item";
-                node.textContent = f;
-                node.addEventListener("click", () => {
-                    if(node.classList.contains("selected")) { node.classList.remove("selected"); selectedDir = null; selectedSubFile = null; return; }
-                    Array.from(dirsBox.children).forEach(c=>c.classList.remove("selected"));
-                    Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
-                    Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
-                    node.classList.add("selected");
-                    selectedDir = null; selectedSubFile = null;
-                    document.getElementById("subdir-box").innerHTML = "";
-                });
-                node.dataset.type = "file";
-                dirsBox.appendChild(node);
-            }
-        });
-    } catch(e) { dirsBox.innerHTML = "Error fetching dirs: "+e.message; }
-}
-
-function onDirClicked(name, node){
-    if(node.classList.contains("selected")) {
-        node.classList.remove("selected"); selectedDir = null; selectedSubFile = null;
-        document.getElementById("subdir-box").innerHTML = ""; return;
-    }
-    Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
-    Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
-    node.classList.add("selected");
-    selectedDir = name; selectedSubFile = null;
-    ws.send(JSON.stringify({action:"request_dir", what: selectedDir}))
-}
-
-document.getElementById("skip-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"skip"})));
-document.getElementById("skpn-inc").addEventListener("click", () => ws.send(JSON.stringify({action:"skipc", add: 1})));
-document.getElementById("skpn-dec").addEventListener("click", () => ws.send(JSON.stringify({action:"skipc", remove: -1})));
-document.getElementById("jingle-btn").addEventListener("click", () => ws.send(JSON.stringify({action:"jingle"})));
-document.getElementById("jingle-btn").addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    ws.send(JSON.stringify({action:"jingle", top: true}));
-});
-document.getElementById("skipidx-btn").addEventListener("click", () => {
-    if (selectedPlaylistIndex == null) return;
-    const action = skipped_idx.includes(selectedPlaylistIndex)
-        ? { action: "skipi", remove: selectedPlaylistIndex }
-        : { action: "skipi", add: selectedPlaylistIndex };
-    ws.send(JSON.stringify(action));
-});
-
-document.getElementById("queue-title").addEventListener("click", () => toggleSection("section-queue"));
-document.getElementById("clear-btn").addEventListener("click", (e) => {
-    e.stopPropagation();
-    ws.send(JSON.stringify({action:"clear_toplay"}));
-});
+// ─── Queue Actions ───────────────────────────────────────────────────────────
 
 function addSelectedFileToQueue(top) {
     let fullPath = null;
-    let success = false;
+
     if (selectedPlaylistIndex != null) {
         const selected = playlist[selectedPlaylistIndex];
         const path = (selected.official ? "" : "!") + selected.path;
-        ws.send(JSON.stringify({ action: "add_to_toplay", songs: [path], top: top }));
-        success = true;
-    } else if (selectedSubFile && selectedDir) fullPath = subbasePath.replace(/\/$/, '') + '/' + selectedSubFile;
-    else {
-        const dirEls = document.getElementById("dirs-box").children;
-        const selectedItem = Array.from(dirEls).find(el => el.classList.contains("selected"));
-        if (selectedItem && selectedItem.dataset.type === "file") fullPath = basePath.replace(/\/$/, '') + '/' + selectedItem.textContent;
+        wsSend({ action: "add_to_toplay", songs: [path], top });
+        // Only clear playlist selection — keep dir/subdir selections intact
+        clearListSelections("playlist-ul");
+        selectedPlaylistIndex = null;
+        updateControls();
+        return true;
     }
-    if (fullPath) { ws.send(JSON.stringify({ action: "add_to_toplay", songs: [fullPath], top: top })); success = true; }
-    Array.from(document.getElementById("playlist-ul").children).forEach(c => c.classList.remove("selected"));
-    Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
-    Array.from(document.getElementById("subdir-box").children).forEach(c => c.classList.remove("selected"));
-    selectedPlaylistIndex = null; selectedSubFile = null;
-    return success;
+
+    if (selectedSubFile && selectedDir) {
+        fullPath = subBasePath.replace(/\/$/, "") + "/" + selectedSubFile;
+    } else {
+        const selectedFileEl = Array.from(document.getElementById("dirs-box").children)
+            .find(el => el.classList.contains("selected") && el.dataset.type === "file");
+        if (selectedFileEl) {
+            fullPath = basePath.replace(/\/$/, "") + "/" + selectedFileEl.textContent;
+        }
+    }
+
+    if (fullPath) {
+        wsSend({ action: "add_to_toplay", songs: [fullPath], top });
+        // Dir/subdir selections are intentionally preserved here
+        return true;
+    }
+
+    return false;
 }
 
-document.getElementById("add-to-queue-btn").addEventListener("click", () => addSelectedFileToQueue(false));
-document.getElementById("add-to-queue2-btn").addEventListener("click", () => addSelectedFileToQueue(true));
+// ─── Controls ────────────────────────────────────────────────────────────────
 
 function updateControls() {
-    document.getElementById("clear-btn").disabled = Queue.length === 0;
+    document.getElementById("clear-btn").disabled = queue.length === 0;
 
     const btn = document.getElementById("skipidx-btn");
     if (selectedPlaylistIndex == null) {
         btn.textContent = "⏭+ Skip in playlist";
         btn.disabled = true;
         btn.classList.remove("activated");
-    } else if (skipped_idx.includes(selectedPlaylistIndex)) {
+    } else if (skippedIndices.includes(selectedPlaylistIndex)) {
         btn.textContent = "✓ Unskip in playlist";
         btn.disabled = false;
         btn.classList.add("activated");
@@ -331,114 +392,147 @@ function updateControls() {
     }
 }
 
+// ─── Event Listeners ─────────────────────────────────────────────────────────
+
+document.getElementById("skip-btn").addEventListener("click", () => wsSend({ action: "skip" }));
+document.getElementById("skpn-inc").addEventListener("click", () => wsSend({ action: "skipc", add: 1 }));
+document.getElementById("skpn-dec").addEventListener("click", () => wsSend({ action: "skipc", remove: -1 }));
+
+document.getElementById("jingle-btn").addEventListener("click", () => wsSend({ action: "jingle" }));
+document.getElementById("jingle-btn").addEventListener("contextmenu", e => {
+    e.preventDefault();
+    wsSend({ action: "jingle", top: true });
+});
+
+document.getElementById("skipidx-btn").addEventListener("click", () => {
+    if (selectedPlaylistIndex == null) return;
+    const action = skippedIndices.includes(selectedPlaylistIndex)
+        ? { action: "skipi", remove: selectedPlaylistIndex }
+        : { action: "skipi", add: selectedPlaylistIndex };
+    wsSend(action);
+});
+
+document.getElementById("queue-title").addEventListener("click", () => toggleSection("section-queue"));
+document.getElementById("clear-btn").addEventListener("click", e => {
+    e.stopPropagation();
+    wsSend({ action: "clear_toplay" });
+});
+
+document.getElementById("add-to-queue-btn").addEventListener("click", () => addSelectedFileToQueue(false));
+document.getElementById("add-to-queue2-btn").addEventListener("click", () => addSelectedFileToQueue(true));
+
 document.addEventListener("keydown", e => {
     if (e.target.tagName === "INPUT") return;
     if (e.key === "Enter" && addSelectedFileToQueue(e.shiftKey)) e.preventDefault();
-    else if (e.key === "s") ws.send(JSON.stringify({action:"skip"}));
-    else if (e.key === "n") ws.send(JSON.stringify({action:"skipc", add: 1}));
-    else if (e.key === "m") ws.send(JSON.stringify({action:"skipc", remove: -1}));
-    else if (e.key.toLowerCase() === "j") ws.send(JSON.stringify({action:"jingle", top: e.shiftKey}));
+    else if (e.key === "s") wsSend({ action: "skip" });
+    else if (e.key === "n") wsSend({ action: "skipc", add: 1 });
+    else if (e.key === "m") wsSend({ action: "skipc", remove: -1 });
+    else if (e.key.toLowerCase() === "j") wsSend({ action: "jingle", top: e.shiftKey });
 });
 
 let whepPc = null;
 let whepAudio = null;
 let whepConnected = false;
 
-function whepLog(msg, type = 'info') {
-    const el = document.getElementById('whep-log');
-    const line = document.createElement('div');
-    line.className = 'wlog-' + type;
-    const ts = new Date().toLocaleTimeString("pl-PL");
-    line.textContent = `[${ts}] ${msg}`;
+function whepLog(msg, type = "info") {
+    const el = document.getElementById("whep-log");
+    const line = document.createElement("div");
+    line.className = "wlog-" + type;
+    line.textContent = `[${new Date().toLocaleTimeString("pl-PL")}] ${msg}`;
     el.appendChild(line);
     el.scrollTop = el.scrollHeight;
-    // Keep log short
     while (el.children.length > 30) el.removeChild(el.firstChild);
 }
 
 function whepSetDot(state) {
-    const dot = document.getElementById('whep-dot');
-    dot.className = 'whep-status-dot' + (state !== 'idle' ? ' ' + state : '');
-    const btn = document.getElementById('whep-btn');
-    if (state === 'connected' || state === 'connecting') {
-        btn.textContent = '⏹ Disconnect';
-        btn.classList.add('activated');
-    } else {
-        btn.textContent = '▶ Connect';
-        btn.classList.remove('activated');
-    }
+    document.getElementById("whep-dot").className =
+        "whep-status-dot" + (state !== "idle" ? " " + state : "");
+    const btn = document.getElementById("whep-btn");
+    const active = state === "connected" || state === "connecting";
+    btn.textContent = active ? "⏹ Disconnect" : "▶ Connect";
+    btn.classList.toggle("activated", active);
 }
 
 function whepSetVol(v) {
-    document.getElementById('whep-vol-out').textContent = (Math.round(v * 1000) / 10).toFixed(1) + '%';
+    document.getElementById("whep-vol-out").textContent =
+        (Math.round(v * 1000) / 10).toFixed(1) + "%";
     if (whepAudio) whepAudio.volume = parseFloat(v);
 }
 
 function whepToggle() {
-    if (whepConnected || whepPc) { whepDisconnect(); return; }
-    whepConnect();
+    if (whepConnected || whepPc) whepDisconnect();
+    else whepConnect();
 }
 
 function whepDisconnect() {
     whepConnected = false;
-    if (whepPc) { try { whepPc.close(); } catch(e){} whepPc = null; }
+    if (whepPc) { try { whepPc.close(); } catch (e) {} whepPc = null; }
     if (whepAudio) { whepAudio.pause(); whepAudio.srcObject = null; whepAudio = null; }
-    whepSetDot('idle');
-    whepLog('Disconnected');
+    whepSetDot("idle");
+    whepLog("Disconnected");
 }
 
 async function whepConnect() {
-    const url = document.getElementById('whep-url-input').value.trim();
+    const url = document.getElementById("whep-url-input").value.trim();
     if (!url) return;
-    whepSetDot('connecting');
-    whepLog('Creating peer connection…');
+    whepSetDot("connecting");
+    whepLog("Creating peer connection…");
     try {
         whepPc = new RTCPeerConnection();
-        whepPc.ontrack = (e) => {
-            whepLog('Track received, starting playback', 'ok');
+
+        whepPc.ontrack = e => {
+            whepLog("Track received, starting playback", "ok");
             whepAudio = new Audio();
             whepAudio.srcObject = e.streams[0];
-            whepAudio.volume = parseFloat(document.getElementById('whep-vol').value);
-            whepAudio.play().then(() => {
-                whepLog('Audio playing', 'ok');
-                whepConnected = true;
-                whepSetDot('connected');
-            }).catch(() => {
-                whepLog('Autoplay blocked — click anywhere to resume', 'err');
-                document.addEventListener('click', () => whepAudio && whepAudio.play(), { once: true });
-            });
+            whepAudio.volume = parseFloat(document.getElementById("whep-vol").value);
+            whepAudio.play()
+                .then(() => {
+                    whepLog("Audio playing", "ok");
+                    whepConnected = true;
+                    whepSetDot("connected");
+                })
+                .catch(() => {
+                    whepLog("Autoplay blocked — click anywhere to resume", "err");
+                    document.addEventListener("click", () => whepAudio?.play(), { once: true });
+                });
         };
+
         whepPc.onconnectionstatechange = () => {
-            whepLog('State: ' + whepPc.connectionState);
-            if (whepPc.connectionState === 'failed' || whepPc.connectionState === 'disconnected') {
-                whepLog('Connection lost', 'err');
+            whepLog("State: " + whepPc.connectionState);
+            if (["failed", "disconnected"].includes(whepPc.connectionState)) {
+                whepLog("Connection lost", "err");
                 whepDisconnect();
-                whepSetDot('error');
+                whepSetDot("error");
             }
         };
-        whepPc.oniceconnectionstatechange = () => whepLog('ICE: ' + whepPc.iceConnectionState);
-        whepPc.addTransceiver('audio', { direction: 'recvonly' });
+
+        whepPc.oniceconnectionstatechange = () => whepLog("ICE: " + whepPc.iceConnectionState);
+        whepPc.addTransceiver("audio", { direction: "recvonly" });
+
         const offer = await whepPc.createOffer();
         offer.sdp = offer.sdp
-            .replace(/useinbandfec=1/g, 'useinbandfec=1;stereo=1;sprop-stereo=1')
-            .replace(/minptime=10/g, 'minptime=10;ptime=10;maxptime=10');
+            .replace(/useinbandfec=1/g, "useinbandfec=1;stereo=1;sprop-stereo=1")
+            .replace(/minptime=10/g, "minptime=10;ptime=10;maxptime=10");
         await whepPc.setLocalDescription(offer);
-        whepLog('Sending offer to ' + url);
+
+        whepLog("Sending offer to " + url);
         const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/sdp', 'Accept': 'application/sdp' },
-            body: whepPc.localDescription.sdp
+            method: "POST",
+            headers: { "Content-Type": "application/sdp", Accept: "application/sdp" },
+            body: whepPc.localDescription.sdp,
         });
         if (!resp.ok) throw new Error(`Server returned ${resp.status} ${resp.statusText}`);
+
         const answerSdp = await resp.text();
-        whepLog(`Got SDP answer (${answerSdp.length} bytes)`, 'ok');
-        await whepPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-        whepLog('Waiting for ICE + track…');
-    } catch(err) {
-        whepLog('Error: ' + err.message, 'err');
+        whepLog(`Got SDP answer (${answerSdp.length} bytes)`, "ok");
+        await whepPc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+        whepLog("Waiting for ICE + track…");
+    } catch (err) {
+        whepLog("Error: " + err.message, "err");
         whepDisconnect();
-        whepSetDot('error');
+        whepSetDot("error");
     }
 }
+
 initLayout();
 setTimeout(connectWs, 100);
