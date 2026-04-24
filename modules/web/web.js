@@ -4,6 +4,7 @@ let playlist = [];
 let queue = [];
 let currentTrackPath = "";
 let currentTrackIndex = 0;
+let selectedPlaylistPath = null;
 let selectedPlaylistIndex = null;
 let selectedDir = null;
 let selectedSubFile = null;
@@ -394,8 +395,6 @@ function updateControls() {
         btn.classList.remove("activated");
     }
 }
-
-// ─── Event Listeners ─────────────────────────────────────────────────────────
 
 document.getElementById("skip-btn").addEventListener("click", () => wsSend({ action: "skip" }));
 document.getElementById("skpn-inc").addEventListener("click", () => wsSend({ action: "skipc", add: 1 }));
