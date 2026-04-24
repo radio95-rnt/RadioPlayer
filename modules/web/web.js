@@ -328,32 +328,31 @@ function applySubdir(payload) {
     });
 }
 
-// ─── Playlist Selection ──────────────────────────────────────────────────────
-
 function selectPlaylistItem(i, el) {
+    const path = el.dataset.path;
     if (el.classList.contains("selected")) {
         el.classList.remove("selected");
-        selectedPlaylistIndex = null;
+        selectedPlaylistPath = null;
         updateControls();
         return;
     }
     clearListSelections("playlist-ul", "dirs-box", "subdir-box");
     el.classList.add("selected");
+    selectedPlaylistPath = path;
     selectedPlaylistIndex = i;
     updateControls();
 }
 
-// ─── Queue Actions ───────────────────────────────────────────────────────────
-
 function addSelectedFileToQueue(top) {
     let fullPath = null;
 
-    if (selectedPlaylistIndex != null) {
-        const selected = playlist[selectedPlaylistIndex];
+    if (selectedPlaylistPath != null) {
+        const selected = playlist.find(t => t.path === selectedPlaylistPath);
+        if (!selected) return false;
         const path = (selected.official ? "" : "!") + selected.path;
         wsSend({ action: "add_to_toplay", songs: [path], top });
-        // Only clear playlist selection — keep dir/subdir selections intact
         clearListSelections("playlist-ul");
+        selectedPlaylistPath = null;
         selectedPlaylistIndex = null;
         updateControls();
         return true;
@@ -362,8 +361,7 @@ function addSelectedFileToQueue(top) {
     if (selectedSubFile && selectedDir) {
         fullPath = subBasePath.replace(/\/$/, "") + "/" + selectedSubFile;
     } else {
-        const selectedFileEl = Array.from(document.getElementById("dirs-box").children)
-            .find(el => el.classList.contains("selected") && el.dataset.type === "file");
+        const selectedFileEl = Array.from(document.getElementById("dirs-box").children).find(el => el.classList.contains("selected") && el.dataset.type === "file");
         if (selectedFileEl) {
             fullPath = basePath.replace(/\/$/, "") + "/" + selectedFileEl.textContent;
         }
@@ -377,8 +375,6 @@ function addSelectedFileToQueue(top) {
 
     return false;
 }
-
-// ─── Controls ────────────────────────────────────────────────────────────────
 
 function updateControls() {
     document.getElementById("clear-btn").disabled = queue.length === 0;
