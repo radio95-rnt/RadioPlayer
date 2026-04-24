@@ -12,12 +12,11 @@
                 font-weight: 400;
             }
             html,body{height:100%; margin:0; background:linear-gradient(180deg,#071018,#0b1220 60%); color:#eef2f6; overflow: hidden;}
-            .container{max-width:1600px; margin:16px auto; padding:16px; display:flex; flex-direction:column; gap:10px}
-            h1{margin:0; font-size:22px; font-weight:500}
-            .layout{display:flex; gap:14px; height:calc(100vh - 140px);}
-            .panel{background:var(--panel); border-radius:10px; padding:8px; box-shadow: 0 6px 18px rgba(2,8,16,0.6); display:flex; flex-direction:column; overflow:hidden}
-            .left{flex:1.2; min-width:420px}
-            .right{flex:1; display:flex; flex-direction:column; gap:6px}
+            .container{max-width:1640px; margin:12px auto; padding:14px; display:flex; flex-direction:column; gap:8px}
+            .layout{display:flex; gap:10px; height:calc(100vh - 100px);}
+            .panel{background:var(--panel); border-radius:10px; padding:6px; box-shadow: 0 6px 18px rgba(2,8,16,0.6); display:flex; flex-direction:column; overflow:hidden}
+            .left{flex:1; min-width:420px}
+            .right{flex:1.2; display:flex; gap:4px}
 
             .frame-title-nc{ font-size:16px; color:var(--muted); margin-bottom:6px; display: flex; justify-content: space-between; align-items: center; user-select: none; padding: 2px 0; transition: color 0.2s ease; }
             .frame-title{ font-size:16px; color:var(--muted); margin-bottom:4px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; padding: 2px 0; transition: color 0.2s ease; }
@@ -33,7 +32,8 @@
             .now .track, .next .track {font-weight:400; font-size:14px; word-break:break-all}
             .progress-wrap { display:flex; gap:10px; align-items:center}
             .progress-bar { flex:1; height:10px; background:var(--glass); border-radius:8px; overflow:hidden; position:relative }
-            .progress-fill { height:100%; width:0%; background:linear-gradient(45deg,var(--accent), #2aa2ff); transition: width 0.5s linear}
+            .progress-fill { height:100%; width:0%; background:linear-gradient(45deg,var(--accent), #2aa2ff); }
+            .progress-fill.init { opacity: 0;}
 
             button, .btn{ background:transparent; border:1px solid rgba(255,255,255,0.06); padding:8px 12px; border-radius:8px; color:inherit; cursor:pointer; transition: background-color 0.15s ease, transform 0.15s ease; }
             button:hover, .btn:hover { background-color: var(--glass); }
@@ -42,7 +42,7 @@
             .btn.primary:hover { background:linear-gradient(90deg, #3399ee, #5bbaff); }
 
             ul.playlist{list-style:none; padding:6px; margin:0; font-family: "Consolas",monospace; font-size:13px;}
-            ul.playlist li{ padding:4px 6px; border-radius:6px; display:flex; justify-content:space -between; gap:8px; transition: background-color 0.2s ease, transform 0.15s ease; }
+            ul.playlist li{ padding:4px 6px; border-radius:6px; display:flex; justify-content:space-between; gap:8px; transition: background-color 0.2s ease, transform 0.15s ease; }
             ul.playlist li:hover{ background:rgba(255,255,255,0.04); }
             ul.playlist li.current{background:rgba(62,166,255,0.08)}
             ul.playlist li.selected{background:rgba(62, 165, 255, 0.305)}
@@ -170,19 +170,13 @@
     </head>
     <body>
         <div class="container">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-            <div>
-                <h1><noscript> - NO SCRIPTING - </noscript></h1>
-            </div>
-        </div>
-
         <div class="layout">
             <div class="panel left">
                 <div class="now">
                     <div class="frame-title-nc" style="cursor: default; pointer-events: none;">Now Playing</div>
                     <div class="track" id="now-track">Loading...</div>
                     <div class="progress-wrap" style="margin-top:8px">
-                        <div class="progress-bar" title="progress"><div class="progress-fill" id="prog-fill"></div></div>
+                        <div class="progress-bar" title="progress"><div class="progress-fill init" id="prog-fill"></div></div>
                         <div class="small" id="time-label">00:00 / 00:00 (00:00)</div>
                     </div>
                     <div class="small" id="rds-text" style="margin-top:6px; color:var(--muted); font-family:'Consolas',monospace;"></div>

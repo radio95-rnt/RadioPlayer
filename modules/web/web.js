@@ -13,6 +13,9 @@ let skipCount = 0;
 let skipCountToRender = 0;
 let indexDigits = 1;
 let skippedIndices = [];
+let lastElapsed = 0;
+let lastUpdateTime = 0;
+let currentRealTotal = 1;
 
 function toggleSection(id) {
     document.getElementById(id).classList.toggle("collapsed");
@@ -164,7 +167,10 @@ function applyProgressState(payload) {
     const realTotal = Number(payload.real_total || payload.total || 1) || 1;
     const percent = Math.max(0, Math.min(100, (elapsed / realTotal) * 100));
 
-    document.getElementById("prog-fill").style.width = percent + "%";
+    lastElapsed = elapsed;
+    lastUpdateTime = performance.now();
+    currentRealTotal = realTotal;
+
     document.getElementById("time-label").textContent =
         `${formatTime(elapsed)} / ${formatTime(total)} (${formatTime(total - elapsed)})`;
 
@@ -179,8 +185,6 @@ function applyProgressState(payload) {
             `${next.official ? "(official)" : "(unofficial)"} ${next.path.replace(basePath, "").slice(1)}`;
     }
 }
-
-// ─── Rendering ───────────────────────────────────────────────────────────────
 
 function renderPlaylist() {
     const ul = document.getElementById("playlist-ul");
@@ -537,5 +541,20 @@ async function whepConnect() {
     }
 }
 
+function animateProgress() {
+    const now = performance.now();
+    const delta = (now - lastUpdateTime) / 1000; // seconds
+    const smoothElapsed = lastElapsed + delta;
+
+    const percent = Math.max(0, Math.min(100, (smoothElapsed / currentRealTotal) * 100));
+    document.getElementById("prog-fill").style.width = percent + "%";
+
+    requestAnimationFrame(animateProgress);
+}
+
 initLayout();
 setTimeout(connectWs, 100);
+requestAnimationFrame(animateProgress);
+setTimeout(() => {
+    document.getElementById("prog-fill").classList.remove("init")
+}, 1000)
