@@ -227,7 +227,7 @@ function renderQueue() {
     ul.innerHTML = "";
     queue.forEach(path => {
         const li = document.createElement("li");
-        li.textContent = path.replace(basePath, "").slice(1);
+        li.textContent = path.replace(basePath, "").replace("!", "(unofficial) ").slice(1);
         if (skipCountToRender > 0) {
             li.style.textDecoration = "line-through";
             skipCountToRender--;
