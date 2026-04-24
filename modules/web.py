@@ -117,6 +117,7 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
 
         async def handler_wrapper(websocket: ServerConnection):
             clients.add(websocket)
+            await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": len(clients), "event": "users"})
             try: await ws_handler(websocket, shared_data, imc_q, ws_q)
             finally:
                 await websocket.close(1001, "")
