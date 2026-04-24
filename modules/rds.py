@@ -70,7 +70,7 @@ def update_rds(track_name: str):
 
 #    title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
 
-    prt = rds_base.format(artist, title)[:64]
+    prt = rds_base.format(artist, title)
     rtp = []
     rtp.append(1) # type 2
     rtp.append(prt.find(title)) # start 2
@@ -82,6 +82,8 @@ def update_rds(track_name: str):
     rtp = [j_size if i_rt > j_size else i_rt for i_rt,j_size in zip(rtp, [255,0x3f,0x3f,255,0x3f,0x1f])]
 
     rtp = ','.join(list(map(str, rtp)))
+
+    prt = prt[:64]
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as f:
