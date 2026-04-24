@@ -2,20 +2,17 @@ from modules import InterModuleCommunication
 
 from . import PlayerModule, log95, Track
 import socket
+
+# https://github.com/chrko/python-uecp
 import uecp.frame
 import uecp.commands
 
 @uecp.commands.UECPCommand.register_type
 class ASCII(uecp.commands.UECPCommand):
     ELEMENT_CODE = 0x2D
-
     @classmethod
-    def create_from(cls, data: bytes | list[int]):
-        raise NotImplementedError()
-
-    def __init__(self, data: bytes) -> None:
-        self.data = data
-
+    def create_from(cls, data: bytes | list[int]): raise NotImplementedError()
+    def __init__(self, data: bytes) -> None: self.data = data
     def encode(self) -> list[int]:
         return [
             self.ELEMENT_CODE,
@@ -87,16 +84,16 @@ def update_rds(track_name: str):
     rtp = ','.join(list(map(str, rtp)))
 
     try:
-        f = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        f.settimeout(1.0)
-        uecp_frame = uecp.frame.UECPFrame()
-        uecp_frame.add_command(uecp.commands.RadioTextSetCommand(prt, 4, True))
-        uecp_frame.add_command(ASCII(f"RTP={rtp}\r\n".encode()))
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as f:
+            f.settimeout(1.0)
+            uecp_frame = uecp.frame.UECPFrame()
+            if 0 < len(prt) < 61: prt += "\r" # makes the warning go away
+            uecp_frame.add_command(uecp.commands.RadioTextSetCommand(prt, 4, True))
+            uecp_frame.add_command(ASCII(f"RTP={rtp}".encode()))
 
-        data = uecp_frame.encode()
-        f.sendto(data, udp_host)
-        logger.debug("Sending", str(data))
-        f.close()
+            data = uecp_frame.encode()
+            f.sendto(data, udp_host)
+            logger.debug("Sending", str(data))
     except Exception as e: logger.error(f"Error updating RDS: {e}")
 
     return prt, rtp
