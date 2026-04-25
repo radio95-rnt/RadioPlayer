@@ -108,13 +108,14 @@ def update_rds(track_name: str):
     rtp = ','.join(list(map(str, rtp)))
 
     prt = prt[:64]
+    dprt = prt.decode("radiodatasystem", "ignore")
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as f:
             f.settimeout(1.0)
             uecp_frame = uecp.frame.UECPFrame()
-            if 0 < len(prt) < 61: prt += b"\r" # makes the warning go away
-            uecp_frame.add_command(RT_Set(prt.decode("radiodatasystem", "ignore"), 0, True))
+            if 0 < len(prt) < 61: dprt += "\r" # makes the warning go away
+            uecp_frame.add_command(RT_Set(dprt, 0, True))
             uecp_frame.add_command(ASCII(f"RTP={rtp}".encode()))
 
             data = uecp_frame.encode()
@@ -122,7 +123,7 @@ def update_rds(track_name: str):
             logger.debug("Sending", str(data))
     except Exception as e: logger.error(f"Error updating RDS: {e}")
 
-    return prt, rtp
+    return dprt, rtp
 
 class Module(PlayerModule):
     def on_new_track(self, index: int, track: Track, next_track: Track | None):
