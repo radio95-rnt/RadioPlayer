@@ -28,7 +28,8 @@ class Module(PlayerModule):
         try:
             temp_file = self.file.with_suffix('.tmp')
             with open(temp_file, 'w') as f:
-                for k, v in sorted(self.counts.items()): f.write(f"{k}:{v}\n")
+                for k, v in sorted(self.counts.items()):
+                    if Path(k).exists(): f.write(f"{k}:{v}\n")
             temp_file.replace(self.file)
         except Exception as e: self.logger.error(f"Failed to write play counts: {e}")
     def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:
