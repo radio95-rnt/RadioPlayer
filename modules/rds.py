@@ -36,7 +36,7 @@ class RT_Set(uecp.commands.RadioTextSetCommand):
                 | self._radiotext.a_b_toggle
             )
             data += [mel, flags]
-            data += list(self._radiotext.text.encode("rp-rds", "replace"))
+            data += list(self._radiotext.text.encode("radiodatasystem", "replace"))
         return data
 
 DEBUG = False

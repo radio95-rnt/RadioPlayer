@@ -339,7 +339,7 @@ _CODEC_INFO = codecs.CodecInfo(
 
 
 def _rds_lookup(name: str):
-    if name in ('rp-rds', 'rds-charset', 'rds_charset'):
+    if name in ('radiodatasystem', 'rds-charset', 'rds_charset'):
         return _CODEC_INFO
     return None
 
