@@ -6,6 +6,7 @@ import socket
 # https://github.com/chrko/python-uecp
 import uecp.frame
 import uecp.commands
+import rds_codec
 
 @uecp.commands.UECPCommand.register_type
 class ASCII(uecp.commands.UECPCommand):
@@ -17,6 +18,26 @@ class ASCII(uecp.commands.UECPCommand):
         return [
             self.ELEMENT_CODE,
             2+len(self.data)] + list(b"95") + list(self.data)
+
+class RT_Set(uecp.commands.RadioTextSetCommand):
+    def encode(self) -> list[int]:
+        data = [self.ELEMENT_CODE, self.data_set_number, self.programme_service_number]
+        if (
+            len(self._radiotext.text) == 0
+            and self._buffer_configuration
+            is uecp.commands.RadioTextBufferConfiguration.TRUNCATE_BEFORE
+        ):
+            data.append(0)
+        else:
+            mel = 1 + len(self._radiotext.text)
+            flags = (
+                self._buffer_configuration << 5
+                | self._radiotext.number_of_transmissions << 1
+                | self._radiotext.a_b_toggle
+            )
+            data += [mel, flags]
+            data += list(self._radiotext.text.encode("rp-rds", "replace"))
+        return data
 
 DEBUG = False
 
@@ -90,7 +111,7 @@ def update_rds(track_name: str):
             f.settimeout(1.0)
             uecp_frame = uecp.frame.UECPFrame()
             if 0 < len(prt) < 61: prt += "\r" # makes the warning go away
-            uecp_frame.add_command(uecp.commands.RadioTextSetCommand(prt, 4, True))
+            uecp_frame.add_command(RT_Set(prt, 0, True))
             uecp_frame.add_command(ASCII(f"RTP={rtp}".encode()))
 
             data = uecp_frame.encode()
