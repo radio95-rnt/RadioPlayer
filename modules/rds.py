@@ -91,7 +91,10 @@ def update_rds(track_name: str):
 
 #    title = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', title) # there might be junk
 
-    prt = rds_base.format(artist, title)
+    prt = rds_base.format(artist, title).encode("radiodatasystem", "replace")
+    title = title.encode("radiodatasystem", "replace")
+    artist = artist.encode("radiodatasystem", "replace")
+
     rtp = []
     rtp.append(1) # type 2
     rtp.append(prt.find(title)) # start 2
@@ -110,8 +113,8 @@ def update_rds(track_name: str):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as f:
             f.settimeout(1.0)
             uecp_frame = uecp.frame.UECPFrame()
-            if 0 < len(prt) < 61: prt += "\r" # makes the warning go away
-            uecp_frame.add_command(RT_Set(prt, 0, True))
+            if 0 < len(prt) < 61: prt += b"\r" # makes the warning go away
+            uecp_frame.add_command(RT_Set(prt.decode("radiodatasystem", "ignore"), 0, True))
             uecp_frame.add_command(ASCII(f"RTP={rtp}".encode()))
 
             data = uecp_frame.encode()
