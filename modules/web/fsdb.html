@@ -74,7 +74,7 @@
                 font-weight: 600;
             }
 
-            .refresh-btn {
+            .btn {
                 font-size: 12px;
                 padding: 4px 10px;
                 border-radius: 5px;
@@ -84,7 +84,7 @@
                 cursor: pointer;
             }
 
-            .refresh-btn:hover { background: #333; }
+            .btn:hover { background: #333; }
 
             .container {
                 display: flex;
@@ -132,7 +132,8 @@
                 <div class="seg-row" id="partPicker"></div>
             </div>
             <div class="playlist-display">playlist: <span id="playlistVal">friday/day</span></div>
-            <button class="refresh-btn" onclick="refreshPlaylist()">Refresh</button>
+            <button class="btn" onclick="refreshPlaylist()">Refresh</button>
+            <button class="btn" onclick="reloadPlaylist()">Reload on Player</button>
         </div>
 
         <div class="container">
@@ -250,6 +251,10 @@
 
             function refreshPlaylist() {
                 ws.send(JSON.stringify({ action: "fsdb_list", playlist: getPlaylistName() }));
+            }
+
+            function reloadPlaylist() {
+                ws.send(JSON.stringify({ action: "fsdb_add", name: "reload" }));
             }
         </script>
     </body>
