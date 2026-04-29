@@ -123,7 +123,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                     "dirs": [i.name for i in p.iterdir() if i.is_dir()]
                 }
                 await websocket.send(json.dumps({"event": "fsdb_list", "data": payload}))
-            except Exception: await websocket.send(json.dumps({"event": "fsdb_list", "data": {}}))
+            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_list", "data": {}, "error": str(e)}))
         else: await websocket.send(json.dumps({"event": "error", "error": "unknown action"}))
 
 async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
