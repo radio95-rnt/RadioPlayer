@@ -6,13 +6,11 @@ import asyncio
 import websockets
 from websockets import ServerConnection, Request, Response, Headers
 import mimetypes
+import shutil
 
 def get_content_type(filename: str) -> str:
-    # Fallback to Python's mimetypes
     mime_type, _ = mimetypes.guess_type(filename)
-
-    if mime_type:
-        return mime_type
+    if mime_type: return mime_type
 
     # Final fallback
     return "application/octet-stream"
@@ -92,6 +90,40 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 payload = {"files": [i.name for i in list(dir.iterdir()) if i.is_file()], "base": str(dir), "dir": dir.name}
             except Exception: payload = {}
             await websocket.send(json.dumps({"event": "request_dir", "data": payload}))
+        elif action == "fsdb_add":
+            name: str | None = msg.get("name")
+            try:
+                if not name: raise Exception("name not defined")
+                path = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""), name)
+                path.touch(exist_ok=True)
+                await websocket.send(json.dumps({"event": "fsdb_add", "ok": True}))
+            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_add", "error": str(e)}))
+        elif action == "fsdb_add_dir":
+            name: str | None = msg.get("name")
+            try:
+                if not name: raise Exception("name not defined")
+                path = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""), name)
+                path.mkdir(parents=True, exist_ok=True)
+                await websocket.send(json.dumps({"event": "fsdb_add_dir", "ok_dir": True}))
+            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_add_dir", "error": str(e)}))
+        elif action == "fsdb_remove":
+            name: str | None = msg.get("name")
+            try:
+                if not name: raise Exception("name not defined")
+                path = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""), name)
+                if path.is_dir(): shutil.rmtree(path)
+                else: path.unlink(missing_ok=True)
+                await websocket.send(json.dumps({"event": "fsdb_remove", "ok": True}))
+            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_remove", "error": str(e)}))
+        elif action == "fsdb_list":
+            try:
+                p = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""))
+                payload = {
+                    "files": [i.name for i in p.iterdir() if i.is_file()],
+                    "dirs": [i.name for i in p.iterdir() if i.is_dir()]
+                }
+                await websocket.send(json.dumps({"event": "fsdb_list", "data": payload}))
+            except Exception: await websocket.send(json.dumps({"event": "fsdb_list", "data": {}}))
         else: await websocket.send(json.dumps({"event": "error", "error": "unknown action"}))
 
 async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
@@ -117,7 +149,7 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
 
         async def handler_wrapper(websocket: ServerConnection):
             clients.add(websocket)
-            await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": len(clients), "event": "users"})
+            await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"event": "users", "data": len(clients)})
             try: await ws_handler(websocket, shared_data, imc_q, ws_q)
             finally:
                 await websocket.close(1001, "")

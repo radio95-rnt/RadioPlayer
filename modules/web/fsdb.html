@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FSDB Editor</title>
+<style>
+    body {
+        margin: 0;
+        font-family: sans-serif;
+        background: #111;
+        color: #eee;
+    }
+
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+.panel {
+    flex: 1;
+    padding: 10px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    border-right: 1px solid #333;
+}
+
+.panel:last-child {
+    border-right: none;
+}
+
+h2 {
+    margin-top: 0;
+    font-size: 16px;
+    color: #aaa;
+}
+
+.item {
+    padding: 6px;
+    margin: 2px 0;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.item:hover {
+    background: #222;
+}
+
+.dir {
+    color: #6cf;
+}
+
+.file {
+    color: #ccc;
+}
+
+.controls {
+    padding: 5px;
+    border-bottom: 1px solid #333;
+}
+
+button {
+    margin-right: 5px;
+    background: #222;
+    color: #eee;
+    border: 1px solid #444;
+    padding: 5px 8px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #333;
+}
+
+input {
+    background: #222;
+    color: #eee;
+    border: 1px solid #444;
+    padding: 4px;
+}
+
+</style>
+</head>
+<body>
+
+<div class="controls">
+    Playlist:
+    <input id="playlist" value="default">
+    <button onclick="refreshPlaylist()">Refresh</button>
+</div>
+
+<div class="container">
+    <div class="panel">
+        <h2>Ref Dir</h2>
+        <div id="ref"></div>
+    </div>
+
+```
+<div class="panel">
+    <h2>Playlist</h2>
+    <div id="playlistView"></div>
+</div>
+```
+
+</div>
+
+<script>
+const ws = new WebSocket("ws://" + location.host + "/ws");
+
+let currentPlaylist = "default";
+
+ws.onopen = () => {
+    console.log("WS connected");
+};
+
+ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.event === "state") {
+        renderRef(msg.data.dirs);
+    }
+
+    if (msg.event === "fsdb_list") {
+        renderPlaylist(msg.data);
+    }
+};
+
+function getPlaylistName() {
+    currentPlaylist = document.getElementById("playlist").value || "";
+    return currentPlaylist;
+}
+
+function renderRef(data) {
+    const el = document.getElementById("ref");
+    el.innerHTML = "";
+
+    data.dirs.forEach(d => {
+        const div = document.createElement("div");
+        div.className = "item dir";
+        div.textContent = d + "/";
+        div.onclick = () => addDir(d);
+        el.appendChild(div);
+    });
+
+    data.files.forEach(f => {
+        const div = document.createElement("div");
+        div.className = "item file";
+        div.textContent = f;
+        div.onclick = () => addFile(f);
+        el.appendChild(div);
+    });
+}
+
+function renderPlaylist(data) {
+    const el = document.getElementById("playlistView");
+    el.innerHTML = "";
+
+    data.dirs.forEach(d => {
+        const div = document.createElement("div");
+        div.className = "item dir";
+        div.textContent = d + "/";
+        div.onclick = () => removeEntry(d);
+        el.appendChild(div);
+    });
+
+    data.files.forEach(f => {
+        const div = document.createElement("div");
+        div.className = "item file";
+        div.textContent = f;
+        div.onclick = () => removeEntry(f);
+        el.appendChild(div);
+    });
+}
+
+function addFile(name) {
+    ws.send(JSON.stringify({
+        action: "fsdb_add",
+        name: name,
+        playlist: getPlaylistName()
+    }));
+    setTimeout(refreshPlaylist, 100);
+}
+
+function addDir(name) {
+    ws.send(JSON.stringify({
+        action: "fsdb_add_dir",
+        name: name,
+        playlist: getPlaylistName()
+    }));
+    setTimeout(refreshPlaylist, 100);
+}
+
+function removeEntry(name) {
+    if (!confirm("Remove " + name + "?")) return;
+
+    ws.send(JSON.stringify({
+        action: "fsdb_remove",
+        name: name,
+        playlist: getPlaylistName()
+    }));
+    setTimeout(refreshPlaylist, 100);
+}
+
+function refreshPlaylist() {
+    ws.send(JSON.stringify({
+        action: "fsdb_list",
+        playlist: getPlaylistName()
+    }));
+}
+</script>
+
+</body>
+</html>

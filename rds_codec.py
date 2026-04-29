@@ -5,14 +5,14 @@ Usage:
     import rds_codec  # registers the codec
 
     # Decode RDS bytes to str
-    text = b'\\x48\\x65\\x8A\\x6C\\x6F'.decode('rp-rds')
+    text = b'\\x48\\x65\\x8A\\x6C\\x6F'.decode('radiodatasystem')
 
     # Encode str to RDS bytes
-    data = 'Héllo'.encode('rp-rds')
+    data = 'Héllo'.encode('radiodatasystem')
 
     # With error handlers
-    text = rds_bytes.decode('rp-rds', errors='replace')
-    text = rds_bytes.decode('rp-rds', errors='ignore')
+    text = rds_bytes.decode('radiodatasystem', errors='replace')
+    text = rds_bytes.decode('radiodatasystem', errors='ignore')
 """
 
 import codecs
