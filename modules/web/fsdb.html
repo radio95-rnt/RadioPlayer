@@ -1,211 +1,256 @@
 <!DOCTYPE html>
-
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<title>FSDB Editor</title>
-<style>
-    body {
-        margin: 0;
-        font-family: sans-serif;
-        background: #111;
-        color: #eee;
-    }
+    <head>
+        <meta charset="utf-8">
+        <title>FSDB Editor</title>
+        <style>
+            body {
+                margin: 0;
+                font-family: sans-serif;
+                background: #111;
+                color: #eee;
+            }
 
-.container {
-    display: flex;
-    height: 100vh;
-}
+            .controls {
+                padding: 8px 10px;
+                border-bottom: 1px solid #333;
+                background: #161616;
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                flex-wrap: wrap;
+            }
 
-.panel {
-    flex: 1;
-    padding: 10px;
-    box-sizing: border-box;
-    overflow-y: auto;
-    border-right: 1px solid #333;
-}
+            .picker-group {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
 
-.panel:last-child {
-    border-right: none;
-}
+            .picker-label {
+                font-size: 12px;
+                color: #888;
+                white-space: nowrap;
+            }
 
-h2 {
-    margin-top: 0;
-    font-size: 16px;
-    color: #aaa;
-}
+            .seg-row {
+                display: flex;
+                gap: 3px;
+            }
 
-.item {
-    padding: 6px;
-    margin: 2px 0;
-    cursor: pointer;
-    border-radius: 4px;
-}
+            .seg-btn {
+                font-size: 12px;
+                padding: 4px 9px;
+                border-radius: 5px;
+                border: 1px solid #444;
+                background: #1e1e1e;
+                color: #ccc;
+                cursor: pointer;
+                white-space: nowrap;
+                transition: background 0.1s;
+            }
 
-.item:hover {
-    background: #222;
-}
+            .seg-btn:hover { background: #2a2a2a; }
 
-.dir {
-    color: #6cf;
-}
+            .seg-btn.active {
+                background: #1a3a5c;
+                color: #7ab8f5;
+                border-color: #2a5a8c;
+                font-weight: 600;
+            }
 
-.file {
-    color: #ccc;
-}
+            .playlist-display {
+                font-family: monospace;
+                font-size: 13px;
+                color: #777;
+                padding: 4px 8px;
+                border: 1px solid #333;
+                border-radius: 5px;
+                background: #1a1a1a;
+            }
 
-.controls {
-    padding: 5px;
-    border-bottom: 1px solid #333;
-}
+            .playlist-display span {
+                color: #eee;
+                font-weight: 600;
+            }
 
-button {
-    margin-right: 5px;
-    background: #222;
-    color: #eee;
-    border: 1px solid #444;
-    padding: 5px 8px;
-    cursor: pointer;
-}
+            .refresh-btn {
+                font-size: 12px;
+                padding: 4px 10px;
+                border-radius: 5px;
+                border: 1px solid #444;
+                background: #222;
+                color: #eee;
+                cursor: pointer;
+            }
 
-button:hover {
-    background: #333;
-}
+            .refresh-btn:hover { background: #333; }
 
-input {
-    background: #222;
-    color: #eee;
-    border: 1px solid #444;
-    padding: 4px;
-}
+            .container {
+                display: flex;
+                height: calc(100vh - 52px);
+            }
 
-</style>
-</head>
-<body>
+            .panel {
+                flex: 1;
+                padding: 10px;
+                box-sizing: border-box;
+                overflow-y: auto;
+                border-right: 1px solid #333;
+            }
 
-<div class="controls">
-    Playlist:
-    <input id="playlist" value="default">
-    <button onclick="refreshPlaylist()">Refresh</button>
-</div>
+            .panel:last-child { border-right: none; }
 
-<div class="container">
-    <div class="panel">
-        <h2>Ref Dir</h2>
-        <div id="ref"></div>
-    </div>
+            h2 {
+                margin-top: 0;
+                font-size: 13px;
+                color: #777;
+                font-weight: 500;
+            }
 
-<div class="panel">
-    <h2>Playlist</h2>
-    <div id="playlistView"></div>
-</div>
+            .item {
+                padding: 5px 7px;
+                margin: 2px 0;
+                cursor: pointer;
+                border-radius: 4px;
+                font-size: 13px;
+            }
 
-</div>
+            .item:hover { background: #1e1e1e; }
+            .dir { color: #6cf; }
+            .file { color: #ccc; }
+        </style>
+    </head>
+    <body>
+        <div class="controls">
+            <div class="picker-group">
+                <span class="picker-label">Day</span>
+                <div class="seg-row" id="dayPicker"></div>
+            </div>
+            <div class="picker-group">
+                <span class="picker-label">Part</span>
+                <div class="seg-row" id="partPicker"></div>
+            </div>
+            <div class="playlist-display">playlist: <span id="playlistVal">friday/day</span></div>
+            <button class="refresh-btn" onclick="refreshPlaylist()">Refresh</button>
+        </div>
 
-<script>
-const ws = new WebSocket("/ws");
+        <div class="container">
+            <div class="panel">
+                <h2>Ref Dir</h2>
+                <div id="ref"></div>
+            </div>
+            <div class="panel">
+                <h2>Playlist</h2>
+                <div id="playlistView"></div>
+            </div>
+        </div>
 
-let currentPlaylist = "default";
+        <script>
+            const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+            const PARTS = ["day","morning","night","late_night"];
 
-ws.onopen = () => {
-    console.log("WS connected");
-};
+            let selectedDay = "friday";
+            let selectedPart = "day";
 
-ws.onmessage = (ev) => {
-    const msg = JSON.parse(ev.data);
+            function buildPicker(containerId, items, getCurrent, setCurrent) {
+                const el = document.getElementById(containerId);
+                el.innerHTML = "";
+                items.forEach(val => {
+                    const btn = document.createElement("button");
+                    btn.className = "seg-btn" + (getCurrent() === val ? " active" : "");
+                    btn.textContent = val.replace("_", " ");
+                    btn.onclick = () => {
+                        setCurrent(val);
+                        buildPicker(containerId, items, getCurrent, setCurrent);
+                        updateDisplay();
+                        refreshPlaylist();
+                    };
+                    el.appendChild(btn);
+                });
+            }
 
-    if (msg.event === "state") {
-        renderRef(msg.data.dirs);
-    }
+            function updateDisplay() {
+                document.getElementById("playlistVal").textContent = selectedDay + "/" + selectedPart;
+            }
 
-    if (msg.event === "fsdb_list") {
-        renderPlaylist(msg.data);
-    }
-};
+            function getPlaylistName() {
+                return selectedDay + "/" + selectedPart;
+            }
 
-function getPlaylistName() {
-    currentPlaylist = document.getElementById("playlist").value || "";
-    return currentPlaylist;
-}
+            buildPicker("dayPicker", DAYS, () => selectedDay, v => { selectedDay = v; });
+            buildPicker("partPicker", PARTS, () => selectedPart, v => { selectedPart = v; });
 
-function renderRef(data) {
-    const el = document.getElementById("ref");
-    el.innerHTML = "";
+            const ws = new WebSocket("/ws");
 
-    data.dirs.forEach(d => {
-        const div = document.createElement("div");
-        div.className = "item dir";
-        div.textContent = d + "/";
-        div.onclick = () => addDir(d);
-        el.appendChild(div);
-    });
+            ws.onopen = () => {
+                console.log("WS connected");
+                refreshPlaylist();
+            };
 
-    data.files.forEach(f => {
-        const div = document.createElement("div");
-        div.className = "item file";
-        div.textContent = f;
-        div.onclick = () => addFile(f);
-        el.appendChild(div);
-    });
-}
+            ws.onmessage = (ev) => {
+                const msg = JSON.parse(ev.data);
+                if (msg.event === "state") renderRef(msg.data.dirs);
+                if (msg.event === "fsdb_list") renderPlaylist(msg.data);
+            };
 
-function renderPlaylist(data) {
-    const el = document.getElementById("playlistView");
-    el.innerHTML = "";
+            function renderRef(data) {
+                const el = document.getElementById("ref");
+                el.innerHTML = "";
+                data.dirs.forEach(d => {
+                    const div = document.createElement("div");
+                    div.className = "item dir";
+                    div.textContent = d + "/";
+                    div.onclick = () => addDir(d);
+                    el.appendChild(div);
+                });
+                data.files.forEach(f => {
+                    const div = document.createElement("div");
+                    div.className = "item file";
+                    div.textContent = f;
+                    div.onclick = () => addFile(f);
+                    el.appendChild(div);
+                });
+            }
 
-    data.dirs.forEach(d => {
-        const div = document.createElement("div");
-        div.className = "item dir";
-        div.textContent = d + "/";
-        div.onclick = () => removeEntry(d);
-        el.appendChild(div);
-    });
+            function renderPlaylist(data) {
+                const el = document.getElementById("playlistView");
+                el.innerHTML = "";
+                data.dirs.forEach(d => {
+                    const div = document.createElement("div");
+                    div.className = "item dir";
+                    div.textContent = d + "/";
+                    div.onclick = () => removeEntry(d);
+                    el.appendChild(div);
+                });
+                data.files.forEach(f => {
+                    const div = document.createElement("div");
+                    div.className = "item file";
+                    div.textContent = f;
+                    div.onclick = () => removeEntry(f);
+                    el.appendChild(div);
+                });
+            }
 
-    data.files.forEach(f => {
-        const div = document.createElement("div");
-        div.className = "item file";
-        div.textContent = f;
-        div.onclick = () => removeEntry(f);
-        el.appendChild(div);
-    });
-}
+            function addFile(name) {
+                ws.send(JSON.stringify({ action: "fsdb_add", name, playlist: getPlaylistName() }));
+                setTimeout(refreshPlaylist, 100);
+            }
 
-function addFile(name) {
-    ws.send(JSON.stringify({
-        action: "fsdb_add",
-        name: name,
-        playlist: getPlaylistName()
-    }));
-    setTimeout(refreshPlaylist, 100);
-}
+            function addDir(name) {
+                ws.send(JSON.stringify({ action: "fsdb_add_dir", name, playlist: getPlaylistName() }));
+                setTimeout(refreshPlaylist, 100);
+            }
 
-function addDir(name) {
-    ws.send(JSON.stringify({
-        action: "fsdb_add_dir",
-        name: name,
-        playlist: getPlaylistName()
-    }));
-    setTimeout(refreshPlaylist, 100);
-}
+            function removeEntry(name) {
+                if (!confirm("Remove " + name + "?")) return;
+                ws.send(JSON.stringify({ action: "fsdb_remove", name, playlist: getPlaylistName() }));
+                setTimeout(refreshPlaylist, 100);
+            }
 
-function removeEntry(name) {
-    if (!confirm("Remove " + name + "?")) return;
-
-    ws.send(JSON.stringify({
-        action: "fsdb_remove",
-        name: name,
-        playlist: getPlaylistName()
-    }));
-    setTimeout(refreshPlaylist, 100);
-}
-
-function refreshPlaylist() {
-    ws.send(JSON.stringify({
-        action: "fsdb_list",
-        playlist: getPlaylistName()
-    }));
-}
-</script>
-
-</body>
+            function refreshPlaylist() {
+                ws.send(JSON.stringify({ action: "fsdb_list", playlist: getPlaylistName() }));
+            }
+        </script>
+    </body>
 </html>
