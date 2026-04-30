@@ -19,25 +19,15 @@ class ASCII(uecp.commands.UECPCommand):
             self.ELEMENT_CODE,
             2+len(self.data)] + list(b"95") + list(self.data)
 
-class RT_Set(uecp.commands.RadioTextSetCommand):
+class RT_Set(uecp.commands.UECPCommand):
+    ELEMENT_CODE = 0x0A
+    @classmethod
+    def create_from(cls, data: bytes | list[int]): raise NotImplementedError()
+    def __init__(self, data: bytes) -> None: self.data = data
     def encode(self) -> list[int]:
-        data = [self.ELEMENT_CODE, self.data_set_number, self.programme_service_number]
-        if (
-            len(self._radiotext.text) == 0
-            and self._buffer_configuration
-            is uecp.commands.RadioTextBufferConfiguration.TRUNCATE_BEFORE
-        ):
-            data.append(0)
-        else:
-            mel = 1 + len(self._radiotext.text)
-            flags = (
-                self._buffer_configuration << 5
-                | self._radiotext.number_of_transmissions << 1
-                | self._radiotext.a_b_toggle
-            )
-            data += [mel, flags]
-            data += list(self._radiotext.text.encode("radiodatasystem", "replace"))
-        return data
+        return [
+            self.ELEMENT_CODE, 0, 0,
+            1+len(self.data), 1] + list(self.data)
 
 DEBUG = False
 
@@ -108,14 +98,12 @@ def update_rds(track_name: str):
     rtp = ','.join(list(map(str, rtp)))
 
     prt = prt[:64]
-    dprt = prt.decode("radiodatasystem", "ignore")
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as f:
             f.settimeout(1.0)
             uecp_frame = uecp.frame.UECPFrame()
-            if 0 < len(prt) < 61: dprt += "\r" # makes the warning go away
-            uecp_frame.add_command(RT_Set(dprt, 0, True))
+            uecp_frame.add_command(RT_Set(prt))
             uecp_frame.add_command(ASCII(f"RTP={rtp}".encode()))
 
             data = uecp_frame.encode()
@@ -123,7 +111,7 @@ def update_rds(track_name: str):
             logger.debug("Sending", str(data))
     except Exception as e: logger.error(f"Error updating RDS: {e}")
 
-    return dprt, rtp
+    return prt.decode("radiodatasystem", "ignore"), rtp
 
 class Module(PlayerModule):
     def on_new_track(self, index: int, track: Track, next_track: Track | None):
