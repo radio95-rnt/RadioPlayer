@@ -1,5 +1,6 @@
 import log95, abc
 from collections.abc import Sequence
+from typing import Literal
 from subprocess import Popen
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,15 +23,18 @@ class Process:
     started_at: float
     duration: float
 
+class RejectedTrack(Exception): ...
 class ABC_ProcessManager(abc.ABC):
     @abc.abstractmethod
-    def play(self, track: Track) -> Process: ...
+    def play(self, track: Track) -> Process: """RejectedTrack may be raised by this function if the track cannot be played, but other can"""
     @abc.abstractmethod
     def anything_playing(self) -> bool: ...
     @abc.abstractmethod
     def stop_all(self, timeout: float | None = None) -> None: ...
     @abc.abstractmethod
     def wait_all(self, timeout: float | None = None) -> None: ...
+    @abc.abstractmethod
+    def test(self) -> bool: """Ran on startup. This should return false if this process manager can't play any track"""
 class BaseIMCModule:
     """This is not a module to be used but rather a placeholder IMC api to be used in other modules"""
     def imc(self, imc: 'InterModuleCommunication') -> None:
@@ -136,7 +140,9 @@ class PlaylistParser:
             and a dictionary of str:str consistent of the arguments which affect the files given
         """
         return {}, []
-    
+
+# This file is a part of RadioPlayer
+
 # This is free and unencumbered software released into the public domain.
 
 # Anyone is free to copy, modify, publish, use, compile, sell, or

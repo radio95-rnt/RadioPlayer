@@ -1,4 +1,4 @@
-from . import ABC_ProcessManager, Process, Track, Popen, tinytag
+from . import ABC_ProcessManager, Process, Track, Popen, tinytag, RejectedTrack
 from threading import Lock
 import subprocess, time
 
@@ -7,8 +7,9 @@ class ProcessManager(ABC_ProcessManager):
         self.lock = Lock()
         self.processes: list[Process] = []
         self.tinytag = tinytag.TinyTag()
+        
     def play(self, track: Track) -> Process:
-        assert track.path.exists()
+        if track.path.suffix not in self.tinytag.SUPPORTED_FILE_EXTENSIONS or not track.path.exists(): raise RejectedTrack
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
 
         duration = self.tinytag.get(track.path.absolute(), tags=False).duration
@@ -48,6 +49,14 @@ class ProcessManager(ABC_ProcessManager):
                 try: process.process.wait(timeout)
                 except subprocess.TimeoutExpired: process.process.terminate()
             self.processes.clear()
+    def test(self) -> bool:
+        proc = Popen(["ffplay"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        start = time.monotonic()
+        while proc.poll() is None and (time.monotonic() - start) < 1: time.sleep(0.01)
+
+        if proc.poll() is None: proc.kill()
+        return proc.poll() not in (None, 127)
 
 procman = ProcessManager()
 

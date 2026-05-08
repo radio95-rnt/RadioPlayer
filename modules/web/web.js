@@ -104,7 +104,7 @@ function handleMessage(msg) {
             document.getElementById("rds-text").textContent = msg.data?.rt ?? "";
             break;
         case "playlist":
-            playlist = msg.data || [];
+            playlist = msg.data?.playlist || [];
             renderAll();
             break;
         case "new_track":

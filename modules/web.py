@@ -9,10 +9,8 @@ import mimetypes
 import shutil
 
 def get_content_type(filename: str) -> str:
-    mime_type, _ = mimetypes.guess_type(filename)
+    mime_type, _ = mimetypes.guess_type(filename, False)
     if mime_type: return mime_type
-
-    # Final fallback
     return "application/octet-stream"
 
 from modules import InterModuleCommunication
@@ -249,8 +247,9 @@ class Module(PlayerModule):
                 "offset": track.offset,
                 "focus_time_offset": track.focus_time_offset
             })
-        self.data["playlist"] = json.dumps(api_data)
-        try: self.ws_q.put({"event": "playlist", "data": api_data})
+        output_data = {"playlist": api_data, "global_args": global_args}
+        self.data["playlist"] = json.dumps(output_data)
+        try: self.ws_q.put({"event": "playlist", "data": output_data})
         except Exception: pass
 
     def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:

@@ -11,7 +11,6 @@ def prefetch(path):
             with open(path, "rb") as f:
                 fd = f.fileno()
                 os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_SEQUENTIAL)
-                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_NOREUSE)
                 os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_WILLNEED)
         except Exception: pass
 
@@ -122,6 +121,9 @@ class ModuleManager:
         if not procman:
             self.logger.critical_error("Missing process mananger.")
             raise SystemExit("Missing process mananger.")
+        if not procman.test():
+            self.logger.critical_error("Process manager has failed its test.")
+            raise SystemExit("Process manager has failed its test.")
         if not parser: self.logger.warning("Missing parser, advisor-less will be forced.")
         self.playlist_modifier_modules += neg_modifiers
         InterModuleCommunication(self.simple_modules + [self.playlist_advisor, ProcmanCommunicator(procman), self.active_modifier])
@@ -158,7 +160,7 @@ class RadioPlayer:
                 raise SystemExit(130)
 
     def start(self):
-        """Single functon for starting the core, returns but might exit raising an SystemExit"""
+        """Single functon for starting the core, returns but might exit raising a SystemExit"""
         self.logger.info("Core starting, loading modules")
         self.modman.load_modules()
         self.procman, self.parser = self.modman.start_modules(self.arg)
@@ -243,15 +245,18 @@ class RadioPlayer:
             self.logger.info("Now playing:", track.path.name)
             prefetch(track.path)
 
-            pr = self.procman.play(track)
-            [module.on_new_track(song_i, pr.track, next_track) for module in self.modman.simple_modules if module]
-            end_time = pr.started_at + pr.duration + pr.track.focus_time_offset
-            self.procman.anything_playing()
+            try:
+                pr = self.procman.play(track)
+                [module.on_new_track(song_i, pr.track, next_track) for module in self.modman.simple_modules if module]
+                end_time = pr.started_at + pr.duration + pr.track.focus_time_offset
+                self.procman.anything_playing()
 
-            while end_time >= time.monotonic() and pr.process.poll() is None:
-                start = time.monotonic()
-                [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, end_time - pr.started_at) for module in self.modman.simple_modules if module]
-                if (elapsed := time.monotonic() - start) < 1 and (remaining_until_end := end_time - time.monotonic()) > 0: time.sleep(min(1 - elapsed, remaining_until_end))
+                while end_time >= time.monotonic() and pr.process.poll() is None:
+                    start = time.monotonic()
+                    [module.progress(song_i, track, time.monotonic() - pr.started_at, pr.duration, end_time - pr.started_at) for module in self.modman.simple_modules if module]
+                    if (elapsed := time.monotonic() - start) < 1 and (remaining_until_end := end_time - time.monotonic()) > 0: time.sleep(min(1 - elapsed, remaining_until_end))
+            except RejectedTrack: pass
+            except BaseException: raise
 
             self.procman.anything_playing()
             if next_track: prefetch(next_track.path)
@@ -276,8 +281,9 @@ class RadioPlayer:
 class RotatingLog(io.TextIOWrapper):
     def write(self, *args, **kwargs) -> int:
         if self.tell() > 2_000_000:
-            self.truncate(0)
+            self.flush()
             self.seek(0)
+            self.truncate(0)
         return super().write(*args, **kwargs)
 
 def main():

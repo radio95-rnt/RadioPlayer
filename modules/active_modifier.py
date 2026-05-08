@@ -2,7 +2,7 @@ from modules import BaseIMCModule, InterModuleCommunication
 from . import ActiveModifier, log95, Track, Path
 import os, glob, datetime
 from threading import Lock
-DEFAULT_CROSSFADE = 5
+DEFAULT_CROSSFADE = 6
 
 from typing import TextIO
 _log_out: TextIO
@@ -94,9 +94,6 @@ class Module(ActiveModifier):
             if self.skip_next > 0:
                 logger.info("Skipping...")
                 self.skip_next -= 1
-                return self.play(index, track, next_track)
-            if index in self.skip_indexes:
-                logger.info("Skipping...")
                 return self.play(index, track, next_track)
             return (self.last_track, next_track), True
         elif len(self.originals):
