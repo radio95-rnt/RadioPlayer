@@ -4,6 +4,7 @@ import sys, signal, time, traceback, io
 import concurrent.futures
 from modules import *
 from threading import Lock
+import syslog
 
 def prefetch(path):
     if os.name == "posix":
