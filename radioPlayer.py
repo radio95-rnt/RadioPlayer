@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-from _io import _WrappedBuffer
 import os, importlib.util, importlib.machinery, types
-import sys, signal, time, traceback, io
+import sys, signal, time, traceback
 import concurrent.futures
 from modules import *
 from threading import Lock
