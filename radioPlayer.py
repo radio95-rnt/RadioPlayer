@@ -280,7 +280,7 @@ class RadioPlayer:
 
 import syslog
 class RotatingLog(log95.SyslogTextIO):
-    def __init__(self, buffer: _WrappedBuffer, encoding: str | None = None, errors: str | None = None, newline: str | None = None, line_buffering: bool = False, write_through: bool = False) -> None:
+    def __init__(self, buffer, encoding: str | None = None, errors: str | None = None, newline: str | None = None, line_buffering: bool = False, write_through: bool = False) -> None:
         super().__init__(buffer, encoding, errors, newline, line_buffering, write_through)
         syslog.openlog("player")
     def write(self, *args, **kwargs) -> int:
