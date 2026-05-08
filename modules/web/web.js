@@ -132,6 +132,9 @@ function handleMessage(msg) {
             skippedIndices = msg.data?.data ?? skippedIndices;
             renderAll();
             break;
+        case "users":
+            document.getElementById("user-count").textContent = msg.data;
+            break;
     }
 }
 
