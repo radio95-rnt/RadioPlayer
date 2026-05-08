@@ -7,11 +7,13 @@ from threading import Lock
 
 def prefetch(path):
     if os.name == "posix":
-        with open(path, "rb") as f:
-            fd = f.fileno()
-            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_SEQUENTIAL)
-            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_NOREUSE)
-            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_WILLNEED)
+        try:
+            with open(path, "rb") as f:
+                fd = f.fileno()
+                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_SEQUENTIAL)
+                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_NOREUSE)
+                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_WILLNEED)
+        except Exception: pass
 
 MODULES_PACKAGE = "modules"
 MODULES_DIR = Path(__file__, "..", MODULES_PACKAGE).resolve()
