@@ -50,11 +50,10 @@ class ProcessManager(ABC_ProcessManager):
                 except subprocess.TimeoutExpired: process.process.terminate()
             self.processes.clear()
     def test(self) -> bool:
-        return True
-        proc = Popen(["ffplay"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(["ffplay"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         start = time.monotonic()
-        while proc.poll() is None and (time.monotonic() - start) < 1: time.sleep(0.01)
+        while proc.poll() is None and (time.monotonic() - start) < 10: time.sleep(0.01)
 
         if proc.poll() is None: proc.kill()
         return proc.poll() not in (None, 127)

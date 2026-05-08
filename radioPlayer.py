@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
+from _io import _WrappedBuffer
 import os, importlib.util, importlib.machinery, types
 import sys, signal, time, traceback, io
 import concurrent.futures
 from modules import *
 from threading import Lock
-import syslog
 
 def prefetch(path):
     if os.name == "posix":
@@ -279,7 +279,11 @@ class RadioPlayer:
             traceback.print_exc(file=self.logger.output)
             raise
 
-class RotatingLog(io.TextIOWrapper):
+import syslog
+class RotatingLog(log95.SyslogTextIO):
+    def __init__(self, buffer: _WrappedBuffer, encoding: str | None = None, errors: str | None = None, newline: str | None = None, line_buffering: bool = False, write_through: bool = False) -> None:
+        super().__init__(buffer, encoding, errors, newline, line_buffering, write_through)
+        syslog.openlog("player")
     def write(self, *args, **kwargs) -> int:
         if self.tell() > 2_000_000:
             self.flush()
@@ -298,7 +302,9 @@ def main():
             signal.signal(signal.SIGINT, core.handle_sigint)
             core.loop()
         except SystemExit:
-            try: core.shutdown()
+            try: 
+                core.shutdown()
+                syslog.closelog()
             except BaseException: traceback.print_exc(file=f)
             raise
 

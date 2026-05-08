@@ -1,3 +1,2 @@
 libcache
-log95
 unidecode

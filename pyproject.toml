@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "radio-tools"
-version = "0.1"
-dependencies = ["log95", "unidecode", "libcache"]
+version = "0.2"
+dependencies = ["unidecode", "libcache"]
 
 [tool.setuptools]
-py-modules = ["radioPlaylist", "radioPlayer", "tinytag", "rds_codec"]
+py-modules = ["radioPlaylist", "radioPlayer", "tinytag", "rds_codec", "log95"]
 packages = ["modules"]
 
 [project.scripts]
