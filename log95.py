@@ -12,10 +12,10 @@ except ModuleNotFoundError:
 class log95Levels(Enum):
     DEBUG = 0
     VERBOSE = 1
-    INFO = 2
-    WARN = 3
-    ERROR = 4
-    CRITICAL_ERROR = 5
+    CRITICAL_ERROR = 2
+    ERROR = 3
+    WARN = 4
+    INFO = 5
 
 def level_to_syslog(level: log95Levels):
     match level:
@@ -36,7 +36,6 @@ class log95:
         self.level = int(level.value)
         self.output = output
     def log(self, level: log95Levels, *args:str, seperator=" ") -> None:
-        if level.value > self.level: return
         we_have_color = "colorama" in sys.modules
         def level_to_str(_level: log95Levels, _color: bool) -> LiteralString | str:
             if _color:
@@ -51,7 +50,7 @@ class log95:
                 match _level:
                     case log95Levels.CRITICAL_ERROR: return "CRITICAL"
                     case _: return _level.name
-        self.output.write(f"[{self.tag}] ({level_to_str(level, we_have_color)}) @ ({datetime.datetime.now().strftime('%d.%m.%Y %H:%M:%S.%f')}) - {seperator.join(args)}{os.linesep}")
+        if level.value > self.level: self.output.write(f"[{self.tag}] ({level_to_str(level, we_have_color)}) @ ({datetime.datetime.now().strftime('%d.%m.%Y %H:%M:%S.%f')}) - {seperator.join(args)}{os.linesep}")
         if isinstance(self.output, SyslogTextIO): self.output.syslog(level, seperator.join(args))
     def debug(self, *args:str, seperator=" ") -> None:
         self.log(log95Levels.DEBUG, *args, seperator)
