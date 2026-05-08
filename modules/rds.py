@@ -86,16 +86,25 @@ def update_rds(track_name: str):
     artist = artist.encode("radiodatasystem", "replace")
 
     rtp = []
-    rtp.append(1) # type 2
-    rtp.append(prt.find(title)) # start 2
-    rtp.append(len(title) - 1) # len 2
-    rtp.append(4) # type 1
-    rtp.append(prt.find(artist)) # start 1
-    rtp.append(len(artist) - 1) # len 1
+    def do_title():
+        rtp.append(1) # type 2
+        rtp.append(prt.find(title)) # start 2
+        rtp.append(len(title) - 1) # len 2
+    def do_artist():
+        rtp.append(4) # type 1
+        rtp.append(prt.find(artist)) # start 1
+        rtp.append(len(artist) - 1) # len 1
+    if len(artist) > len(title):
+        do_artist()
+        do_title()
+    else:
+        #len(artist) < len(title)
+        do_title()
+        do_artist()
 
     rtp = [j_size if i_rt > j_size else i_rt for i_rt,j_size in zip(rtp, [255,0x3f,0x3f,255,0x3f,0x1f])]
 
-    rtp = ','.join(list(map(str, rtp)))
+    rtp_str = ','.join(list(map(str, rtp)))
 
     prt = prt[:64]
 
@@ -104,14 +113,14 @@ def update_rds(track_name: str):
             f.settimeout(1.0)
             uecp_frame = uecp.frame.UECPFrame()
             uecp_frame.add_command(RT_Set(prt))
-            uecp_frame.add_command(ASCII(f"RTP={rtp}".encode()))
+            uecp_frame.add_command(ASCII(f"RTP={rtp_str}".encode()))
 
             data = uecp_frame.encode()
             f.sendto(data, udp_host)
             logger.debug("Sending", str(data))
     except Exception as e: logger.error(f"Error updating RDS: {e}")
 
-    return prt.decode("radiodatasystem", "ignore"), rtp
+    return prt.decode("radiodatasystem", "ignore"), rtp_str
 
 class Module(PlayerModule):
     def on_new_track(self, index: int, track: Track, next_track: Track | None):

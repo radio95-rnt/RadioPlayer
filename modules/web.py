@@ -134,13 +134,15 @@ async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
         payload = json.dumps(msg)
         if clients:
             coros = []
-            for ws in list(clients): coros.append(_safe_send(ws, payload, clients))
+            for ws in list(clients): coros.append(_safe_send(ws, payload, clients, ws_q))
             await asyncio.gather(*coros)
 
-async def _safe_send(ws, payload: str, clients: set):
+async def _safe_send(ws, payload: str, clients: set, ws_q: multiprocessing.Queue):
     try: await ws.send(payload)
     except Exception:
-        try: clients.discard(ws)
+        try: 
+            clients.discard(ws)
+            await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"event": "users", "data": len(clients)})
         except Exception: pass
 
 def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
@@ -154,6 +156,7 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
             finally:
                 await websocket.close(1001, "")
                 clients.discard(websocket)
+                await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"event": "users", "data": len(clients)})
         async def process_request(websocket: ServerConnection, request: Request):
             if request.path == "/ws":
                 if not "upgrade" in request.headers.get("Connection", "").lower():
