@@ -85,6 +85,13 @@ function connectWs() {
     ws.addEventListener("message", evt => {
         handleMessage(JSON.parse(evt.data));
     });
+
+    function syncTime() {
+        wsSend({ action: "get_time", client_time: performance.now() / 1000 });
+    }
+
+    setInterval(syncTime, 10000);
+    syncTime(); // initial sync
 }
 
 function wsSend(obj) {
@@ -100,7 +107,13 @@ function handleMessage(msg) {
     switch (msg.event) {
         case "time": {
             const localNow = performance.now() / 1000;
-            timeOffset = localNow - msg.data;
+            const rtt = localNow - msg.client_time;  // round-trip time
+            const serverNow = msg.data + rtt / 2;    // estimate server time at this moment
+            const newOffset = localNow - serverNow;
+
+            if (timeOffset === 0) timeOffset = newOffset;
+            else timeOffset = timeOffset * 0.9 + newOffset * 0.1;
+            break;
         }
         case "state": {
             const d = msg.data || {};

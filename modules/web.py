@@ -3,7 +3,7 @@ from queue import Empty
 import json
 import threading, uuid, time
 import asyncio
-import websockets
+import websockets, base64
 from websockets import ServerConnection, Request, Response, Headers
 import mimetypes
 import shutil
@@ -19,8 +19,7 @@ from . import Track, PlayerModule, Path, BaseIMCModule
 
 MAIN_PATH_DIR = Path("/home/user/mixes")
 
-async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
-    await websocket.send(json.dumps({"event": "time", "data": time.monotonic()}))
+async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue, writer_q: asyncio.Queue):
     try:
         initial = {
             "track": json.loads(shared_data.get("track", "{}")),
@@ -123,6 +122,8 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 }
                 await websocket.send(json.dumps({"event": "fsdb_list", "data": payload, "time": time.monotonic()}))
             except Exception as e: await websocket.send(json.dumps({"event": "fsdb_list", "data": {}, "error": str(e), "time": time.monotonic()}))
+        elif action == "fm95": await writer_q.put((base64.b64decode(msg.get("data", "")), websocket))
+        elif action == "get_time": await websocket.send(json.dumps({"event": "time", "data": time.monotonic(), "client_time": msg.get("client_time", 0)}))
         else: await websocket.send(json.dumps({"event": "error", "error": "unknown action", "time": time.monotonic()}))
 
 async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
@@ -145,14 +146,36 @@ async def _safe_send(ws, payload: str, clients: set, ws_q: multiprocessing.Queue
             await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"event": "users", "data": len(clients)})
         except Exception: pass
 
+async def socket_handler(socket: asyncio.StreamReader, writer: asyncio.StreamWriter, writer_q: asyncio.Queue):
+    while True:
+        qdata, ws = await writer_q.get()
+        if not qdata or not ws: break
+
+        try:
+            writer.write(qdata)
+            await writer.drain()
+
+            data = await socket.read(256)
+            if not data:
+                await ws.send(json.dumps({"event": "error", "error": "fm95 socket closed", "time": time.monotonic()}))
+                break
+            await ws.send(json.dumps({"event": "fm95", "data": base64.b64encode(data).decode(), "time": time.monotonic()}))
+        except Exception as e:
+            await ws.send(json.dumps({"event": "error", "error": str(e), "time": time.monotonic()}))
+            break
+
 def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
     async def runner():
         clients = set()
+        reader, writer = await asyncio.open_unix_connection("/etc/fm95/ctl.socket") # pyright: ignore[reportAttributeAccessIssue]
+        reader: asyncio.StreamReader
+        writer: asyncio.StreamWriter
+        writer_q: asyncio.Queue[tuple[bytes | None, ServerConnection | None]] = asyncio.Queue()
 
         async def handler_wrapper(websocket: ServerConnection):
             clients.add(websocket)
             await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"event": "users", "data": len(clients)})
-            try: await ws_handler(websocket, shared_data, imc_q, ws_q)
+            try: await ws_handler(websocket, shared_data, imc_q, ws_q, writer_q)
             finally:
                 await websocket.close(1001, "")
                 clients.discard(websocket)
@@ -195,7 +218,14 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
 
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
+        sockethand = asyncio.create_task(socket_handler(reader, writer, writer_q))
         await broadcaster
+
+        await writer_q.put((None, None))
+        await sockethand
+
+        writer.close()
+        await writer.wait_closed()
         await server.wait_closed()
 
     loop = asyncio.new_event_loop()
