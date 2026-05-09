@@ -55,8 +55,6 @@ function initLayout() {
     }
 }
 
-// ─── WebSocket ───────────────────────────────────────────────────────────────
-
 function connectWs() {
     const statusEl = document.getElementById("server-status");
     statusEl.textContent = "connecting...";
@@ -88,10 +86,10 @@ function connectWs() {
 
     function syncTime() {
         wsSend({ action: "get_time", client_time: performance.now() / 1000 });
+        setInterval(syncTime, 10000);
     }
 
-    setInterval(syncTime, 10000);
-    syncTime(); // initial sync
+    setInterval(syncTime, 500);
 }
 
 function wsSend(obj) {
