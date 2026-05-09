@@ -232,6 +232,8 @@ class RadioPlayer:
         track, next_track, extend = get_track()
         while i < max_iterator and running:
             check_conditions()
+            if not running: break
+
             self.procman.anything_playing()
 
             if not track.path.exists():
@@ -263,8 +265,9 @@ class RadioPlayer:
             i += 1
             if not extend: song_i += 1
 
-            check_conditions()
             self.procman.anything_playing()
+            check_conditions()
+            if not running: break
             track, next_track, extend = get_track()
             prefetch(track.path)
 
