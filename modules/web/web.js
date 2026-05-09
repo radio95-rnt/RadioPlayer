@@ -86,10 +86,10 @@ function connectWs() {
 
     function syncTime() {
         wsSend({ action: "get_time", client_time: performance.now() / 1000 });
-        setInterval(syncTime, 10000);
     }
 
-    setInterval(syncTime, 500);
+    setInterval(syncTime, 10000);
+    setTimeout(syncTime, 500);
 }
 
 function wsSend(obj) {
