@@ -95,7 +95,7 @@ function handleMessage(msg) {
     if(msg.time && timeOffset != 0) {
         const now = performance.now() / 1000;
         const lag = now - (msg.time + timeOffset);
-        document.getElementById("ping-status").textContent = lag * 1000;
+        document.getElementById("ping-status").textContent = (Math.max(lag, 0) * 1000).toFixed(2);
     }
     switch (msg.event) {
         case "time": {
