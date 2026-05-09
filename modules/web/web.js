@@ -17,6 +17,7 @@ let skippedIndices = [];
 let lastElapsed = 0;
 let lastUpdateTime = 0;
 let currentRealTotal = 1;
+let timeOffset = 0;
 
 function toggleSection(id) {
     document.getElementById(id).classList.toggle("collapsed");
@@ -90,10 +91,17 @@ function wsSend(obj) {
     ws.send(JSON.stringify(obj));
 }
 
-// ─── Message Handling ────────────────────────────────────────────────────────
-
 function handleMessage(msg) {
+    if(msg.time && timeOffset != 0) {
+        const now = performance.now() / 1000;
+        const lag = now - (msg.time + offset);
+        document.getElementById("ping-status").textContent = lag;
+    }
     switch (msg.event) {
+        case "time": {
+            const localNow = performance.now() / 1000;
+            timeOffset = localNow - msg.data;
+        }
         case "state": {
             const d = msg.data || {};
             if (d.dirs) updateDirs(d.dirs);
@@ -143,8 +151,6 @@ function renderAll() {
     renderQueue();
     renderPlaylist();
 }
-
-// ─── Track State ─────────────────────────────────────────────────────────────
 
 function trackLabel(track, index) {
     const prefix = track.official ? "(official) " : "(unofficial) ";
