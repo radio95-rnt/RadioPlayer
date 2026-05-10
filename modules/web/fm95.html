@@ -133,6 +133,7 @@
     <div class="scope-legend">
       <span><span class="dot" style="background:#f472b6"></span>Input Level</span>
       <span><span class="dot" style="background:#38bdf8"></span>Audio Level</span>
+      <span><span class="dot" style="background:#fb923c"></span>AGC</span>
     </div>
   </div>
   <canvas id="scope"></canvas>
@@ -168,10 +169,10 @@ const FIELD_CFG = {
   agc_gain:    { unit:'x',   fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*10)), warn: v=>v>3 },
 };
 
-// --- Oscilloscope state ---
 const MAX_PTS  = 400;
-let histInput  = new Array(MAX_PTS).fill(null);
-let histAudio  = new Array(MAX_PTS).fill(null);
+let histInput = new Array(MAX_PTS).fill(null);
+let histAudio = new Array(MAX_PTS).fill(null);
+let histAgc = new Array(MAX_PTS).fill(null);
 
 const canvas   = document.getElementById('scope');
 const ctx      = canvas.getContext('2d');
@@ -208,7 +209,7 @@ function drawScope() {
   let yMin = -1, yMax = 1;
   if (yscale === '2') { yMin = -2; yMax = 2; }
   else if (yscale === 'auto') {
-    const vals = [...histInput, ...histAudio].filter(v => v !== null);
+    const vals = [...histInput, ...histAudio, ...histAgc].filter(v => v !== null);
     if (vals.length) {
       yMin = Math.min(...vals);
       yMax = Math.max(...vals);
@@ -271,6 +272,7 @@ function drawScope() {
 
   drawLine(histInput, '#f472b6');
   drawLine(histAudio, '#38bdf8');
+  drawLine(histAgc, '#fb923c');
 }
 
 function decode(b64) {
@@ -296,10 +298,9 @@ function updateUI(values) {
   });
 
   // push to oscilloscope history
-  const inputVal = values[3];
-  const audioVal = values[4];
-  histInput.push(inputVal); if (histInput.length > MAX_PTS) histInput.shift();
-  histAudio.push(audioVal); if (histAudio.length > MAX_PTS) histAudio.shift();
+  histAgc.push(values[2]); if (histAgc.length > MAX_PTS) histAgc.shift();
+  histInput.push(values[3]); if (histInput.length > MAX_PTS) histInput.shift();
+  histAudio.push(values[4]); if (histAudio.length > MAX_PTS) histAudio.shift();
   drawScope();
 
   document.getElementById('last-update').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
