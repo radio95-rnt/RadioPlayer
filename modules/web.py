@@ -186,19 +186,18 @@ async def socket_handler(socket: asyncio.StreamReader, writer: asyncio.StreamWri
     while True:
         qdata, ws = await writer_q.get()
         if not qdata or not ws: break
-
         try:
             writer.write(qdata)
             await writer.drain()
-
             data = await socket.read(256)
             if not data:
                 await ws.send(json.dumps({"event": "error", "error": "fm95 socket closed"}))
-                break
+                raise ConnectionResetError("fm95 socket closed")  # ← let reconnect handle it
             await ws.send(json.dumps({"event": "fm95", "data": base64.b64encode(data).decode()}))
         except Exception as e:
-            await ws.send(json.dumps({"event": "error", "error": str(e)}))
-            break
+            try: await ws.send(json.dumps({"event": "error", "error": str(e)}))
+            except Exception: pass
+            raise 
 
 def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
     async def runner():

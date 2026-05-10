@@ -1,351 +1,332 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FM95 Processor Status</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0a0e1a;
-    color: #e0e6f0;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 30px 16px;
-  }
-  header { text-align: center; margin-bottom: 22px; }
-  header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #7eb8f7; }
-  header p  { font-size: 0.75rem; color: #4a5a7a; margin-top: 4px; letter-spacing: 1px; text-transform: uppercase; }
-  #status-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; font-size: 0.8rem; color: #4a5a7a; }
-  #status-dot { width: 9px; height: 9px; border-radius: 50%; background: #444; transition: background 0.3s; }
-  #status-dot.connecting { background: #f0a500; box-shadow: 0 0 6px #f0a500; }
-  #status-dot.connected  { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
-  #status-dot.error      { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 14px;
-    width: 100%;
-    max-width: 960px;
-    margin-bottom: 20px;
-  }
-  .card {
-    background: #111827;
-    border: 1px solid #1e2d45;
-    border-radius: 12px;
-    padding: 16px 18px;
-    position: relative;
-    overflow: hidden;
-  }
-  .card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: var(--accent, #7eb8f7);
-    border-radius: 12px 12px 0 0;
-  }
-  .card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1.5px; color: #4a6080; margin-bottom: 8px; }
-  .card-value { font-size: 1.8rem; font-weight: 700; color: var(--accent, #7eb8f7); line-height: 1; font-variant-numeric: tabular-nums; }
-  .card-unit  { font-size: 0.8rem; color: #3a5070; margin-left: 3px; font-weight: 400; }
-  .bar-wrap   { margin-top: 10px; background: #0a0e1a; border-radius: 4px; height: 5px; overflow: hidden; }
-  .bar-fill   { height: 100%; border-radius: 4px; background: var(--accent, #7eb8f7); width: 0%; transition: width 0.4s ease; }
-  .card-desc  { font-size: 0.68rem; color: #2e4060; margin-top: 6px; }
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>FM95 Processor Status</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                background: #0a0e1a;
+                color: #e0e6f0;
+                font-family: 'Segoe UI', system-ui, sans-serif;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 30px 16px;
+            }
+            header { text-align: center; margin-bottom: 22px; }
+            header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #7eb8f7; }
+            header p  { font-size: 0.75rem; color: #4a5a7a; margin-top: 4px; letter-spacing: 1px; text-transform: uppercase; }
+            #status-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; font-size: 0.8rem; color: #4a5a7a; }
+            #status-dot { width: 9px; height: 9px; border-radius: 50%; background: #444; transition: background 0.3s; }
+            #status-dot.connecting { background: #f0a500; box-shadow: 0 0 6px #f0a500; }
+            #status-dot.connected  { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+            #status-dot.error      { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 14px;
+                width: 100%;
+                max-width: 960px;
+                margin-bottom: 20px;
+            }
+            .card {
+                background: #111827;
+                border: 1px solid #1e2d45;
+                border-radius: 12px;
+                padding: 16px 18px;
+                position: relative;
+                overflow: hidden;
+            }
+            .card::before {
+                content: '';
+                position: absolute;
+                top: 0; left: 0; right: 0;
+                height: 3px;
+                background: var(--accent, #7eb8f7);
+                border-radius: 12px 12px 0 0;
+            }
+            .card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1.5px; color: #4a6080; margin-bottom: 8px; }
+            .card-value { font-size: 1.8rem; font-weight: 700; color: var(--accent, #7eb8f7); line-height: 1; font-variant-numeric: tabular-nums; }
+            .card-unit  { font-size: 0.8rem; color: #3a5070; margin-left: 3px; font-weight: 400; }
+            .bar-wrap   { margin-top: 10px; background: #0a0e1a; border-radius: 4px; height: 5px; overflow: hidden; }
+            .bar-fill   { height: 100%; border-radius: 4px; background: var(--accent, #7eb8f7); width: 0%; transition: width 0.4s ease; }
+            .card-desc  { font-size: 0.68rem; color: #2e4060; margin-top: 6px; }
 
-  /* Oscilloscope */
-  .scope-wrap {
-    width: 100%;
-    max-width: 960px;
-    background: #0b1120;
-    border: 1px solid #1e2d45;
-    border-radius: 14px;
-    padding: 16px 18px;
-    margin-bottom: 20px;
-  }
-  .scope-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-  }
-  .scope-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.5px; color: #4a6080; }
-  .scope-legend { display: flex; gap: 18px; }
-  .scope-legend span { font-size: 0.7rem; display: flex; align-items: center; gap: 5px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  canvas#scope {
-    width: 100%;
-    height: 200px;
-    display: block;
-    border-radius: 6px;
-    background: #060b14;
-    image-rendering: pixelated;
-  }
-  .scope-controls { display: flex; gap: 16px; margin-top: 10px; align-items: center; }
-  .scope-controls label { font-size: 0.72rem; color: #4a6080; }
-  .scope-controls select, .scope-controls input {
-    background: #111827; color: #7eb8f7; border: 1px solid #1e2d45;
-    border-radius: 6px; padding: 3px 8px; font-size: 0.72rem;
-  }
+            /* Oscilloscope */
+            .scope-wrap {
+                width: 100%;
+                max-width: 960px;
+                background: #0b1120;
+                border: 1px solid #1e2d45;
+                border-radius: 14px;
+                padding: 16px 18px;
+                margin-bottom: 20px;
+            }
+            .scope-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+            }
+            .scope-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.5px; color: #4a6080; }
+            .scope-legend { display: flex; gap: 18px; }
+            .scope-legend span { font-size: 0.7rem; display: flex; align-items: center; gap: 5px; }
+            .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+            canvas#scope {
+                width: 100%;
+                height: 200px;
+                display: block;
+                border-radius: 6px;
+                background: #060b14;
+                image-rendering: pixelated;
+            }
+            .scope-controls { display: flex; gap: 16px; margin-top: 10px; align-items: center; }
+            .scope-controls label { font-size: 0.72rem; color: #4a6080; }
+            .scope-controls select, .scope-controls input {
+                background: #111827; color: #7eb8f7; border: 1px solid #1e2d45;
+                border-radius: 6px; padding: 3px 8px; font-size: 0.72rem;
+            }
 
-  #last-update { font-size: 0.7rem; color: #2e4060; }
-</style>
-</head>
-<body>
+            #last-update { font-size: 0.7rem; color: #2e4060; }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>FM95 Processor</h1>
+            <p>Live Status Monitor</p>
+        </header>
 
-<header>
-  <h1>FM95 Processor</h1>
-  <p>Live Status Monitor</p>
-</header>
+        <div id="status-bar">
+            <div id="status-dot" class="connecting"></div>
+            <span id="status-text">Connecting…</span>
+        </div>
 
-<div id="status-bar">
-  <div id="status-dot" class="connecting"></div>
-  <span id="status-text">Connecting…</span>
-</div>
+        <div class="grid">
+            <div class="card" style="--accent:#a78bfa">
+                <div class="card-label">MPX Power</div>
+                <div class="card-value" id="mpx_power">—<span class="card-unit">dB</span></div>
+                <div class="bar-wrap"><div class="bar-fill" id="bar_mpx_power"></div></div>
+                <div class="card-desc">Multiplex signal power · dBr</div>
+            </div>
+            <div class="card" style="--accent:#34d399">
+                <div class="card-label">BS412 Gain</div>
+                <div class="card-value" id="bs412_gain">—</div>
+                <div class="bar-wrap"><div class="bar-fill" id="bar_bs412_gain"></div></div>
+                <div class="card-desc">BS412 loudness gain · linear</div>
+            </div>
+            <div class="card" style="--accent:#fb923c">
+                <div class="card-label">AGC Gain</div>
+                <div class="card-value" id="agc_gain">—</div>
+                <div class="bar-wrap"><div class="bar-fill" id="bar_agc_gain"></div></div>
+                <div class="card-desc">Automatic gain control · linear</div>
+            </div>
+        </div>
 
-<div class="grid">
-  <div class="card" style="--accent:#a78bfa">
-    <div class="card-label">MPX Power</div>
-    <div class="card-value" id="mpx_power">—<span class="card-unit">dB</span></div>
-    <div class="bar-wrap"><div class="bar-fill" id="bar_mpx_power"></div></div>
-    <div class="card-desc">Multiplex signal power · dBr</div>
-  </div>
-  <div class="card" style="--accent:#34d399">
-    <div class="card-label">BS412 Gain</div>
-    <div class="card-value" id="bs412_gain">—</div>
-    <div class="bar-wrap"><div class="bar-fill" id="bar_bs412_gain"></div></div>
-    <div class="card-desc">BS412 loudness gain · linear</div>
-  </div>
-  <div class="card" style="--accent:#fb923c">
-    <div class="card-label">AGC Gain</div>
-    <div class="card-value" id="agc_gain">—</div>
-    <div class="bar-wrap"><div class="bar-fill" id="bar_agc_gain"></div></div>
-    <div class="card-desc">Automatic gain control · linear</div>
-  </div>
-</div>
+        <!-- Oscilloscope -->
+        <div class="scope-wrap">
+            <div class="scope-header">
+                <div class="scope-title">Oscilloscope — Input &amp; Audio Level</div>
+                <div class="scope-legend">
+                <span><span class="dot" style="background:#f472b6"></span>Input Level</span>
+                <span><span class="dot" style="background:#38bdf8"></span>Audio Level</span>
+                <span><span class="dot" style="background:#fb923c"></span>AGC</span>
+                </div>
+            </div>
+            <canvas id="scope"></canvas>
+            <div class="scope-controls">
+                <label>History:
+                <select id="histSel">
+                    <option value="100">100 pts</option>
+                    <option value="200" selected>200 pts</option>
+                    <option value="400">400 pts</option>
+                </select>
+                </label>
+                <label style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+                <input type="checkbox" id="gridCb" checked> Grid
+                </label>
+            </div>
+        </div>
 
-<!-- Oscilloscope -->
-<div class="scope-wrap">
-  <div class="scope-header">
-    <div class="scope-title">Oscilloscope — Input &amp; Audio Level</div>
-    <div class="scope-legend">
-      <span><span class="dot" style="background:#f472b6"></span>Input Level</span>
-      <span><span class="dot" style="background:#38bdf8"></span>Audio Level</span>
-      <span><span class="dot" style="background:#fb923c"></span>AGC</span>
-    </div>
-  </div>
-  <canvas id="scope"></canvas>
-  <div class="scope-controls">
-    <label>History:
-      <select id="histSel">
-        <option value="100">100 pts</option>
-        <option value="200" selected>200 pts</option>
-        <option value="400">400 pts</option>
-      </select>
-    </label>
-    <label>Y scale:
-      <select id="yscaleSel">
-        <option value="1">-1 – 1</option>
-        <option value="2">-2 – 2</option>
-        <option value="auto" selected>Auto</option>
-      </select>
-    </label>
-    <label style="margin-left:auto; display:flex; align-items:center; gap:6px;">
-      <input type="checkbox" id="gridCb" checked> Grid
-    </label>
-  </div>
-</div>
+        <div id="last-update">Waiting for data…</div>
 
-<div id="last-update">Waiting for data…</div>
+        <script>
+            const POLL_MSG = JSON.stringify({ action: "fm95", data: "/w==" });
+            const FIELDS = ['mpx_power','bs412_gain','agc_gain','input_level','audio_level'];
+            const FIELD_CFG = {
+                mpx_power: { unit:'dB', fmt: v=>v.toFixed(3), bar: v=>Math.max(0,Math.min(100,(v/3)*100)), warn: v=>v>3 },
+                bs412_gain: { unit:'x', fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*10)), warn: v=>v>2 },
+                agc_gain: { unit:'x', fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*10)), warn: v=>v>3 },
+            };
 
-<script>
-const POLL_MSG = JSON.stringify({ action: "fm95", data: "/w==" });
-const FIELDS   = ['mpx_power','bs412_gain','agc_gain','input_level','audio_level'];
-const FIELD_CFG = {
-  mpx_power:   { unit:'dB', fmt: v=>v.toFixed(3), bar: v=>Math.max(0,Math.min(100,(v/3)*100)), warn: v=>v>3 },
-  bs412_gain:  { unit:'x',   fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*10)), warn: v=>v>2 },
-  agc_gain:    { unit:'x',   fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*10)), warn: v=>v>3 },
-};
+            const MAX_PTS  = 400;
+            let histInput = new Array(MAX_PTS).fill(null);
+            let histAudio = new Array(MAX_PTS).fill(null);
+            let histAgc = new Array(MAX_PTS).fill(null);
 
-const MAX_PTS  = 400;
-let histInput = new Array(MAX_PTS).fill(null);
-let histAudio = new Array(MAX_PTS).fill(null);
-let histAgc = new Array(MAX_PTS).fill(null);
+            const canvas = document.getElementById('scope');
+            const ctx = canvas.getContext('2d');
+            const histSel = document.getElementById('histSel');
+            const gridCb = document.getElementById('gridCb');
 
-const canvas   = document.getElementById('scope');
-const ctx      = canvas.getContext('2d');
-const histSel  = document.getElementById('histSel');
-const yscaleSel= document.getElementById('yscaleSel');
-const gridCb   = document.getElementById('gridCb');
+            function resizeCanvas() {
+                const r = window.devicePixelRatio || 1;
+                const w = canvas.parentElement.clientWidth - 36;
+                canvas.style.width  = w + 'px';
+                canvas.style.height = '200px';
+                canvas.width  = w * r;
+                canvas.height = 200 * r;
+                ctx.scale(r, r);
+            } resizeCanvas();
+            window.addEventListener('resize', () => { ctx.setTransform(1,0,0,1,0,0); resizeCanvas(); drawScope(); });
 
-function resizeCanvas() {
-  const r = window.devicePixelRatio || 1;
-  const w = canvas.parentElement.clientWidth - 36;
-  canvas.style.width  = w + 'px';
-  canvas.style.height = '200px';
-  canvas.width  = w * r;
-  canvas.height = 200 * r;
-  ctx.scale(r, r);
-}
-resizeCanvas();
-window.addEventListener('resize', () => { ctx.setTransform(1,0,0,1,0,0); resizeCanvas(); drawScope(); });
+            function drawScope() {
+                const W = canvas.width  / (window.devicePixelRatio || 1);
+                const H = canvas.height / (window.devicePixelRatio || 1);
+                const nPts = parseInt(histSel.value);
+                const showGrid = gridCb.checked;
 
-function drawScope() {
-  const W = canvas.width  / (window.devicePixelRatio || 1);
-  const H = canvas.height / (window.devicePixelRatio || 1);
-  const nPts = parseInt(histSel.value);
-  const yscale = yscaleSel.value;
-  const showGrid = gridCb.checked;
+                ctx.clearRect(0, 0, W, H);
 
-  ctx.clearRect(0, 0, W, H);
+                ctx.fillStyle = '#060b14';
+                ctx.fillRect(0, 0, W, H);
 
-  // background
-  ctx.fillStyle = '#060b14';
-  ctx.fillRect(0, 0, W, H);
+                const vals = [...histInput, ...histAudio, ...histAgc].filter(v => v !== null);
+                if (vals.length) {
+                    yMin = Math.min(...vals);
+                    yMax = Math.max(...vals);
+                    const pad = (yMax - yMin) * 0.1 || 0.05;
+                    yMin -= pad; yMax += pad;
+                }
 
-  // determine y range
-  let yMin = -1, yMax = 1;
-  if (yscale === '2') { yMin = -2; yMax = 2; }
-  else if (yscale === 'auto') {
-    const vals = [...histInput, ...histAudio, ...histAgc].filter(v => v !== null);
-    if (vals.length) {
-      yMin = Math.min(...vals);
-      yMax = Math.max(...vals);
-      const pad = (yMax - yMin) * 0.1 || 0.05;
-      yMin -= pad; yMax += pad;
-    }
-  }
+                const toY = v => H - ((v - yMin) / (yMax - yMin)) * H;
 
-  const toY = v => H - ((v - yMin) / (yMax - yMin)) * H;
+                // grid
+                if (showGrid) {
+                    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                    ctx.lineWidth = 1;
+                    const hLines = 5;
+                    for (let i = 0; i <= hLines; i++) {
+                        const y = (i / hLines) * H;
+                        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+                        const val = yMax - (i / hLines) * (yMax - yMin);
+                        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+                        ctx.font = '10px monospace';
+                        ctx.fillText(val.toFixed(2), 4, y - 3);
+                    }
+                    const vLines = 8;
+                    for (let i = 1; i < vLines; i++) {
+                        const x = (i / vLines) * W;
+                        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+                    }
+                    // zero line
+                    if (yMin < 0 && yMax > 0) {
+                        const y0 = toY(0);
+                        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                        ctx.setLineDash([4,4]);
+                        ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W, y0); ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                }
 
-  // grid
-  if (showGrid) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 1;
-    const hLines = 5;
-    for (let i = 0; i <= hLines; i++) {
-      const y = (i / hLines) * H;
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-      const val = yMax - (i / hLines) * (yMax - yMin);
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.font = '10px monospace';
-      ctx.fillText(val.toFixed(2), 4, y - 3);
-    }
-    const vLines = 8;
-    for (let i = 1; i < vLines; i++) {
-      const x = (i / vLines) * W;
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-    // zero line
-    if (yMin < 0 && yMax > 0) {
-      const y0 = toY(0);
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-      ctx.setLineDash([4,4]);
-      ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W, y0); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-  }
+                // draw series
+                function drawLine(hist, color) {
+                    const slice = hist.slice(-nPts);
+                    const step  = W / (nPts - 1);
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    let started = false;
+                    for (let i = 0; i < slice.length; i++) {
+                    if (slice[i] === null) { started = false; continue; }
+                    const x = i * step;
+                    const y = toY(slice[i]);
+                    if (!started) { ctx.moveTo(x, y); started = true; }
+                    else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                    // glow
+                    ctx.strokeStyle = color + '44';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                }
 
-  // draw series
-  function drawLine(hist, color) {
-    const slice = hist.slice(-nPts);
-    const step  = W / (nPts - 1);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    let started = false;
-    for (let i = 0; i < slice.length; i++) {
-      if (slice[i] === null) { started = false; continue; }
-      const x = i * step;
-      const y = toY(slice[i]);
-      if (!started) { ctx.moveTo(x, y); started = true; }
-      else           ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    // glow
-    ctx.strokeStyle = color + '44';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-  }
+                drawLine(histInput, '#f472b6');
+                drawLine(histAudio, '#38bdf8');
+                drawLine(histAgc, '#fb923c');
+            }
 
-  drawLine(histInput, '#f472b6');
-  drawLine(histAudio, '#38bdf8');
-  drawLine(histAgc, '#fb923c');
-}
+            function decode(b64) {
+                const bin = atob(b64);
+                const buf = new ArrayBuffer(bin.length);
+                const u8  = new Uint8Array(buf);
+                for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+                const view = new DataView(buf);
+                return FIELDS.map((_, i) => view.getFloat32(i * 4, true));
+            }
 
-function decode(b64) {
-  const bin = atob(b64);
-  const buf = new ArrayBuffer(bin.length);
-  const u8  = new Uint8Array(buf);
-  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-  const view = new DataView(buf);
-  return FIELDS.map((_, i) => view.getFloat32(i * 4, true));
-}
+            function updateUI(values) {
+                values.forEach((v, i) => {
+                    const key = FIELDS[i];
+                    const cfg = FIELD_CFG[key];
+                    if(cfg) {
+                        const el  = document.getElementById(key);
+                        const bar = document.getElementById('bar_' + key);
+                        el.innerHTML = `${cfg.fmt(v)}${cfg.unit ? `<span class="card-unit">${cfg.unit}</span>` : ''}`;
+                        bar.style.width      = cfg.bar(v) + '%';
+                        bar.style.background = cfg.warn(v) ? '#ef4444' : '';
+                    }
+                });
 
-function updateUI(values) {
-  values.forEach((v, i) => {
-    const key = FIELDS[i];
-    const cfg = FIELD_CFG[key];
-    if(cfg) {
-        const el  = document.getElementById(key);
-        const bar = document.getElementById('bar_' + key);
-        el.innerHTML = `${cfg.fmt(v)}${cfg.unit ? `<span class="card-unit">${cfg.unit}</span>` : ''}`;
-        bar.style.width      = cfg.bar(v) + '%';
-        bar.style.background = cfg.warn(v) ? '#ef4444' : '';
-    }
-  });
+                // push to oscilloscope history
+                histAgc.push(values[2]); if (histAgc.length > MAX_PTS) histAgc.shift();
+                histInput.push(values[3]); if (histInput.length > MAX_PTS) histInput.shift();
+                histAudio.push(values[4]); if (histAudio.length > MAX_PTS) histAudio.shift();
+                drawScope();
 
-  // push to oscilloscope history
-  histAgc.push(values[2]); if (histAgc.length > MAX_PTS) histAgc.shift();
-  histInput.push(values[3]); if (histInput.length > MAX_PTS) histInput.shift();
-  histAudio.push(values[4]); if (histAudio.length > MAX_PTS) histAudio.shift();
-  drawScope();
+                document.getElementById('last-update').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+            }
 
-  document.getElementById('last-update').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
-}
+            histSel.addEventListener('change', drawScope);
+            gridCb.addEventListener('change', drawScope);
 
-histSel.addEventListener('change', drawScope);
-yscaleSel.addEventListener('change', drawScope);
-gridCb.addEventListener('change', drawScope);
+            function setStatus(state, text) {
+                const dot = document.getElementById('status-dot');
+                dot.className = '';
+                dot.classList.add(state);
+                document.getElementById('status-text').textContent = text;
+            }
 
-// --- WebSocket ---
-function setStatus(state, text) {
-  const dot = document.getElementById('status-dot');
-  dot.className = '';
-  dot.classList.add(state);
-  document.getElementById('status-text').textContent = text;
-}
+            let ws, pollTimer;
+            function connect() {
+                const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+                ws = new WebSocket(`${proto}://${location.host}/ws`);
+                setStatus('connecting', 'Connecting…');
 
-let ws, pollTimer;
-function connect() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/ws`);
-  setStatus('connecting', 'Connecting…');
+                ws.addEventListener('open', () => {
+                    setStatus('connected', 'Connected');
+                    poll();
+                    pollTimer = setInterval(poll, 70 + (Math.random() * 30));
+                });
+                ws.addEventListener('message', e => {
+                    try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.event === 'fm95' && msg.data) updateUI(decode(msg.data));
+                    } catch(err) { console.warn('Parse error', err); }
+                });
+                ws.addEventListener('close', () => {
+                    clearInterval(pollTimer);
+                    setStatus('error', 'Disconnected — retrying in 3s…');
+                    setTimeout(connect, 3000);
+                });
+                ws.addEventListener('error', () => setStatus('error', 'WebSocket error'));
+            }
+            function poll() { if (ws && ws.readyState === WebSocket.OPEN) ws.send(POLL_MSG); }
 
-  ws.addEventListener('open', () => {
-    setStatus('connected', 'Connected');
-    poll();
-    pollTimer = setInterval(poll, 70 + (Math.random() * 30));
-  });
-  ws.addEventListener('message', e => {
-    try {
-      const msg = JSON.parse(e.data);
-      if (msg.event === 'fm95' && msg.data) updateUI(decode(msg.data));
-    } catch(err) { console.warn('Parse error', err); }
-  });
-  ws.addEventListener('close', () => {
-    clearInterval(pollTimer);
-    setStatus('error', 'Disconnected — retrying in 3s…');
-    setTimeout(connect, 3000);
-  });
-  ws.addEventListener('error', () => setStatus('error', 'WebSocket error'));
-}
-function poll() { if (ws && ws.readyState === WebSocket.OPEN) ws.send(POLL_MSG); }
-
-connect();
-drawScope();
-</script>
-</body>
+            connect();
+            drawScope();
+        </script>
+    </body>
 </html>
