@@ -93,7 +93,7 @@ function gotLock() {
         wsSend({action: "skipc"});
         wsSend({action: "skipi"});
         pollLockHeld = true;
-    }, 500 + (Math.random() * 1000))
+    }, 500 + (Math.random() * 2500))
 }
 
 function handleLockState(msg) {
