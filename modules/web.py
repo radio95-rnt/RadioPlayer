@@ -182,23 +182,6 @@ async def _safe_send(ws, payload: str, clients: set, ws_q: multiprocessing.Queue
             await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"event": "users", "data": len(clients)})
         except Exception: pass
 
-async def socket_handler(socket: asyncio.StreamReader, writer: asyncio.StreamWriter, writer_q: asyncio.Queue):
-    while True:
-        qdata, ws = await writer_q.get()
-        if not qdata or not ws: break
-        try:
-            writer.write(qdata)
-            await writer.drain()
-            data = await socket.read(256)
-            if not data:
-                await ws.send(json.dumps({"event": "error", "error": "fm95 socket closed"}))
-                raise ConnectionResetError("fm95 socket closed")  # ← let reconnect handle it
-            await ws.send(json.dumps({"event": "fm95", "data": base64.b64encode(data).decode()}))
-        except Exception as e:
-            try: await ws.send(json.dumps({"event": "error", "error": str(e)}))
-            except Exception: pass
-            raise 
-
 def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):
     async def runner():
         clients: set[ServerConnection] = set()
@@ -214,15 +197,44 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                     await asyncio.sleep(retry_delay)
         
         async def socket_handler_with_reconnect():
+            pending: tuple[bytes, ServerConnection] | None = None
             while True:
                 reader, writer = await get_socket_connection()
                 try:
-                    await socket_handler(reader, writer, writer_q)
+                    while True:
+                        if pending is None:
+                            qdata, ws = await writer_q.get()
+                            if not qdata or not ws:
+                                return  # shutdown sentinel
+                        else:
+                            qdata, ws = pending
+                            pending = None
+
+                        try:
+                            writer.write(qdata)
+                            await writer.drain()
+                            data = await reader.read(256)
+                            if not data:
+                                raise ConnectionResetError("fm95 socket closed")
+                            await ws.send(json.dumps({"event": "fm95", "data": base64.b64encode(data).decode()}))
+                        except Exception as e:
+                            try:
+                                await ws.send(json.dumps({"event": "error", "error": str(e)}))
+                            except Exception:
+                                pass
+                            pending = (qdata, ws)
+                            raise  # break to outer loop → reconnect
+
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    pass  # reconnect
                 finally:
                     try:
                         writer.close()
                         await writer.wait_closed()
-                    except Exception: pass
+                    except Exception:
+                        pass
 
         async def handler_wrapper(websocket: ServerConnection):
             clients.add(websocket)
