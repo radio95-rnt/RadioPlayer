@@ -17,6 +17,7 @@ let skippedIndices = [];
 let lastElapsed = 0;
 let lastUpdateTime = 0;
 let currentRealTotal = 1;
+let pollLockHeld = false;
 
 function toggleSection(id) {
     document.getElementById(id).classList.toggle("collapsed");
@@ -63,9 +64,6 @@ function connectWs() {
     ws.addEventListener("open", () => {
         statusEl.textContent = "connected";
         reconnectDelay = 1500;
-        ws.send(JSON.stringify({ action: "get_toplay" }));
-        ws.send(JSON.stringify({ action: "skipc" }));
-        ws.send(JSON.stringify({ action: "skipi" }));
     });
 
     ws.addEventListener("close", () => {
@@ -88,12 +86,29 @@ function wsSend(obj) {
     ws.send(JSON.stringify(obj));
 }
 
+function handleLockState(msg) {
+    if(msg[0] == true) pollLockHeld = false;
+    else {
+        setTimeout(() => {
+            wsSend({action: "lock", "id": 0});
+            wsSend({action: "get_toplay"});
+            wsSend({action: "skipc"});
+            wsSend({action: "skipi"});
+        }, 500 + (Math.random() * 1000))
+    }
+}
+
 function handleMessage(msg) {
     switch (msg.event) {
         case "state": {
             const d = msg.data || {};
-            if (d.dirs) updateDirs(d.dirs);
-            if (d.track) applyProgressState(d.track);
+            if(d.dirs) updateDirs(d.dirs);
+            if(d.track) applyProgressState(d.track);
+            if(d.locks) handleLockState(d.locks)
+            break;
+        }
+        case "lock": {
+            if(msg.error) pollLockHeld = false;
             break;
         }
         case "rds":
@@ -105,9 +120,11 @@ function handleMessage(msg) {
             break;
         case "new_track":
             applyTrackState(msg.data);
-            wsSend({ action: "get_toplay" });
-            wsSend({ action: "skipc" });
-            wsSend({ action: "skipi" });
+            if(pollLockHeld) {
+                wsSend({ action: "get_toplay" });
+                wsSend({ action: "skipc" });
+                wsSend({ action: "skipi" });
+            }
             break;
         case "progress":
             applyProgressState(msg.data);
