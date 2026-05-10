@@ -204,11 +204,26 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
     async def runner():
         clients: set[ServerConnection] = set()
         locks: dict[int, ServerConnection | None] = {}  # lock_id -> owning websocket or None
-
-        reader, writer = await asyncio.open_unix_connection("/etc/fm95/ctl.socket") # pyright: ignore[reportAttributeAccessIssue]
-        reader: asyncio.StreamReader
-        writer: asyncio.StreamWriter
         writer_q: asyncio.Queue[tuple[bytes | None, ServerConnection | None]] = asyncio.Queue()
+
+        async def get_socket_connection(retry_delay=2.0):
+            while True:
+                try:
+                    reader, writer = await asyncio.open_unix_connection("/etc/fm95/ctl.socket") # pyright: ignore[reportAttributeAccessIssue]
+                    return reader, writer
+                except Exception as e:
+                    await asyncio.sleep(retry_delay)
+        
+        async def socket_handler_with_reconnect():
+            while True:
+                reader, writer = await get_socket_connection()
+                try:
+                    await socket_handler(reader, writer, writer_q)
+                finally:
+                    try:
+                        writer.close()
+                        await writer.wait_closed()
+                    except Exception: pass
 
         async def handler_wrapper(websocket: ServerConnection):
             clients.add(websocket)
@@ -242,14 +257,11 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
 
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
-        sockethand = asyncio.create_task(socket_handler(reader, writer, writer_q))
+        sockethand = asyncio.create_task(socket_handler_with_reconnect())
         await broadcaster
 
         await writer_q.put((None, None))
         await sockethand
-
-        writer.close()
-        await writer.wait_closed()
         await server.wait_closed()
 
     loop = asyncio.new_event_loop()
