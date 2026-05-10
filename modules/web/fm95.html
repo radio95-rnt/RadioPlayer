@@ -165,31 +165,41 @@
             let histInput = new Array(MAX_PTS).fill(null);
             let histAudio = new Array(MAX_PTS).fill(null);
             let histAgc = new Array(MAX_PTS).fill(null);
-            let dispInput = new Array(MAX_PTS).fill(null);
-            let dispAudio = new Array(MAX_PTS).fill(null);
-            let dispAgc = new Array(MAX_PTS).fill(null);
 
-            const LERP = 0.15; // 0.0 = never moves, 1.0 = instant jump
+            let targets = { input: null, audio: null, agc: null };
+            let current = { input: null, audio: null, agc: null };
+            let rafId = null;
 
-            function lerp(a, b) {
-                if (a === null) return b;
-                if (b === null) return a;
-                return a + (b - a) * LERP;
+            const LERP = 0.18;
+
+            function animateTo(key, target) {
+                targets[key] = target;
+                if (!rafId) rafId = requestAnimationFrame(animStep);
             }
 
-            function animLoop() {
+            function animStep() {
+                rafId = null;
                 let dirty = false;
-                for (let i = 0; i < MAX_PTS; i++) {
-                    const ni = lerp(dispInput[i], histInput[i]);
-                    const na = lerp(dispAudio[i], histAudio[i]);
-                    const ng = lerp(dispAgc[i],   histAgc[i]);
-                    if (ni !== dispInput[i] || na !== dispAudio[i] || ng !== dispAgc[i]) dirty = true;
-                    dispInput[i] = ni;
-                    dispAudio[i] = na;
-                    dispAgc[i]   = ng;
+
+                for (const key of ['input', 'audio', 'agc']) {
+                    if (targets[key] === null) continue;
+                    const prev = current[key] ?? targets[key];
+                    const next = prev + (targets[key] - prev) * LERP;
+                    if (Math.abs(next - targets[key]) < 0.0001) {
+                        current[key] = targets[key];
+                    } else {
+                        current[key] = next;
+                        dirty = true;
+                    }
                 }
-                if (dirty) drawScope();
-                requestAnimationFrame(animLoop);
+
+                // only push to history when the tip actually moves
+                histInput[histInput.length - 1] = current.input;
+                histAudio[histAudio.length - 1] = current.audio;
+                histAgc[histAgc.length - 1]     = current.agc;
+
+                drawScope();
+                if (dirty) rafId = requestAnimationFrame(animStep);
             }
 
             const canvas = document.getElementById('scope');
@@ -279,9 +289,9 @@
                     ctx.stroke();
                 }
 
-                drawLine(dispInput, '#f472b6');
-                drawLine(dispAudio, '#38bdf8');
-                drawLine(dispAgc, '#fb923c');
+                drawLine(histInput, '#f472b6');
+                drawLine(histInput, '#38bdf8');
+                drawLine(histInput, '#fb923c');
             }
 
             function decode(b64) {
@@ -301,16 +311,19 @@
                         const el  = document.getElementById(key);
                         const bar = document.getElementById('bar_' + key);
                         el.innerHTML = `${cfg.fmt(v)}${cfg.unit ? `<span class="card-unit">${cfg.unit}</span>` : ''}`;
-                        bar.style.width      = cfg.bar(v) + '%';
+                        bar.style.width = cfg.bar(v) + '%';
                         bar.style.background = cfg.warn(v) ? '#ef4444' : '';
                     }
                 });
 
-                // push to oscilloscope history
-                histAgc.push(values[2]); if (histAgc.length > MAX_PTS) histAgc.shift();
-                histInput.push(values[3]); if (histInput.length > MAX_PTS) histInput.shift();
-                histAudio.push(values[4]); if (histAudio.length > MAX_PTS) histAudio.shift();
-                drawScope();
+                // replace the three histX.push() lines with:
+                histInput.push(current.input ?? values[3]); if (histInput.length > MAX_PTS) histInput.shift();
+                histAudio.push(current.audio ?? values[4]); if (histAudio.length > MAX_PTS) histAudio.shift();
+                histAgc.push(current.agc   ?? values[2]); if (histAgc.length > MAX_PTS)   histAgc.shift();
+
+                animateTo('input', values[3]);
+                animateTo('audio', values[4]);
+                animateTo('agc',   values[2]);
 
                 document.getElementById('last-update').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
             }
