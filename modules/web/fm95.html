@@ -124,18 +124,6 @@
     <div class="bar-wrap"><div class="bar-fill" id="bar_agc_gain"></div></div>
     <div class="card-desc">Automatic gain control · linear</div>
   </div>
-  <div class="card" style="--accent:#f472b6">
-    <div class="card-label">Input Level</div>
-    <div class="card-value" id="input_level">—</div>
-    <div class="bar-wrap"><div class="bar-fill" id="bar_input_level"></div></div>
-    <div class="card-desc">Incoming signal level · linear raw</div>
-  </div>
-  <div class="card" style="--accent:#38bdf8">
-    <div class="card-label">Audio Level</div>
-    <div class="card-value" id="audio_level">—</div>
-    <div class="bar-wrap"><div class="bar-fill" id="bar_audio_level"></div></div>
-    <div class="card-desc">Output audio level · linear raw</div>
-  </div>
 </div>
 
 <!-- Oscilloscope -->
@@ -178,8 +166,6 @@ const FIELD_CFG = {
   mpx_power:   { unit:'dB', fmt: v=>v.toFixed(2),  bar: v=>Math.max(0,Math.min(100,(v/3)*100)), warn: v=>v>3 },
   bs412_gain:  { unit:'',   fmt: v=>v.toFixed(4),  bar: v=>Math.max(0,Math.min(100,v*50)),             warn: v=>v>2 },
   agc_gain:    { unit:'',   fmt: v=>v.toFixed(4),  bar: v=>Math.max(0,Math.min(100,v*50)),             warn: v=>v>2 },
-  input_level: { unit:'',   fmt: v=>v.toFixed(5),  bar: v=>Math.max(0,Math.min(100,v*100)),            warn: v=>v>0.95 },
-  audio_level: { unit:'',   fmt: v=>v.toFixed(5),  bar: v=>Math.max(0,Math.min(100,v*100)),            warn: v=>v>0.95 },
 };
 
 // --- Oscilloscope state ---
@@ -300,11 +286,13 @@ function updateUI(values) {
   values.forEach((v, i) => {
     const key = FIELDS[i];
     const cfg = FIELD_CFG[key];
-    const el  = document.getElementById(key);
-    const bar = document.getElementById('bar_' + key);
-    el.innerHTML = `${cfg.fmt(v)}${cfg.unit ? `<span class="card-unit">${cfg.unit}</span>` : ''}`;
-    bar.style.width      = cfg.bar(v) + '%';
-    bar.style.background = cfg.warn(v) ? '#ef4444' : '';
+    if(cfg) {
+        const el  = document.getElementById(key);
+        const bar = document.getElementById('bar_' + key);
+        el.innerHTML = `${cfg.fmt(v)}${cfg.unit ? `<span class="card-unit">${cfg.unit}</span>` : ''}`;
+        bar.style.width      = cfg.bar(v) + '%';
+        bar.style.background = cfg.warn(v) ? '#ef4444' : '';
+    }
   });
 
   // push to oscilloscope history
