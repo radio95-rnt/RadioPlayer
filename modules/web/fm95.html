@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FM95 Processor Status</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0e1a;
+    color: #e0e6f0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 16px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #7eb8f7;
+  }
+
+  header p {
+    font-size: 0.78rem;
+    color: #4a5a7a;
+    margin-top: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  #status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 28px;
+    font-size: 0.8rem;
+    color: #4a5a7a;
+  }
+
+  #status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #444;
+    transition: background 0.3s;
+  }
+  #status-dot.connecting { background: #f0a500; box-shadow: 0 0 6px #f0a500; }
+  #status-dot.connected  { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+  #status-dot.error      { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .card {
+    background: #111827;
+    border: 1px solid #1e2d45;
+    border-radius: 12px;
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .card:hover { border-color: #2e4a70; }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent, #7eb8f7);
+    opacity: 0.7;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .card-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #4a6080;
+    margin-bottom: 10px;
+  }
+
+  .card-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent, #7eb8f7);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.3s;
+  }
+
+  .card-unit {
+    font-size: 0.85rem;
+    color: #3a5070;
+    margin-left: 4px;
+    font-weight: 400;
+  }
+
+  .bar-wrap {
+    margin-top: 14px;
+    background: #0a0e1a;
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--accent, #7eb8f7);
+    width: 0%;
+    transition: width 0.5s ease, background 0.3s;
+  }
+
+  .card-desc {
+    font-size: 0.7rem;
+    color: #2e4060;
+    margin-top: 8px;
+  }
+
+  #last-update {
+    margin-top: 28px;
+    font-size: 0.72rem;
+    color: #2e4060;
+    letter-spacing: 0.5px;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .pulse { animation: pulse 1s ease-in-out; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FM95 Processor</h1>
+  <p>Live Status Monitor</p>
+</header>
+
+<div id="status-bar">
+  <div id="status-dot" class="connecting"></div>
+  <span id="status-text">Connecting…</span>
+</div>
+
+<div class="grid">
+  <div class="card" style="--accent:#a78bfa">
+    <div class="card-label">MPX Power</div>
+    <div class="card-value" id="mpx_power">—<span class="card-unit">dB</span></div>
+    <div class="bar-wrap"><div class="bar-fill" id="bar_mpx_power"></div></div>
+    <div class="card-desc">Multiplex signal power · dBr</div>
+  </div>
+
+  <div class="card" style="--accent:#34d399">
+    <div class="card-label">BS412 Gain</div>
+    <div class="card-value" id="bs412_gain">—</div>
+    <div class="bar-wrap"><div class="bar-fill" id="bar_bs412_gain"></div></div>
+    <div class="card-desc">BS412 loudness gain · linear</div>
+  </div>
+
+  <div class="card" style="--accent:#fb923c">
+    <div class="card-label">AGC Gain</div>
+    <div class="card-value" id="agc_gain">—</div>
+    <div class="bar-wrap"><div class="bar-fill" id="bar_agc_gain"></div></div>
+    <div class="card-desc">Automatic gain control · linear</div>
+  </div>
+
+  <div class="card" style="--accent:#f472b6">
+    <div class="card-label">Input Level</div>
+    <div class="card-value" id="input_level">—</div>
+    <div class="bar-wrap"><div class="bar-fill" id="bar_input_level"></div></div>
+    <div class="card-desc">Incoming signal level · linear raw</div>
+  </div>
+
+  <div class="card" style="--accent:#38bdf8">
+    <div class="card-label">Audio Level</div>
+    <div class="card-value" id="audio_level">—</div>
+    <div class="bar-wrap"><div class="bar-fill" id="bar_audio_level"></div></div>
+    <div class="card-desc">Output audio level · linear raw</div>
+  </div>
+</div>
+
+<div id="last-update">Waiting for data…</div>
+
+<script>
+  const POLL_MSG = JSON.stringify({ action: "fm95", data: "/w==" });
+  const FIELDS = ['mpx_power','bs412_gain','agc_gain','input_level','audio_level'];
+
+  // Per-field display config: { unit, format, toBar, warnHigh }
+  const FIELD_CFG = {
+    mpx_power:  { unit: 'dB',  fmt: v => v.toFixed(2),                  bar: v => Math.max(0, Math.min(100, ((v + 40) / 40) * 100)), warn: v => v > -1 },
+    bs412_gain: { unit: '',    fmt: v => v.toFixed(4),                  bar: v => Math.max(0, Math.min(100, v * 50)),                 warn: v => v > 1.9, label: 'BS412 Gain', sub: 'linear gain' },
+    agc_gain:   { unit: '',    fmt: v => v.toFixed(4),                  bar: v => Math.max(0, Math.min(100, v * 50)),                 warn: v => v > 1.9, label: 'AGC Gain',   sub: 'linear gain' },
+    input_level:{ unit: '',    fmt: v => v.toFixed(5),                  bar: v => Math.max(0, Math.min(100, v * 100)),                warn: v => v > 0.95 },
+    audio_level:{ unit: '',    fmt: v => v.toFixed(5),                  bar: v => Math.max(0, Math.min(100, v * 100)),                warn: v => v > 0.95 },
+  };
+
+  function decode(b64) {
+    const bin = atob(b64);
+    const buf = new ArrayBuffer(bin.length);
+    const u8  = new Uint8Array(buf);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const view = new DataView(buf);
+    // 5 floats, little-endian, 4 bytes each
+    return FIELDS.map((_, i) => view.getFloat32(i * 4, true));
+  }
+
+  function updateUI(values) {
+    values.forEach((v, i) => {
+      const key = FIELDS[i];
+      const cfg = FIELD_CFG[key];
+      const el  = document.getElementById(key);
+      const bar = document.getElementById('bar_' + key);
+      el.innerHTML = `${cfg.fmt(v)}${cfg.unit ? `<span class="card-unit">${cfg.unit}</span>` : ''}`;
+      bar.style.width = cfg.bar(v) + '%';
+      bar.style.background = cfg.warn(v) ? '#ef4444' : '';
+    });
+    const now = new Date().toLocaleTimeString();
+    document.getElementById('last-update').textContent = `Last update: ${now}`;
+  }
+
+  function setStatus(state, text) {
+    const dot  = document.getElementById('status-dot');
+    const span = document.getElementById('status-text');
+    dot.className = 'status-dot ' + state;
+    dot.id = 'status-dot';
+    dot.classList.add(state);
+    span.textContent = text;
+  }
+
+  let ws, pollTimer;
+
+  function connect() {
+    setStatus('connecting', 'Connecting…');
+
+    ws = new WebSocket("/ws");
+
+    ws.addEventListener('open', () => {
+      setStatus('connected', 'Connected');
+      poll();
+      pollTimer = setInterval(poll, 1000);
+    });
+
+    ws.addEventListener('message', e => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.event === 'fm95' && msg.data) {
+          updateUI(decode(msg.data));
+        }
+      } catch (err) {
+        console.warn('Parse error', err);
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      clearInterval(pollTimer);
+      setStatus('error', 'Disconnected — retrying in 3 s…');
+      setTimeout(connect, 3000);
+    });
+
+    ws.addEventListener('error', () => {
+      setStatus('error', 'WebSocket error');
+    });
+  }
+
+  function poll() {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(POLL_MSG);
+  }
+
+  connect();
+</script>
+</body>
+</html>
