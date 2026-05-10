@@ -338,7 +338,7 @@ function connect() {
   ws.addEventListener('open', () => {
     setStatus('connected', 'Connected');
     poll();
-    pollTimer = setInterval(poll, 1000);
+    pollTimer = setInterval(poll, 100);
   });
   ws.addEventListener('message', e => {
     try {
