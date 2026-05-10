@@ -365,7 +365,7 @@
             function poll() { if (ws && ws.readyState === WebSocket.OPEN) ws.send(POLL_MSG); }
 
             connect();
-            animLoop();
+            drawScope();
         </script>
     </body>
 </html>
