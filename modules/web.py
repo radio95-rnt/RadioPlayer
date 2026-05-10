@@ -26,14 +26,14 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             "dirs": {"files": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_file()], "dirs": [i.name for i in list(MAIN_PATH_DIR.iterdir()) if i.is_dir()], "base": str(MAIN_PATH_DIR)},
         }
     except Exception: initial = {"track": {}, "dirs": {}}
-    await websocket.send(json.dumps({"event": "state", "data": initial, "time": time.monotonic()}))
-    await websocket.send(json.dumps({"event": "playlist", "data": json.loads(shared_data.get("playlist", "[]")), "time": time.monotonic()}))
-    await websocket.send(json.dumps({"event": "rds", "data": json.loads(shared_data.get("rds", "{}")), "time": time.monotonic()}))
+    await websocket.send(json.dumps({"event": "state", "data": initial}))
+    await websocket.send(json.dumps({"event": "playlist", "data": json.loads(shared_data.get("playlist", "[]"))}))
+    await websocket.send(json.dumps({"event": "rds", "data": json.loads(shared_data.get("rds", "{}"))}))
 
     async for raw in websocket:
         try: msg: dict = json.loads(raw)
         except Exception:
-            await websocket.send(json.dumps({"error": "invalid json", "time": time.monotonic()}))
+            await websocket.send(json.dumps({"error": "invalid json"}))
             continue
 
         async def get_imc(name, data):
@@ -48,7 +48,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
         action = msg.get("action")
         if action == "skip":
             imc_q.put({"name": "procman", "data": {"op": 2}})
-            await websocket.send(json.dumps({"event": "skip", "time": time.monotonic()}))
+            await websocket.send(json.dumps({"event": "skip"}))
         elif action == "add_to_toplay":
             songs = msg.get("songs")
             at_top = msg.get("top", False)
@@ -61,21 +61,21 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                     await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
         elif action == "get_toplay":
             result = await get_imc("activemod", {"action": "get_toplay"})
-            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504, "time": time.monotonic()}))
-            else: await websocket.send(json.dumps({"data": result, "event": "toplay", "time": time.monotonic()}))
+            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
+            else: await websocket.send(json.dumps({"data": result, "event": "toplay"}))
         elif action == "clear_toplay":
             result = await get_imc("activemod", {"action": "clear_toplay"})
-            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504, "time": time.monotonic()}))
+            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else:
                 await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": "toplay"})
         elif action == "skipc" or action == "skipi":
             result = await get_imc("activemod", msg)
-            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504, "time": time.monotonic()}))
+            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else:
                 await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"data": result, "event": action})
         elif action == "jingle":
             result = await get_imc("jingle", msg.get("top", False))
-            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504, "time": time.monotonic()}))
+            if result is None: await websocket.send(json.dumps({"error": "timeout", "code": 504}))
             else:
                 await websocket.send(json.dumps(result))
                 result = await get_imc("activemod", {"action": "get_toplay"})
@@ -87,23 +87,23 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 dir = Path(MAIN_PATH_DIR, what).resolve()
                 payload = {"files": [i.name for i in list(dir.iterdir()) if i.is_file()], "base": str(dir), "dir": dir.name}
             except Exception: payload = {}
-            await websocket.send(json.dumps({"event": "request_dir", "data": payload, "time": time.monotonic()}))
+            await websocket.send(json.dumps({"event": "request_dir", "data": payload}))
         elif action == "fsdb_add":
             name: str | None = msg.get("name")
             try:
                 if not name: raise Exception("name not defined")
                 path = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""), name)
                 path.touch(exist_ok=True)
-                await websocket.send(json.dumps({"event": "fsdb_add", "ok": True, "time": time.monotonic()}))
-            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_add", "error": str(e), "time": time.monotonic()}))
+                await websocket.send(json.dumps({"event": "fsdb_add", "ok": True}))
+            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_add", "error": str(e)}))
         elif action == "fsdb_add_dir":
             name: str | None = msg.get("name")
             try:
                 if not name: raise Exception("name not defined")
                 path = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""), name)
                 path.mkdir(parents=True, exist_ok=True)
-                await websocket.send(json.dumps({"event": "fsdb_add_dir", "ok_dir": True, "time": time.monotonic()}))
-            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_add_dir", "error": str(e), "time": time.monotonic()}))
+                await websocket.send(json.dumps({"event": "fsdb_add_dir", "ok_dir": True}))
+            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_add_dir", "error": str(e)}))
         elif action == "fsdb_remove":
             name: str | None = msg.get("name")
             try:
@@ -111,8 +111,8 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 path = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""), name)
                 if path.is_dir(): shutil.rmtree(path)
                 else: path.unlink(missing_ok=True)
-                await websocket.send(json.dumps({"event": "fsdb_remove", "ok": True, "time": time.monotonic()}))
-            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_remove", "error": str(e), "time": time.monotonic()}))
+                await websocket.send(json.dumps({"event": "fsdb_remove", "ok": True}))
+            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_remove", "error": str(e)}))
         elif action == "fsdb_list":
             try:
                 p = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""))
@@ -120,18 +120,16 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                     "files": [i.name for i in p.iterdir() if i.is_file()],
                     "dirs": [i.name for i in p.iterdir() if i.is_dir()]
                 }
-                await websocket.send(json.dumps({"event": "fsdb_list", "data": payload, "time": time.monotonic()}))
-            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_list", "data": {}, "error": str(e), "time": time.monotonic()}))
+                await websocket.send(json.dumps({"event": "fsdb_list", "data": payload}))
+            except Exception as e: await websocket.send(json.dumps({"event": "fsdb_list", "data": {}, "error": str(e)}))
         elif action == "fm95": await writer_q.put((base64.b64decode(msg.get("data", "")), websocket))
-        elif action == "get_time": await websocket.send(json.dumps({"event": "time", "data": time.monotonic(), "client_time": msg.get("client_time", 0)}))
-        else: await websocket.send(json.dumps({"event": "error", "error": "unknown action", "time": time.monotonic()}))
+        else: await websocket.send(json.dumps({"event": "error", "error": "unknown action"}))
 
 async def broadcast_worker(ws_q: multiprocessing.Queue, clients: set):
     loop = asyncio.get_event_loop()
     while True:
         msg: dict = await loop.run_in_executor(None, ws_q.get)
         if msg is None: break
-        msg["time"] = time.monotonic()
         payload = json.dumps(msg)
         if clients:
             coros = []
@@ -157,11 +155,11 @@ async def socket_handler(socket: asyncio.StreamReader, writer: asyncio.StreamWri
 
             data = await socket.read(256)
             if not data:
-                await ws.send(json.dumps({"event": "error", "error": "fm95 socket closed", "time": time.monotonic()}))
+                await ws.send(json.dumps({"event": "error", "error": "fm95 socket closed"}))
                 break
-            await ws.send(json.dumps({"event": "fm95", "data": base64.b64encode(data).decode(), "time": time.monotonic()}))
+            await ws.send(json.dumps({"event": "fm95", "data": base64.b64encode(data).decode()}))
         except Exception as e:
-            await ws.send(json.dumps({"event": "error", "error": str(e), "time": time.monotonic()}))
+            await ws.send(json.dumps({"event": "error", "error": str(e)}))
             break
 
 def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws_q: multiprocessing.Queue):

@@ -17,7 +17,6 @@ let skippedIndices = [];
 let lastElapsed = 0;
 let lastUpdateTime = 0;
 let currentRealTotal = 1;
-let timeOffset = 0;
 
 function toggleSection(id) {
     document.getElementById(id).classList.toggle("collapsed");
@@ -83,13 +82,6 @@ function connectWs() {
     ws.addEventListener("message", evt => {
         handleMessage(JSON.parse(evt.data));
     });
-
-    function syncTime() {
-        wsSend({ action: "get_time", client_time: performance.now() / 1000 });
-    }
-
-    setInterval(syncTime, 10000);
-    setTimeout(syncTime, 500);
 }
 
 function wsSend(obj) {
@@ -97,22 +89,7 @@ function wsSend(obj) {
 }
 
 function handleMessage(msg) {
-    if(msg.time && timeOffset != 0) {
-        const now = performance.now() / 1000;
-        const lag = now - (msg.time + timeOffset);
-        document.getElementById("ping-status").textContent = (Math.max(lag, 0) * 1000).toFixed(2);
-    }
     switch (msg.event) {
-        case "time": {
-            const localNow = performance.now() / 1000;
-            const rtt = localNow - msg.client_time;  // round-trip time
-            const serverNow = msg.data + rtt / 2;    // estimate server time at this moment
-            const newOffset = localNow - serverNow;
-
-            if (timeOffset === 0) timeOffset = newOffset;
-            else timeOffset = timeOffset * 0.9 + newOffset * 0.1;
-            break;
-        }
         case "state": {
             const d = msg.data || {};
             if (d.dirs) updateDirs(d.dirs);
