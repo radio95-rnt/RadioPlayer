@@ -54,8 +54,6 @@
             .bar-wrap   { margin-top: 10px; background: #0a0e1a; border-radius: 4px; height: 5px; overflow: hidden; }
             .bar-fill   { height: 100%; border-radius: 4px; background: var(--accent, #7eb8f7); width: 0%; transition: width 0.4s ease; }
             .card-desc  { font-size: 0.68rem; color: #2e4060; margin-top: 6px; }
-
-            /* Oscilloscope */
             .scope-wrap {
                 width: 100%;
                 max-width: 960px;
@@ -89,7 +87,6 @@
                 background: #111827; color: #7eb8f7; border: 1px solid #1e2d45;
                 border-radius: 6px; padding: 3px 8px; font-size: 0.72rem;
             }
-
             #last-update { font-size: 0.7rem; color: #2e4060; }
         </style>
     </head>
@@ -125,27 +122,26 @@
             </div>
         </div>
 
-        <!-- Oscilloscope -->
         <div class="scope-wrap">
             <div class="scope-header">
                 <div class="scope-title">Oscilloscope — Input &amp; Audio Level</div>
                 <div class="scope-legend">
-                <span><span class="dot" style="background:#f472b6"></span>Input Level</span>
-                <span><span class="dot" style="background:#38bdf8"></span>Audio Level</span>
-                <span><span class="dot" style="background:#fb923c"></span>AGC</span>
+                    <span><span class="dot" style="background:#f472b6"></span>Input Level</span>
+                    <span><span class="dot" style="background:#38bdf8"></span>Audio Level</span>
+                    <span><span class="dot" style="background:#fb923c"></span>AGC</span>
                 </div>
             </div>
             <canvas id="scope"></canvas>
             <div class="scope-controls">
                 <label>History:
-                <select id="histSel">
-                    <option value="100">100 pts</option>
-                    <option value="200" selected>200 pts</option>
-                    <option value="400">400 pts</option>
-                </select>
+                    <select id="histSel">
+                        <option value="100">100 pts</option>
+                        <option value="200" selected>200 pts</option>
+                        <option value="400">400 pts</option>
+                    </select>
                 </label>
                 <label style="margin-left:auto; display:flex; align-items:center; gap:6px;">
-                <input type="checkbox" id="gridCb" checked> Grid
+                    <input type="checkbox" id="gridCb" checked> Grid
                 </label>
             </div>
         </div>
@@ -156,20 +152,20 @@
             const POLL_MSG = JSON.stringify({ action: "fm95", data: "/w==" });
             const FIELDS = ['mpx_power','bs412_gain','agc_gain','input_level','audio_level'];
             const FIELD_CFG = {
-                mpx_power: { unit:'dB', fmt: v=>v.toFixed(3), bar: v=>Math.max(0,Math.min(100,(v/3)*100)), warn: v=>v>3 },
-                bs412_gain: { unit:'x', fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*10)), warn: v=>v>2 },
-                agc_gain: { unit:'x', fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*10)), warn: v=>v>3 },
+                mpx_power:  { unit:'dB', fmt: v=>v.toFixed(3), bar: v=>Math.max(0,Math.min(100,(v/3)*100)), warn: v=>v>3 },
+                bs412_gain: { unit:'x',  fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*10)),      warn: v=>v>2 },
+                agc_gain:   { unit:'x',  fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*10)),      warn: v=>v>3 },
             };
 
-            const MAX_PTS  = 400;
+            const MAX_PTS = 400;
             let histInput = new Array(MAX_PTS).fill(null);
             let histAudio = new Array(MAX_PTS).fill(null);
-            let histAgc = new Array(MAX_PTS).fill(null);
+            let histAgc   = new Array(MAX_PTS).fill(null);
 
+            // animation state
             let targets = { input: null, audio: null, agc: null };
             let current = { input: null, audio: null, agc: null };
             let rafId = null;
-
             const LERP = 0.18;
 
             function animateTo(key, target) {
@@ -193,7 +189,7 @@
                     }
                 }
 
-                // only push to history when the tip actually moves
+                // update only the tip of each history array
                 histInput[histInput.length - 1] = current.input;
                 histAudio[histAudio.length - 1] = current.audio;
                 histAgc[histAgc.length - 1]     = current.agc;
@@ -202,10 +198,10 @@
                 if (dirty) rafId = requestAnimationFrame(animStep);
             }
 
-            const canvas = document.getElementById('scope');
-            const ctx = canvas.getContext('2d');
+            const canvas  = document.getElementById('scope');
+            const ctx     = canvas.getContext('2d');
             const histSel = document.getElementById('histSel');
-            const gridCb = document.getElementById('gridCb');
+            const gridCb  = document.getElementById('gridCb');
 
             function resizeCanvas() {
                 const r = window.devicePixelRatio || 1;
@@ -215,7 +211,8 @@
                 canvas.width  = w * r;
                 canvas.height = 200 * r;
                 ctx.scale(r, r);
-            } resizeCanvas();
+            }
+            resizeCanvas();
             window.addEventListener('resize', () => { ctx.setTransform(1,0,0,1,0,0); resizeCanvas(); drawScope(); });
 
             function drawScope() {
@@ -225,12 +222,10 @@
                 const showGrid = gridCb.checked;
 
                 ctx.clearRect(0, 0, W, H);
-
                 ctx.fillStyle = '#060b14';
                 ctx.fillRect(0, 0, W, H);
 
-                let yMax = 1;
-                let yMin = -1;
+                let yMin = -1, yMax = 1;
                 const vals = [...histInput, ...histAudio, ...histAgc].filter(v => v !== null);
                 if (vals.length) {
                     yMin = Math.min(...vals);
@@ -241,7 +236,6 @@
 
                 const toY = v => H - ((v - yMin) / (yMax - yMin)) * H;
 
-                // grid
                 if (showGrid) {
                     ctx.strokeStyle = 'rgba(255,255,255,0.05)';
                     ctx.lineWidth = 1;
@@ -259,7 +253,6 @@
                         const x = (i / vLines) * W;
                         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
                     }
-                    // zero line
                     if (yMin < 0 && yMax > 0) {
                         const y0 = toY(0);
                         ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -269,7 +262,6 @@
                     }
                 }
 
-                // draw series
                 function drawLine(hist, color) {
                     const slice = hist.slice(-nPts);
                     const step  = W / (nPts - 1);
@@ -278,22 +270,22 @@
                     ctx.beginPath();
                     let started = false;
                     for (let i = 0; i < slice.length; i++) {
-                    if (slice[i] === null) { started = false; continue; }
-                    const x = i * step;
-                    const y = toY(slice[i]);
-                    if (!started) { ctx.moveTo(x, y); started = true; }
-                    else ctx.lineTo(x, y);
+                        if (slice[i] === null) { started = false; continue; }
+                        const x = i * step;
+                        const y = toY(slice[i]);
+                        if (!started) { ctx.moveTo(x, y); started = true; }
+                        else ctx.lineTo(x, y);
                     }
                     ctx.stroke();
-                    // glow
                     ctx.strokeStyle = color + '44';
                     ctx.lineWidth = 4;
                     ctx.stroke();
                 }
 
+                // FIX: was drawing histInput three times
                 drawLine(histInput, '#f472b6');
-                drawLine(histInput, '#38bdf8');
-                drawLine(histInput, '#fb923c');
+                drawLine(histAudio, '#38bdf8');
+                drawLine(histAgc,   '#fb923c');
             }
 
             function decode(b64) {
@@ -309,19 +301,22 @@
                 values.forEach((v, i) => {
                     const key = FIELDS[i];
                     const cfg = FIELD_CFG[key];
-                    if(cfg) {
+                    if (cfg) {
                         const el  = document.getElementById(key);
                         const bar = document.getElementById('bar_' + key);
                         el.innerHTML = `${cfg.fmt(v)}${cfg.unit ? `<span class="card-unit">${cfg.unit}</span>` : ''}`;
-                        bar.style.width = cfg.bar(v) + '%';
+                        bar.style.width      = cfg.bar(v) + '%';
                         bar.style.background = cfg.warn(v) ? '#ef4444' : '';
                     }
                 });
 
-                // replace the three histX.push() lines with:
-                histInput.push(current.input ?? values[3]); if (histInput.length > MAX_PTS) histInput.shift();
-                histAudio.push(current.audio ?? values[4]); if (histAudio.length > MAX_PTS) histAudio.shift();
-                histAgc.push(current.agc   ?? values[2]); if (histAgc.length > MAX_PTS)   histAgc.shift();
+                // FIX: use the raw values as the initial push, not current.* which may be null
+                const iv = current.input ?? values[3];
+                const av = current.audio ?? values[4];
+                const gv = current.agc   ?? values[2];
+                histInput.push(iv); if (histInput.length > MAX_PTS) histInput.shift();
+                histAudio.push(av); if (histAudio.length > MAX_PTS) histAudio.shift();
+                histAgc.push(gv);   if (histAgc.length   > MAX_PTS) histAgc.shift();
 
                 animateTo('input', values[3]);
                 animateTo('audio', values[4]);
@@ -353,8 +348,8 @@
                 });
                 ws.addEventListener('message', e => {
                     try {
-                    const msg = JSON.parse(e.data);
-                    if (msg.event === 'fm95' && msg.data) updateUI(decode(msg.data));
+                        const msg = JSON.parse(e.data);
+                        if (msg.event === 'fm95' && msg.data) updateUI(decode(msg.data));
                     } catch(err) { console.warn('Parse error', err); }
                 });
                 ws.addEventListener('close', () => {
