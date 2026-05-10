@@ -163,9 +163,9 @@
 const POLL_MSG = JSON.stringify({ action: "fm95", data: "/w==" });
 const FIELDS   = ['mpx_power','bs412_gain','agc_gain','input_level','audio_level'];
 const FIELD_CFG = {
-  mpx_power:   { unit:'dB', fmt: v=>v.toFixed(2),  bar: v=>Math.max(0,Math.min(100,(v/3)*100)), warn: v=>v>3 },
-  bs412_gain:  { unit:'',   fmt: v=>v.toFixed(4),  bar: v=>Math.max(0,Math.min(100,v*50)),             warn: v=>v>2 },
-  agc_gain:    { unit:'',   fmt: v=>v.toFixed(4),  bar: v=>Math.max(0,Math.min(100,v*50)),             warn: v=>v>2 },
+  mpx_power:   { unit:'dB', fmt: v=>v.toFixed(3), bar: v=>Math.max(0,Math.min(100,(v/3)*100)), warn: v=>v>3 },
+  bs412_gain:  { unit:'x',   fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*100)), warn: v=>v>2 },
+  agc_gain:    { unit:'x',   fmt: v=>v.toFixed(4), bar: v=>Math.max(0,Math.min(100,v*100)), warn: v=>v>2 },
 };
 
 // --- Oscilloscope state ---
@@ -326,7 +326,7 @@ function connect() {
   ws.addEventListener('open', () => {
     setStatus('connected', 'Connected');
     poll();
-    pollTimer = setInterval(poll, 100);
+    pollTimer = setInterval(poll, 50 + (Math.random() * 50));
   });
   ws.addEventListener('message', e => {
     try {
