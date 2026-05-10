@@ -175,9 +175,9 @@
 const POLL_MSG = JSON.stringify({ action: "fm95", data: "/w==" });
 const FIELDS   = ['mpx_power','bs412_gain','agc_gain','input_level','audio_level'];
 const FIELD_CFG = {
-  mpx_power:   { unit:'dB', fmt: v=>v.toFixed(2),  bar: v=>Math.max(0,Math.min(100,((v+40)/40)*100)), warn: v=>v>-1 },
-  bs412_gain:  { unit:'',   fmt: v=>v.toFixed(4),  bar: v=>Math.max(0,Math.min(100,v*50)),             warn: v=>v>1.9 },
-  agc_gain:    { unit:'',   fmt: v=>v.toFixed(4),  bar: v=>Math.max(0,Math.min(100,v*50)),             warn: v=>v>1.9 },
+  mpx_power:   { unit:'dB', fmt: v=>v.toFixed(2),  bar: v=>Math.max(0,Math.min(100,(v/3)*100)), warn: v=>v>3 },
+  bs412_gain:  { unit:'',   fmt: v=>v.toFixed(4),  bar: v=>Math.max(0,Math.min(100,v*50)),             warn: v=>v>2 },
+  agc_gain:    { unit:'',   fmt: v=>v.toFixed(4),  bar: v=>Math.max(0,Math.min(100,v*50)),             warn: v=>v>2 },
   input_level: { unit:'',   fmt: v=>v.toFixed(5),  bar: v=>Math.max(0,Math.min(100,v*100)),            warn: v=>v>0.95 },
   audio_level: { unit:'',   fmt: v=>v.toFixed(5),  bar: v=>Math.max(0,Math.min(100,v*100)),            warn: v=>v>0.95 },
 };
