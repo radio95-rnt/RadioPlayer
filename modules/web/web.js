@@ -86,16 +86,19 @@ function wsSend(obj) {
     ws.send(JSON.stringify(obj));
 }
 
+function gotLock() {
+    setTimeout(() => {
+        wsSend({action: "lock", "id": 0});
+        wsSend({action: "get_toplay"});
+        wsSend({action: "skipc"});
+        wsSend({action: "skipi"});
+        pollLockHeld = true;
+    }, 500 + (Math.random() * 1000))
+}
+
 function handleLockState(msg) {
     if(msg[0] == true) pollLockHeld = false;
-    else {
-        setTimeout(() => {
-            wsSend({action: "lock", "id": 0});
-            wsSend({action: "get_toplay"});
-            wsSend({action: "skipc"});
-            wsSend({action: "skipi"});
-        }, 500 + (Math.random() * 1000))
-    }
+    else gotLock();
 }
 
 function handleMessage(msg) {
@@ -109,6 +112,7 @@ function handleMessage(msg) {
         }
         case "lock": {
             if(msg.error) pollLockHeld = false;
+            else if (msg.id == 0 && msg.data == false) gotLock();
             break;
         }
         case "rds":
