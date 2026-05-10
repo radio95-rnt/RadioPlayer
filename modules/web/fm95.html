@@ -158,8 +158,8 @@
     </label>
     <label>Y scale:
       <select id="yscaleSel">
-        <option value="1" selected>0 – 1</option>
-        <option value="2">0 – 2</option>
+        <option value="1" selected>-1 – 1</option>
+        <option value="2">-2 – 2</option>
         <option value="auto">Auto</option>
       </select>
     </label>
@@ -219,8 +219,8 @@ function drawScope() {
   ctx.fillRect(0, 0, W, H);
 
   // determine y range
-  let yMin = 0, yMax = 1;
-  if (yscale === '2') { yMax = 2; }
+  let yMin = -1, yMax = 1;
+  if (yscale === '2') { yMin = -2; yMax = 2; }
   else if (yscale === 'auto') {
     const vals = [...histInput, ...histAudio].filter(v => v !== null);
     if (vals.length) {
