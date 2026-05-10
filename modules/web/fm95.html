@@ -161,10 +161,11 @@
             let histInput = new Array(MAX_PTS).fill(null);
             let histAudio = new Array(MAX_PTS).fill(null);
             let histAgc   = new Array(MAX_PTS).fill(null);
+            let histBs   = new Array(MAX_PTS).fill(null);
 
             // animation state
-            let targets = { input: null, audio: null, agc: null };
-            let current = { input: null, audio: null, agc: null };
+            let targets = { input: null, audio: null, agc: null, bs: null };
+            let current = { input: null, audio: null, agc: null, bs: null };
             let rafId = null;
             const LERP = 0.18;
 
@@ -177,7 +178,7 @@
                 rafId = null;
                 let dirty = false;
 
-                for (const key of ['input', 'audio', 'agc']) {
+                for (const key of ['input', 'audio', 'agc', 'bs']) {
                     if (targets[key] === null) continue;
                     const prev = current[key] ?? targets[key];
                     const next = prev + (targets[key] - prev) * LERP;
@@ -192,7 +193,8 @@
                 // update only the tip of each history array
                 histInput[histInput.length - 1] = current.input;
                 histAudio[histAudio.length - 1] = current.audio;
-                histAgc[histAgc.length - 1]     = current.agc;
+                histAgc[histAgc.length - 1] = current.agc;
+                histBs[histBs.length - 1] = current.bs;
 
                 drawScope();
                 if (dirty) rafId = requestAnimationFrame(animStep);
@@ -226,7 +228,7 @@
                 ctx.fillRect(0, 0, W, H);
 
                 let yMin = -1, yMax = 1;
-                const vals = [...histInput, ...histAudio, ...histAgc].filter(v => v !== null);
+                const vals = [...histInput, ...histAudio, ...histAgc, ...histBs].filter(v => v !== null);
                 if (vals.length) {
                     yMin = Math.min(...vals);
                     yMax = Math.max(...vals);
@@ -286,6 +288,7 @@
                 drawLine(histInput, '#f472b6');
                 drawLine(histAudio, '#38bdf8');
                 drawLine(histAgc,   '#fb923c');
+                drawLine(histBs,   '#34d399');
             }
 
             function decode(b64) {
@@ -314,13 +317,16 @@
                 const iv = current.input ?? values[3];
                 const av = current.audio ?? values[4];
                 const gv = current.agc   ?? values[2];
+                const hv = current.bs   ?? values[1];
                 histInput.push(iv); if (histInput.length > MAX_PTS) histInput.shift();
                 histAudio.push(av); if (histAudio.length > MAX_PTS) histAudio.shift();
                 histAgc.push(gv);   if (histAgc.length   > MAX_PTS) histAgc.shift();
+                histBs.push(hv);   if (histBs.length   > MAX_PTS) histBs.shift();
 
                 animateTo('input', values[3]);
                 animateTo('audio', values[4]);
                 animateTo('agc',   values[2]);
+                animateTo('bs',   values[1]);
 
                 document.getElementById('last-update').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
             }
