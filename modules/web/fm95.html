@@ -229,6 +229,8 @@
                 ctx.fillStyle = '#060b14';
                 ctx.fillRect(0, 0, W, H);
 
+                let yMax = 1;
+                let yMin = -1;
                 const vals = [...histInput, ...histAudio, ...histAgc].filter(v => v !== null);
                 if (vals.length) {
                     yMin = Math.min(...vals);
