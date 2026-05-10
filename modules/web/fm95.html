@@ -165,6 +165,32 @@
             let histInput = new Array(MAX_PTS).fill(null);
             let histAudio = new Array(MAX_PTS).fill(null);
             let histAgc = new Array(MAX_PTS).fill(null);
+            let dispInput = new Array(MAX_PTS).fill(null);
+            let dispAudio = new Array(MAX_PTS).fill(null);
+            let dispAgc = new Array(MAX_PTS).fill(null);
+
+            const LERP = 0.15; // 0.0 = never moves, 1.0 = instant jump
+
+            function lerp(a, b) {
+                if (a === null) return b;
+                if (b === null) return a;
+                return a + (b - a) * LERP;
+            }
+
+            function animLoop() {
+                let dirty = false;
+                for (let i = 0; i < MAX_PTS; i++) {
+                    const ni = lerp(dispInput[i], histInput[i]);
+                    const na = lerp(dispAudio[i], histAudio[i]);
+                    const ng = lerp(dispAgc[i],   histAgc[i]);
+                    if (ni !== dispInput[i] || na !== dispAudio[i] || ng !== dispAgc[i]) dirty = true;
+                    dispInput[i] = ni;
+                    dispAudio[i] = na;
+                    dispAgc[i]   = ng;
+                }
+                if (dirty) drawScope();
+                requestAnimationFrame(animLoop);
+            }
 
             const canvas = document.getElementById('scope');
             const ctx = canvas.getContext('2d');
@@ -233,29 +259,44 @@
 
                 // draw series
                 function drawLine(hist, color) {
-                    const slice = hist.slice(-nPts);
-                    const step  = W / (nPts - 1);
+                    const slice = hist.slice(-nPts).filter((v, i, a) => {
+                        // fill nulls with neighbors for smoother rendering
+                        return true;
+                    });
+                    const pts = slice.map((v, i) => ({ x: i * (W / (nPts - 1)), y: v === null ? null : toY(v) }));
+
                     ctx.strokeStyle = color;
                     ctx.lineWidth = 1.5;
                     ctx.beginPath();
                     let started = false;
-                    for (let i = 0; i < slice.length; i++) {
-                    if (slice[i] === null) { started = false; continue; }
-                    const x = i * step;
-                    const y = toY(slice[i]);
-                    if (!started) { ctx.moveTo(x, y); started = true; }
-                    else ctx.lineTo(x, y);
+
+                    for (let i = 0; i < pts.length; i++) {
+                        if (pts[i].y === null) { started = false; continue; }
+                        if (!started) { ctx.moveTo(pts[i].x, pts[i].y); started = true; continue; }
+
+                        // cardinal spline control points
+                        const p0 = pts[i - 2]?.y !== null ? pts[i - 2] : pts[i - 1];
+                        const p1 = pts[i - 1];
+                        const p2 = pts[i];
+                        const p3 = pts[i + 1] ?? p2;
+
+                        const tension = 0.4;
+                        const cp1x = p1.x + (p2.x - p0.x) * tension / 2;
+                        const cp1y = p1.y + (p2.y - p0.y) * tension / 2;
+                        const cp2x = p2.x - (p3.x - p1.x) * tension / 2;
+                        const cp2y = p2.y - (p3.y - p1.y) * tension / 2;
+
+                        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
                     }
                     ctx.stroke();
-                    // glow
                     ctx.strokeStyle = color + '44';
                     ctx.lineWidth = 4;
                     ctx.stroke();
                 }
 
-                drawLine(histInput, '#f472b6');
-                drawLine(histAudio, '#38bdf8');
-                drawLine(histAgc, '#fb923c');
+                drawLine(dispInput, '#f472b6');
+                drawLine(dispAudio, '#38bdf8');
+                drawLine(dispAgc, '#fb923c');
             }
 
             function decode(b64) {
@@ -308,7 +349,7 @@
                 ws.addEventListener('open', () => {
                     setStatus('connected', 'Connected');
                     poll();
-                    pollTimer = setInterval(poll, 70 + (Math.random() * 30));
+                    pollTimer = setInterval(poll, 50 + (Math.random() * 25));
                 });
                 ws.addEventListener('message', e => {
                     try {
@@ -326,7 +367,7 @@
             function poll() { if (ws && ws.readyState === WebSocket.OPEN) ws.send(POLL_MSG); }
 
             connect();
-            drawScope();
+            animLoop();
         </script>
     </body>
 </html>
