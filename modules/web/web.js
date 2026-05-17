@@ -338,13 +338,13 @@ function selectPlaylistItem(i, el) {
     updateControls();
 }
 
-function addSelectedFileToQueue(top) {
+function addSelectedFileToQueue(top, jingle) {
     let fullPath = null;
 
     if (selectedPlaylistPath != null) {
         const selected = playlist.find(t => t.path === selectedPlaylistPath);
         if (!selected) return false;
-        const path = (selected.official ? "" : "!") + selected.path;
+        const path = ((selected.official || !jingle) ? "" : "!") + selected.path;
         wsSend({ action: "add_to_toplay", songs: [path], top });
         clearListSelections("playlist-ul");
         selectedPlaylistPath = null;
@@ -363,7 +363,7 @@ function addSelectedFileToQueue(top) {
     }
 
     if (fullPath) {
-        wsSend({ action: "add_to_toplay", songs: [fullPath], top });
+        wsSend({ action: "add_to_toplay", songs: [(jingle ? "!" : "") + fullPath], top });
         // Dir/subdir selections are intentionally preserved here
         return true;
     }
@@ -414,12 +414,13 @@ document.getElementById("clear-btn").addEventListener("click", e => {
     wsSend({ action: "clear_toplay" });
 });
 
-document.getElementById("add-to-queue-btn").addEventListener("click", () => addSelectedFileToQueue(false));
-document.getElementById("add-to-queue2-btn").addEventListener("click", () => addSelectedFileToQueue(true));
+document.getElementById("add-to-queue-btn").addEventListener("click", () => addSelectedFileToQueue(false, false));
+document.getElementById("add-to-queue2-btn").addEventListener("click", () => addSelectedFileToQueue(true, false));
+document.getElementById("add-as-jingle-btn").addEventListener("click", () => addSelectedFileToQueue(false, true));
 
 document.addEventListener("keydown", e => {
     if (e.target.tagName === "INPUT") return;
-    if (e.key === "Enter" && addSelectedFileToQueue(e.shiftKey)) e.preventDefault();
+    if (e.key === "Enter" && addSelectedFileToQueue(e.shiftKey, false)) e.preventDefault();
     else if (e.key === "s") wsSend({ action: "skip" });
     else if (e.key === "n") wsSend({ action: "skipc", add: 1 });
     else if (e.key === "m") wsSend({ action: "skipc", remove: -1 });
