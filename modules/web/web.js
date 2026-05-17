@@ -64,6 +64,9 @@ function connectWs() {
     ws.addEventListener("open", () => {
         statusEl.textContent = "connected";
         reconnectDelay = 1500;
+        wsSend({ action: "get_toplay" });
+        wsSend({ action: "skipc" });
+        wsSend({ action: "skipi" });
     });
 
     ws.addEventListener("close", () => {
