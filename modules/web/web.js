@@ -204,6 +204,10 @@ function renderPlaylist() {
         } else if (i === currentTrackIndex) {
             li.classList.add("pointer");
             currentIndex = i - 1;
+            if(skipCountToRender > 0) {
+                li.style.textDecoration = "line-through";
+                skipCountToRender--;
+            }
         }
 
         if (skipCountToRender > 0 && i > currentTrackIndex) {
