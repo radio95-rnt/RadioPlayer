@@ -229,9 +229,9 @@ function renderQueue() {
     ul.innerHTML = "";
     queue.forEach(path => {
         const li = document.createElement("li");
+        li.dataset.line = path;
+        
         var c = path.replace(basePath, "");
-        li.dataset.line = c;
-
         if(c.startsWith("!")) c = "(unofficial) " + c.slice(2)
         else c = "(official) " + c.slice(1)
         li.textContent = c;
