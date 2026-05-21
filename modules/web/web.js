@@ -214,17 +214,13 @@ function renderPlaylist() {
             li.style.textDecoration = "line-through";
             skipCountToRender--;
         }
-        if (skippedIndices.includes(i)) {
-            li.style.textDecoration = "line-through";
-        }
+        if (skippedIndices.includes(i)) li.style.textDecoration = "line-through";
 
         li.textContent = `${i === currentTrackIndex ? "▶ " : "  "}${String(i).padStart(indexDigits, "0")}: ${displayPath}`;
         ul.appendChild(li);
     });
 
-    if (currentIndex !== null) {
-        ul.children[currentIndex]?.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
+    if (currentIndex !== null) ul.children[currentIndex]?.scrollIntoView({ block: "center", behavior: "smooth" });
     updateControls();
 }
 
@@ -234,6 +230,8 @@ function renderQueue() {
     queue.forEach(path => {
         const li = document.createElement("li");
         var c = path.replace(basePath, "");
+        li.dataset.line = c;
+
         if(c.startsWith("!")) c = "(unofficial) " + c.slice(2)
         else c = "(official) " + c.slice(1)
         li.textContent = c;
@@ -241,6 +239,11 @@ function renderQueue() {
             li.style.textDecoration = "line-through";
             skipCountToRender--;
         }
+
+        li.addEventListener("click", () => {
+            wsSend({ action: "remove_toplay", songs: [li.dataset.line] });
+            renderAll();
+        });
         ul.appendChild(li);
     });
     updateControls();

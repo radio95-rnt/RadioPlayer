@@ -60,12 +60,12 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             if action == "skip":
                 imc_q.put({"name": "procman", "data": {"op": 2}})
                 await websocket.send(json.dumps({"event": "skip"}))
-            elif action == "add_to_toplay":
+            elif action == "add_to_toplay" or action == "remove_toplay":
                 songs = msg.get("songs")
                 at_top = msg.get("top", False)
                 if not isinstance(songs, list): await websocket.send(json.dumps({"error": "songs must be a list"}))
                 else:
-                    imc_q.put({"name": "activemod", "data": {"action": "add_to_toplay", "songs": songs, "top": at_top}})
+                    imc_q.put({"name": "activemod", "data": {"action": action, "songs": songs, "top": at_top}})
                     result = await get_imc("activemod", {"action": "get_toplay"})
                     if result is not None:
                         await broadcast({"data": result, "event": "toplay"})

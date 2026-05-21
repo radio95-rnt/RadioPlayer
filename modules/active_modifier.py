@@ -131,7 +131,7 @@ class Module(ActiveModifier):
 
     def imc(self, imc: InterModuleCommunication) -> None:
         super().imc(imc)
-        self._imc.register(self, "activemod")
+        imc.register(self, "activemod")
     def imc_data(self, source: BaseIMCModule, source_name: str | None, data: object, broadcast: bool) -> object:
         if not isinstance(data, dict) or broadcast: return
 
@@ -154,14 +154,16 @@ class Module(ActiveModifier):
                 with open(TOPLAY, "r") as f: return {"status": "ok", "data": [i.strip() for i in f.readlines() if i.strip()]}
         elif data.get("action") == "clear_toplay":
             with self.file_lock:
-                # Due to policy, i will not recommend to strip the next song but only the songs after.
+                with open(TOPLAY, "w") as f: f.write("")
+                return {"status": "ok", "data": []}
+        elif data.get("action") == "remove_toplay":
+            targets = data.get("songs", [])
+            with self.file_lock:
                 with open(TOPLAY, "r") as f:
-                    first_line, i = "", 0
-                    while not first_line.strip() and i < 3:
-                        first_line = f.readline()
-                        i += 1
-                with open(TOPLAY, "w") as f: f.write(first_line.strip() + "\n")
-                return {"status": "ok", "data": [first_line.strip()]}
+                    lines = [l.strip() for l in f.readlines() if l.strip()]
+                lines = [l for l in lines if l not in targets and l not in targets]
+                with open(TOPLAY, "w") as f: f.write('\n'.join(lines) + "\n")
+            return {"status": "ok", "data": lines}
         elif data.get("action") == "skipc":
             if (count := data.get("set", -1)) > -1: self.skip_next = count
             if (count2 := data.get("add", None)): self.skip_next += count2
