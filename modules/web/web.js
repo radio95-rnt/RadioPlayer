@@ -227,9 +227,10 @@ function renderPlaylist() {
 function renderQueue() {
     const ul = document.getElementById("queue-ul");
     ul.innerHTML = "";
+    var i = 0;
     queue.forEach(path => {
         const li = document.createElement("li");
-        li.dataset.line = path;
+        li.dataset.idx = i++;
         
         var c = path.replace(basePath, "");
         if(c.startsWith("!")) c = "(unofficial) " + c.slice(2)
@@ -241,9 +242,14 @@ function renderQueue() {
         }
 
         li.addEventListener("click", () => {
-            wsSend({ action: "remove_toplay", songs: [li.dataset.line] });
+            wsSend({ action: "remove_toplay", indexes: [li.dataset.idx] });
             renderAll();
         });
+        li.addEventListener("contextmenu", e => {
+            e.preventDefault();
+            wsSend({ action: "toggle_official_toplay", indexes: [li.dataset.idx] });
+            renderAll();
+        })
         ul.appendChild(li);
     });
     updateControls();

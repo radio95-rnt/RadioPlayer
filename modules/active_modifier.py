@@ -157,11 +157,24 @@ class Module(ActiveModifier):
                 with open(TOPLAY, "w") as f: f.write("")
                 return {"status": "ok", "data": []}
         elif data.get("action") == "remove_toplay":
-            targets = data.get("songs", [])
+            targets = data.get("indexes", [])
             with self.file_lock:
-                with open(TOPLAY, "r") as f:
-                    lines = [l.strip() for l in f.readlines() if l.strip()]
-                lines = [l for l in lines if l not in targets and l not in targets]
+                with open(TOPLAY, "r") as f: lines = [l.strip() for l in f.readlines() if l.strip()]
+                if isinstance(targets, list):
+                    target_set = set(targets)
+                    lines = [l for i, l in enumerate(lines) if i not in target_set]
+                with open(TOPLAY, "w") as f: f.write('\n'.join(lines) + "\n")
+            return {"status": "ok", "data": lines}
+        elif data.get("action") == "toggle_official_toplay":
+            targets = data.get("indexes", [])
+            with self.file_lock:
+                with open(TOPLAY, "r") as f: lines = [l.strip() for l in f.readlines() if l.strip()]
+                if isinstance(targets, list):
+                    target_set = set(targets)
+                    for i in target_set:
+                        if 0 <= i < len(lines):
+                            if lines[i].startswith("!"): lines[i] = lines[i][1:]
+                            else: lines[i] = "!" + lines[i]
                 with open(TOPLAY, "w") as f: f.write('\n'.join(lines) + "\n")
             return {"status": "ok", "data": lines}
         elif data.get("action") == "skipc":

@@ -60,12 +60,20 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             if action == "skip":
                 imc_q.put({"name": "procman", "data": {"op": 2}})
                 await websocket.send(json.dumps({"event": "skip"}))
-            elif action == "add_to_toplay" or action == "remove_toplay":
+            elif action == "add_to_toplay":
                 songs = msg.get("songs")
                 at_top = msg.get("top", False)
                 if not isinstance(songs, list): await websocket.send(json.dumps({"error": "songs must be a list"}))
                 else:
                     imc_q.put({"name": "activemod", "data": {"action": action, "songs": songs, "top": at_top}})
+                    result = await get_imc("activemod", {"action": "get_toplay"})
+                    if result is not None:
+                        await broadcast({"data": result, "event": "toplay"})
+            elif action == "remove_toplay" or action == "toggle_official_toplay":
+                idx = msg.get("indexes")
+                if not isinstance(songs, list): await websocket.send(json.dumps({"error": "songs must be a list"}))
+                else:
+                    imc_q.put({"name": "activemod", "data": {"action": action, "indexes": idx}})
                     result = await get_imc("activemod", {"action": "get_toplay"})
                     if result is not None:
                         await broadcast({"data": result, "event": "toplay"})
@@ -142,7 +150,6 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 else:
                     locks[lid] = websocket
                     await broadcast({"event": "lock", "id": lid, "data": True})
-
             elif action == "unlock":
                 lid = msg.get("id")
                 if lid is None:
@@ -153,7 +160,6 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 else:
                     locks[lid] = None
                     await broadcast({"event": "lock", "id": lid, "data": False})
-
             else: await websocket.send(json.dumps({"event": "error", "error": "unknown action"}))
     finally:
         # release every lock this client held on disconnect
