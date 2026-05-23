@@ -242,12 +242,12 @@ function renderQueue() {
         }
 
         li.addEventListener("click", () => {
-            wsSend({ action: "remove_toplay", indexes: [li.dataset.idx] });
+            wsSend({ action: "remove_toplay", indexes: [Number(li.dataset.idx)] });
             renderAll();
         });
         li.addEventListener("contextmenu", e => {
             e.preventDefault();
-            wsSend({ action: "toggle_official_toplay", indexes: [li.dataset.idx] });
+            wsSend({ action: "toggle_official_toplay", indexes: [Number(li.dataset.idx)] });
             renderAll();
         })
         ul.appendChild(li);
