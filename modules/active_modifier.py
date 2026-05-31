@@ -44,8 +44,16 @@ class Module(ActiveModifier):
             TOPLAY.touch()
             with open(TOPLAY, "r") as f: songs = [s.strip() for s in f.readlines() if s.strip()]
 
-        songs[:] = [('!' if s.startswith('!') else '') + f for s in songs for f in glob.glob(s.removeprefix("!")) if os.path.isfile(f)]
+        def expand_song(s):
+            prefix = '!' if s.startswith('!') else ''
+            path = s.removeprefix('!')
+            if any(c in path for c in ('*', '?')):
+                return [(prefix + f) for f in glob.glob(path) if os.path.isfile(f)]
+            else:
+                return [(prefix + path)] if os.path.isfile(path) else []
 
+        songs[:] = [result for s in songs for result in expand_song(s)]
+        
         def get_song(pop: bool = True):
             nonlocal songs
             if pop: song = songs.pop(0)
