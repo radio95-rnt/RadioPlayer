@@ -51,6 +51,7 @@ class Module(PlaylistModifierModule):
 
 class Module2(PlayerModule):
     def on_new_track(self, index: int, track: Track, next_track: Track | None) -> None:
+        if not track.official: return
         played_tracks.add(track.path)
         save_played()
 
