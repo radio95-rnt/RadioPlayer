@@ -27,7 +27,7 @@ class RT_Set(uecp.commands.UECPCommand):
     def encode(self) -> list[int]:
         return [
             self.ELEMENT_CODE, 0, 0,
-            1+len(self.data), 1] + list(self.data)
+            1+len(self.data), (5 << 1) | 1] + list(self.data)
 
 DEBUG = False
 
