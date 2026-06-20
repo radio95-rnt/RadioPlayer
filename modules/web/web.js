@@ -18,7 +18,24 @@ let currentRealTotal = 1;
 let pollLockHeld = false;
 
 function toggleSection(id) {
-    document.getElementById(id).classList.toggle("collapsed");
+    const pairMap = {
+        'section-dirs': 'section-subdir',
+        'section-subdir': 'section-dirs'
+    };
+
+    const el = document.getElementById(id);
+    const partnerId = pairMap[id];
+
+    if (partnerId) {
+        const willCollapse = !el.classList.contains('collapsed');
+        const partner = document.getElementById(partnerId);
+
+        if (willCollapse && partner.classList.contains('collapsed')) {
+            partner.classList.remove('collapsed');
+        }
+    }
+
+    el.classList.toggle('collapsed');
 }
 
 function isTnet() {
@@ -44,7 +61,7 @@ function clearListSelections(...ids) {
 
 function initLayout() {
     if (window.innerWidth <= 800) {
-        ["section-playlist", "section-dirs", "section-subdir"].forEach(id =>
+        ["section-playlist", "section-subdir"].forEach(id =>
             document.getElementById(id).classList.add("collapsed")
         );
     }
