@@ -263,7 +263,7 @@ function updateDirs(payload) {
         node.className = "item";
         node.textContent = name;
         node.addEventListener("click", (e) => onClick(node, e));
-        if(onContext !== undefined) node.addEventListener("contextmenu", () => onContext(node, e));
+        if(onContext !== undefined) node.addEventListener("contextmenu", (e) => onContext(node, e));
         box.appendChild(node);
     };
 
