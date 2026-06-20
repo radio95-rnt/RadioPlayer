@@ -4,10 +4,8 @@ let playlist = [];
 let queue = [];
 let currentTrackPath = "";
 let currentTrackIndex = 0;
-let selectedPlaylistPath = null;
 let selectedPlaylistIndex = null;
 let selectedDir = null;
-let selectedSubFile = null;
 let basePath = "";
 let subBasePath = "";
 let skipCount = 0;
@@ -231,7 +229,7 @@ function renderQueue() {
     queue.forEach(path => {
         const li = document.createElement("li");
         li.dataset.idx = i++;
-        
+
         var c = path.replace(basePath, "");
         if(c.startsWith("!")) c = "(unofficial) " + c.slice(2)
         else c = "(official) " + c.slice(1)
@@ -260,34 +258,26 @@ function updateDirs(payload) {
     box.innerHTML = "";
     basePath = payload.base || "";
 
-    const addItem = (name, onClick) => {
+    const addItem = (name, onClick, onContext) => {
         const node = document.createElement("div");
         node.className = "item";
         node.textContent = name;
-        node.addEventListener("click", () => onClick(node));
+        node.addEventListener("click", (e) => onClick(node, e));
+        if(onContext !== undefined) node.addEventListener("contextmenu", () => onContext(node, e));
         box.appendChild(node);
     };
 
     (payload.dirs || []).sort().forEach(name => {
-        if (!name.startsWith(".")) addItem(name, node => onDirClicked(name, node));
+        if (!name.startsWith(".")) addItem(name, (node, e) => onDirClicked(name, node));
     });
 
     (payload.files || []).sort().forEach(name => {
         if (!name.startsWith(".")) {
-            addItem(name, node => {
-                if (node.classList.contains("selected")) {
-                    node.classList.remove("selected");
-                    selectedDir = null;
-                    selectedSubFile = null;
-                    return;
-                }
-                clearListSelections("playlist-ul", "subdir-box");
-                Array.from(box.children).forEach(c => c.classList.remove("selected"));
-                node.classList.add("selected");
-                node.dataset.type = "file";
-                selectedDir = null;
-                selectedSubFile = null;
-                document.getElementById("subdir-box").innerHTML = "";
+            addItem(name, () => {
+                wsSend({ action: "add_to_toplay", songs: [basePath.replace(/\/$/, "") + "/" + name], top: false })
+            }, (node, e) => {
+                e.preventDefault()
+                wsSend({ action: "add_to_toplay", songs: [basePath.replace(/\/$/, "") + "/" + name], top: true })
             });
         }
     });
@@ -297,14 +287,12 @@ function onDirClicked(name, node) {
     if (node.classList.contains("selected")) {
         node.classList.remove("selected");
         selectedDir = null;
-        selectedSubFile = null;
         document.getElementById("subdir-box").innerHTML = "";
         return;
     }
     clearListSelections("dirs-box", "playlist-ul");
     node.classList.add("selected");
     selectedDir = name;
-    selectedSubFile = null;
     wsSend({ action: "request_dir", what: selectedDir });
 }
 
@@ -319,91 +307,26 @@ function applySubdir(payload) {
         node.className = "item";
         node.textContent = f;
         node.addEventListener("click", () => {
-            if (node.classList.contains("selected")) {
-                node.classList.remove("selected");
-                selectedSubFile = null;
-                return;
-            }
-            clearListSelections("subdir-box", "playlist-ul");
-            Array.from(document.getElementById("dirs-box").children).forEach(c => c.classList.remove("selected"));
-
-            // Re-select the parent dir node
-            Array.from(document.getElementById("dirs-box").children).forEach(c => {
-                if (c.textContent === selectedDir) c.classList.add("selected");
-            });
-
-            node.classList.add("selected");
-            selectedSubFile = f;
+            wsSend({ action: "add_to_toplay", songs: [subBasePath.replace(/\/$/, "") + "/" + f], top: false });
+        });
+        node.addEventListener("contextmenu", (e) => {
+            e.preventDefault()
+            wsSend({ action: "add_to_toplay", songs: [subBasePath.replace(/\/$/, "") + "/" + f], top: true });
         });
         box.appendChild(node);
     });
 }
 
 function selectPlaylistItem(i, el) {
-    const path = el.dataset.path;
-    if (el.classList.contains("selected")) {
-        el.classList.remove("selected");
-        selectedPlaylistPath = null;
-        updateControls();
-        return;
-    }
-    clearListSelections("playlist-ul", "dirs-box", "subdir-box");
-    el.classList.add("selected");
-    selectedPlaylistPath = path;
-    selectedPlaylistIndex = i;
+    const action = skippedIndices.includes(i)
+        ? { action: "skipi", remove: i }
+        : { action: "skipi", add: i };
+    wsSend(action);
     updateControls();
-}
-
-function addSelectedFileToQueue(top) {
-    let fullPath = null;
-
-    if (selectedPlaylistPath != null) {
-        const selected = playlist.find(t => t.path === selectedPlaylistPath);
-        if (!selected) return false;
-        const path = (selected.official ? "" : "!") + selected.path;
-        wsSend({ action: "add_to_toplay", songs: [path], top });
-        clearListSelections("playlist-ul");
-        selectedPlaylistPath = null;
-        selectedPlaylistIndex = null;
-        updateControls();
-        return true;
-    }
-
-    if (selectedSubFile && selectedDir) {
-        fullPath = subBasePath.replace(/\/$/, "") + "/" + selectedSubFile;
-    } else {
-        const selectedFileEl = Array.from(document.getElementById("dirs-box").children).find(el => el.classList.contains("selected") && el.dataset.type === "file");
-        if (selectedFileEl) {
-            fullPath = basePath.replace(/\/$/, "") + "/" + selectedFileEl.textContent;
-        }
-    }
-
-    if (fullPath) {
-        wsSend({ action: "add_to_toplay", songs: [fullPath], top });
-        // Dir/subdir selections are intentionally preserved here
-        return true;
-    }
-
-    return false;
 }
 
 function updateControls() {
     document.getElementById("clear-btn").disabled = queue.length === 0;
-
-    const btn = document.getElementById("skipidx-btn");
-    if (selectedPlaylistIndex == null) {
-        btn.textContent = "⏭+ Skip in playlist";
-        btn.disabled = true;
-        btn.classList.remove("activated");
-    } else if (skippedIndices.includes(selectedPlaylistIndex)) {
-        btn.textContent = "✓ Unskip in playlist";
-        btn.disabled = false;
-        btn.classList.add("activated");
-    } else {
-        btn.textContent = "⏭+ Skip in playlist";
-        btn.disabled = false;
-        btn.classList.remove("activated");
-    }
 }
 
 document.getElementById("skip-btn").addEventListener("click", () => wsSend({ action: "skip" }));
@@ -416,26 +339,14 @@ document.getElementById("jingle-btn").addEventListener("contextmenu", e => {
     wsSend({ action: "jingle", top: true });
 });
 
-document.getElementById("skipidx-btn").addEventListener("click", () => {
-    if (selectedPlaylistIndex == null) return;
-    const action = skippedIndices.includes(selectedPlaylistIndex)
-        ? { action: "skipi", remove: selectedPlaylistIndex }
-        : { action: "skipi", add: selectedPlaylistIndex };
-    wsSend(action);
-});
-
 document.getElementById("queue-title").addEventListener("click", () => toggleSection("section-queue"));
 document.getElementById("clear-btn").addEventListener("click", e => {
     e.stopPropagation();
     wsSend({ action: "clear_toplay" });
 });
 
-document.getElementById("add-to-queue-btn").addEventListener("click", () => addSelectedFileToQueue(false));
-document.getElementById("add-to-queue2-btn").addEventListener("click", () => addSelectedFileToQueue(true));
-
 document.addEventListener("keydown", e => {
     if (e.target.tagName === "INPUT") return;
-    if (e.key === "Enter" && addSelectedFileToQueue(e.shiftKey)) e.preventDefault();
     else if (e.key === "s") wsSend({ action: "skip" });
     else if (e.key === "n") wsSend({ action: "skipc", add: 1 });
     else if (e.key === "m") wsSend({ action: "skipc", remove: -1 });

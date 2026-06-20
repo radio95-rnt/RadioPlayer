@@ -71,7 +71,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                         await broadcast({"data": result, "event": "toplay"})
             elif action == "remove_toplay" or action == "toggle_official_toplay":
                 idx = msg.get("indexes")
-                if not isinstance(songs, list): await websocket.send(json.dumps({"error": "songs must be a list"}))
+                if not isinstance(idx, list): await websocket.send(json.dumps({"error": "indexes must be a list"}))
                 else:
                     imc_q.put({"name": "activemod", "data": {"action": action, "indexes": idx}})
                     result = await get_imc("activemod", {"action": "get_toplay"})
