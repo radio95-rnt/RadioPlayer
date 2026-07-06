@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WHEP Player + Sleep Timer</title>
+<style>
+  :root{
+    --panel:#1c1c1c; --muted:#98a0a8; --accent:#bcbcbc; --card:#242424;
+    --success:#47d18b; --danger:#ff6b6b; --glass: rgba(255,255,255,0.05);
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  html,body{height:100%; margin:0; background:#202020; color:#eef2f6;}
+  .container{max-width:480px; margin:40px auto; padding:16px;}
+  .panel{background:var(--panel); border-radius:10px; padding:14px;}
+  .frame-title{font-size:16px; color:var(--muted); margin-bottom:10px; display:flex; align-items:center; gap:8px;}
+  .whep-status-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s;}
+  .whep-status-dot.connecting{background:#f0c040;}
+  .whep-status-dot.connected{background:var(--success); box-shadow:0 0 6px rgba(71,209,139,.5);}
+  .whep-status-dot.error{background:var(--danger);}
+  .whep-row{display:flex; gap:8px; align-items:center; margin-bottom:10px;}
+  #whep-url-input{
+    flex:1; font-size:12px; font-family:"Consolas",monospace;
+    background:var(--card); border:1px solid rgba(255,255,255,.08);
+    border-radius:6px; color:#eef2f6; padding:6px 8px; outline:none;
+  }
+  #whep-url-input:focus{border-color:rgba(62,166,255,.4);}
+  button,.btn{background:transparent; border:1px solid rgba(255,255,255,.06); padding:8px 12px; border-radius:8px; color:inherit; cursor:pointer; transition:background-color .15s ease;}
+  button:hover,.btn:hover{background-color:var(--glass);}
+  .btn.activated{background:linear-gradient(90deg,#9ed3ff46,#5bbbff2a); border-color:#dbdbdb55;}
+  .whep-vol-row{display:flex; align-items:center; gap:6px; margin-bottom:14px;}
+  #whep-vol{flex:1; -webkit-appearance:none; appearance:none; height:6px; background:rgba(255,255,255,.12); border-radius:4px; outline:none;}
+  #whep-vol::-webkit-slider-thumb{-webkit-appearance:none; width:12px; height:12px; border-radius:6px; background:var(--accent);}
+  #whep-vol::-moz-range-thumb{width:12px; height:12px; border-radius:6px; background:var(--accent); border:none;}
+  #whep-log{
+    font-family:"Consolas",monospace; font-size:11px; background:var(--card);
+    border-radius:6px; padding:6px 8px; max-height:120px; overflow-y:auto;
+    line-height:1.6; margin-top:10px;
+  }
+  .wlog-ok{color:var(--success);} .wlog-err{color:var(--danger);} .wlog-info{color:var(--muted);}
+
+  /* sleep timer */
+  .sleep-box{margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);}
+  .sleep-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .sleep-presets{display:flex; gap:6px;}
+  .sleep-presets button{padding:6px 10px; font-size:12px;}
+  .sleep-presets button.activated{background:linear-gradient(90deg,#9ed3ff46,#5bbbff2a); border-color:#dbdbdb55;}
+  #sleep-remaining{font-family:"Consolas",monospace; font-size:20px; margin-top:10px; text-align:center; color:var(--accent);}
+  #sleep-remaining.hidden{display:none;}
+  .small{font-size:12px; color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="panel" id="whep-section">
+    <div class="frame-title">
+      <span id="whep-dot" class="whep-status-dot"></span>
+      Live Player
+    </div>
+
+    <div class="whep-row">
+      <input id="whep-url-input" type="text" value="https://webrtc.flerken.pl.eu.org:5000/radio/whep" spellcheck="false" />
+      <button id="whep-btn" class="btn" onclick="whepToggle()">▶ Connect</button>
+    </div>
+
+    <div class="whep-vol-row">
+      <span class="small">🔈</span>
+      <input type="range" id="whep-vol" min="0" max="1" step="0.001" value="0.8" oninput="whepSetVol(this.value)" />
+      <span class="small" id="whep-vol-out" style="min-width:40px;text-align:right">80.0%</span>
+    </div>
+
+    <div id="whep-log"></div>
+
+    <div class="sleep-box">
+      <div class="frame-title" style="margin-bottom:8px;">🌙 Sleep Timer</div>
+      <div class="sleep-row">
+        <div class="sleep-presets">
+          <button data-min="15" onclick="setSleepPreset(15)">15m</button>
+          <button data-min="30" onclick="setSleepPreset(30)">30m</button>
+          <button data-min="45" onclick="setSleepPreset(45)">45m</button>
+          <button data-min="60" onclick="setSleepPreset(60)">60m</button>
+        </div>
+        <input id="sleep-custom" type="number" min="1" placeholder="mins" style="width:70px; background:var(--card); border:1px solid rgba(255,255,255,.08); border-radius:6px; color:#eef2f6; padding:6px;" />
+        <button class="btn" onclick="startCustomSleep()">Set</button>
+        <button class="btn" id="sleep-cancel-btn" onclick="cancelSleep()" style="display:none;">✖ Cancel</button>
+      </div>
+      <div id="sleep-remaining" class="hidden">--:--</div>
+      <div class="small" id="sleep-status" style="margin-top:6px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── WHEP player (unchanged behavior, lifted out) ─────────────────────────
+let whepPc = null;
+let whepAudio = null;
+let whepConnected = false;
+
+function whepLog(msg, type = "info") {
+  const el = document.getElementById("whep-log");
+  const line = document.createElement("div");
+  line.className = "wlog-" + type;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+  while (el.children.length > 30) el.removeChild(el.firstChild);
+}
+
+function whepSetDot(state) {
+  document.getElementById("whep-dot").className =
+    "whep-status-dot" + (state !== "idle" ? " " + state : "");
+  const btn = document.getElementById("whep-btn");
+  const active = state === "connected" || state === "connecting";
+  btn.textContent = active ? "⏹ Disconnect" : "▶ Connect";
+  btn.classList.toggle("activated", active);
+}
+
+function whepSetVol(v) {
+  document.getElementById("whep-vol-out").textContent =
+    (Math.round(v * 1000) / 10).toFixed(1) + "%";
+  if (whepAudio) whepAudio.volume = parseFloat(v);
+}
+
+function whepToggle() {
+  if (whepConnected || whepPc) whepDisconnect();
+  else whepConnect();
+}
+
+function whepDisconnect() {
+  whepConnected = false;
+  if (whepPc) { try { whepPc.close(); } catch (e) {} whepPc = null; }
+  if (whepAudio) { whepAudio.pause(); whepAudio.srcObject = null; whepAudio = null; }
+  whepSetDot("idle");
+  whepLog("Disconnected");
+}
+
+async function whepConnect() {
+  const url = document.getElementById("whep-url-input").value.trim();
+  if (!url) return;
+  whepSetDot("connecting");
+  whepLog("Creating peer connection…");
+  try {
+    whepPc = new RTCPeerConnection();
+
+    whepPc.ontrack = e => {
+      whepLog("Track received, starting playback", "ok");
+      whepAudio = new Audio();
+      whepAudio.srcObject = e.streams[0];
+      whepAudio.volume = parseFloat(document.getElementById("whep-vol").value);
+      whepAudio.play()
+        .then(() => {
+          whepLog("Audio playing", "ok");
+          whepConnected = true;
+          whepSetDot("connected");
+        })
+        .catch(() => {
+          whepLog("Autoplay blocked — click anywhere to resume", "err");
+          document.addEventListener("click", () => whepAudio?.play(), { once: true });
+        });
+    };
+
+    whepPc.onconnectionstatechange = () => {
+      whepLog("State: " + whepPc.connectionState);
+      if (["failed", "disconnected"].includes(whepPc.connectionState)) {
+        whepLog("Connection lost", "err");
+        whepDisconnect();
+        whepSetDot("error");
+      }
+    };
+
+    whepPc.oniceconnectionstatechange = () => whepLog("ICE: " + whepPc.iceConnectionState);
+    whepPc.addTransceiver("audio", { direction: "recvonly" });
+
+    const offer = await whepPc.createOffer();
+    offer.sdp = offer.sdp
+      .replace(/useinbandfec=1/g, "useinbandfec=1;stereo=1;sprop-stereo=1")
+      .replace(/minptime=10/g, "minptime=10;ptime=10;maxptime=10");
+    await whepPc.setLocalDescription(offer);
+
+    whepLog("Sending offer to " + url);
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/sdp", Accept: "application/sdp" },
+      body: whepPc.localDescription.sdp,
+    });
+    if (!resp.ok) throw new Error(`Server returned ${resp.status} ${resp.statusText}`);
+
+    const answerSdp = await resp.text();
+    whepLog(`Got SDP answer (${answerSdp.length} bytes)`, "ok");
+    await whepPc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+    whepLog("Waiting for ICE + track…");
+  } catch (err) {
+    whepLog("Error: " + err.message, "err");
+    whepDisconnect();
+    whepSetDot("error");
+  }
+}
+
+// ─── Sleep timer ───────────────────────────────────────────────────────────
+let sleepEndTime = null;      // timestamp (ms) when playback should stop
+let sleepInterval = null;
+let sleepBaseVolume = null;   // volume to restore to / fade from
+const FADE_SECONDS = 30;      // fade out over the last N seconds
+
+function clearPresetHighlight() {
+  document.querySelectorAll(".sleep-presets button").forEach(b => b.classList.remove("activated"));
+}
+
+function setSleepPreset(minutes) {
+  clearPresetHighlight();
+  const btn = document.querySelector(`.sleep-presets button[data-min="${minutes}"]`);
+  if (btn) btn.classList.add("activated");
+  startSleep(minutes);
+}
+
+function startCustomSleep() {
+  const val = parseFloat(document.getElementById("sleep-custom").value);
+  if (!val || val <= 0) return;
+  clearPresetHighlight();
+  startSleep(val);
+}
+
+function startSleep(minutes) {
+  sleepBaseVolume = parseFloat(document.getElementById("whep-vol").value);
+  sleepEndTime = Date.now() + minutes * 60 * 1000;
+  document.getElementById("sleep-remaining").classList.remove("hidden");
+  document.getElementById("sleep-cancel-btn").style.display = "";
+  document.getElementById("sleep-status").textContent = `Playback will stop in ${minutes} minute${minutes === 1 ? "" : ""}.`;
+
+  if (sleepInterval) clearInterval(sleepInterval);
+  sleepInterval = setInterval(tickSleep, 250);
+  tickSleep();
+}
+
+function cancelSleep() {
+  sleepEndTime = null;
+  if (sleepInterval) { clearInterval(sleepInterval); sleepInterval = null; }
+  document.getElementById("sleep-remaining").classList.add("hidden");
+  document.getElementById("sleep-cancel-btn").style.display = "none";
+  document.getElementById("sleep-status").textContent = "Sleep timer cancelled.";
+  clearPresetHighlight();
+  // restore volume if we'd started fading it
+  if (sleepBaseVolume !== null && whepAudio) {
+    whepAudio.volume = sleepBaseVolume;
+    document.getElementById("whep-vol").value = sleepBaseVolume;
+    whepSetVol(sleepBaseVolume);
+  }
+  sleepBaseVolume = null;
+}
+
+function tickSleep() {
+  if (!sleepEndTime) return;
+  const remainingMs = sleepEndTime - Date.now();
+
+  if (remainingMs <= 0) {
+    finishSleep();
+    return;
+  }
+
+  const totalSec = Math.ceil(remainingMs / 1000);
+  const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+  const ss = String(totalSec % 60).padStart(2, "0");
+  document.getElementById("sleep-remaining").textContent = `${mm}:${ss}`;
+
+  // fade out over the last FADE_SECONDS
+  if (totalSec <= FADE_SECONDS && whepAudio && sleepBaseVolume !== null) {
+    const fadeFactor = Math.max(0, totalSec / FADE_SECONDS);
+    whepAudio.volume = sleepBaseVolume * fadeFactor;
+  }
+}
+
+function finishSleep() {
+  clearInterval(sleepInterval);
+  sleepInterval = null;
+  sleepEndTime = null;
+  document.getElementById("sleep-remaining").classList.add("hidden");
+  document.getElementById("sleep-cancel-btn").style.display = "none";
+  document.getElementById("sleep-status").textContent = "Sleep timer finished — disconnected.";
+  clearPresetHighlight();
+  whepDisconnect();
+  // restore slider to the pre-fade volume for next time
+  if (sleepBaseVolume !== null) {
+    document.getElementById("whep-vol").value = sleepBaseVolume;
+    whepSetVol(sleepBaseVolume);
+  }
+  sleepBaseVolume = null;
+}
+</script>
+</body>
+</html>
