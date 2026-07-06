@@ -58,7 +58,7 @@ class Module2(PlayerModule):
         return self._imc.send(self, "activemod", {"action": "add_to_toplay", "songs": [f"!{jingle}"], "top": bool(data)})
 
 module = Module2()
-playlistmod = Module(), 2
+playlistmod = Module(), 3
 
 # This is free and unencumbered software released into the public domain.
 

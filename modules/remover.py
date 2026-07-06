@@ -11,20 +11,14 @@ def get_day():
     return t.day + (t.month * 100)
 
 def load_played():
-    if not PLAYED_FILE.exists():
-        return
+    if not PLAYED_FILE.exists(): return
     lines = PLAYED_FILE.read_text().splitlines()
-    if not lines:
-        return
-    try:
-        saved_day = int(lines[0])
-    except ValueError:
-        return
-    if saved_day != get_day():
-        return  # Different day, discard
+    if not lines: return
+    try: saved_day = int(lines[0])
+    except ValueError: return
+    if saved_day != get_day(): return  # Different day, discard
     for line in lines[1:]:
-        if line:
-            played_tracks.add(Path(line))
+        if line: played_tracks.add(Path(line))
 
 def save_played():
     PLAYED_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -41,12 +35,11 @@ class Module(PlaylistModifierModule):
             played_tracks.clear()
             save_played()
             return playlist
-
         output = []
         for track in playlist:
             if track.path in played_tracks: continue
             output.append(track)
-        if len(output) < (len(playlist) / 4): return playlist
+        if len(output) < (len(playlist) // 2): return playlist
         return output
 
 class Module2(PlayerModule):
@@ -55,7 +48,7 @@ class Module2(PlayerModule):
         played_tracks.add(track.path)
         save_played()
 
-playlistmod = Module(), 3
+playlistmod = Module(), 2
 module = Module2()
 
 # This is free and unencumbered software released into the public domain.
