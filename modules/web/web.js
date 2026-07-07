@@ -2,6 +2,7 @@ let ws = null;
 let reconnectDelay = 1000;
 let playlist = [];
 let queue = [];
+let last_q_len = Infinity;
 let currentTrackPath = "";
 let currentTrackIndex = 0;
 let selectedPlaylistIndex = null;
@@ -16,6 +17,9 @@ let lastElapsed = 0;
 let lastUpdateTime = 0;
 let currentRealTotal = 1;
 let pollLockHeld = false;
+let alarmEnabled = false;
+let alarmFired = false;
+let alarmAudioCtx = null;
 
 function toggleSection(id) {
     const pairMap = {
@@ -267,6 +271,16 @@ function renderQueue() {
         })
         ul.appendChild(li);
     });
+
+    if (alarmEnabled) {
+        if (queue.length === 0 && !alarmFired && last_q_len > queue.length) {
+            playAlarmTone();
+            alarmFired = true;
+        } else if (queue.length !== 1) {
+            alarmFired = false;
+        }
+    }
+    last_q_len = queue.length;
     updateControls();
 }
 
@@ -345,6 +359,39 @@ function selectPlaylistItem(i, el) {
 function updateControls() {
     document.getElementById("clear-btn").disabled = queue.length === 0;
 }
+
+function toggleAlarm() {
+    alarmEnabled = !alarmEnabled;
+    document.getElementById("alarm-btn").classList.toggle("activated", alarmEnabled);
+    if (!alarmEnabled) alarmFired = false;
+}
+
+function playAlarmTone() {
+    if (!alarmAudioCtx) alarmAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = alarmAudioCtx;
+    const now = ctx.currentTime;
+    const beeps = 5;
+    for (let i = 0; i < beeps; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "square";
+        osc.frequency.value = 880;
+        const t = now + i * 0.45;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(1, t + 0.02);
+        gain.gain.setValueAtTime(1, t + 0.28);
+        gain.gain.linearRampToValueAtTime(0, t + 0.32);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.35);
+    }
+}
+
+document.getElementById("alarm-btn").addEventListener("click", e => {
+    e.stopPropagation();
+    toggleAlarm();
+});
 
 document.getElementById("skip-btn").addEventListener("click", () => wsSend({ action: "skip" }));
 document.getElementById("skpn-inc").addEventListener("click", () => wsSend({ action: "skipc", add: 1 }));
