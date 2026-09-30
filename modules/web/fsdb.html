@@ -196,17 +196,25 @@
                 if (msg.event === "fsdb_list") renderPlaylist(msg.data);
             };
 
+            function sortNames(items) {
+                return [...items].sort((a, b) =>
+                    a.localeCompare(b, undefined, { sensitivity: "base" })
+                );
+            }
+
             function renderRef(data) {
                 const el = document.getElementById("ref");
                 el.innerHTML = "";
-                data.dirs.forEach(d => {
+
+                sortNames(data.dirs).forEach(d => {
                     const div = document.createElement("div");
                     div.className = "item dir";
                     div.textContent = d + "/";
                     div.onclick = () => addDir(d);
                     el.appendChild(div);
                 });
-                data.files.forEach(f => {
+
+                sortNames(data.files).forEach(f => {
                     const div = document.createElement("div");
                     div.className = "item file";
                     div.textContent = f;
@@ -218,14 +226,16 @@
             function renderPlaylist(data) {
                 const el = document.getElementById("playlistView");
                 el.innerHTML = "";
-                data.dirs.forEach(d => {
+
+                sortNames(data.dirs).forEach(d => {
                     const div = document.createElement("div");
                     div.className = "item dir";
                     div.textContent = d + "/";
                     div.onclick = () => removeEntry(d);
                     el.appendChild(div);
                 });
-                data.files.forEach(f => {
+
+                sortNames(data.files).forEach(f => {
                     const div = document.createElement("div");
                     div.className = "item file";
                     div.textContent = f;

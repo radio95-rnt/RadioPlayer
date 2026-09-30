@@ -59,7 +59,7 @@
     </div>
 
     <div class="whep-row">
-      <input id="whep-url-input" type="text" value="https://webrtc.flerken.pl.eu.org:5000/radio/whep" spellcheck="false" />
+      <input id="whep-url-input" type="text" value="https://lwebrtc.flerken.pl.eu.org/radio/whep" spellcheck="false" />
       <button id="whep-btn" class="btn" onclick="whepToggle()">▶ Connect</button>
     </div>
 
@@ -286,17 +286,6 @@ function finishSleep() {
   sleepBaseVolume = null;
 }
 
-function isTnet() {
-  return window.location.protocol === "file:" || window.location.hostname.includes("tnet");
-}
-
-function initTnetUrl() {
-  if (isTnet()) {
-    document.getElementById("whep-url-input").value = "https://webrtc.terminal.tnet/radio/whep";
-  }
-}
-
-initTnetUrl();
 </script>
 </body>
 </html>

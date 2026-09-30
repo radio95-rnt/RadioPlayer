@@ -42,10 +42,6 @@ function toggleSection(id) {
     el.classList.toggle('collapsed');
 }
 
-function isTnet() {
-    return window.location.protocol === "file:" || window.location.hostname.includes("tnet");
-}
-
 function formatTime(s) {
     s = Number(s || 0);
     const h = Math.floor(s / 3600);
@@ -69,16 +65,13 @@ function initLayout() {
             document.getElementById(id).classList.add("collapsed")
         );
     }
-    if (isTnet()) {
-        document.getElementById("whep-url-input").value = "https://webrtc.terminal.tnet/radio/whep";
-    }
 }
 
 function connectWs() {
     const statusEl = document.getElementById("server-status");
     statusEl.textContent = "connecting...";
 
-    ws = new WebSocket(isTnet() ? "https://radio95.tnet/ws" : "/ws");
+    ws = new WebSocket("/ws");
 
     ws.addEventListener("open", () => {
         statusEl.textContent = "connected";
@@ -411,7 +404,7 @@ document.getElementById("clear-btn").addEventListener("click", e => {
 
 document.addEventListener("keydown", e => {
     if (e.target.tagName === "INPUT") return;
-    else if (e.key === "s") wsSend({ action: "skip" });
+    // else if (e.key === "s") wsSend({ action: "skip" });
     else if (e.key === "n") wsSend({ action: "skipc", add: 1 });
     else if (e.key === "m") wsSend({ action: "skipc", remove: -1 });
     else if (e.key.toLowerCase() === "j") wsSend({ action: "jingle", top: e.shiftKey });
