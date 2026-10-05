@@ -204,6 +204,10 @@ class RadioPlayer:
                     playlist_track = playlist[song_i % len(playlist)]
                     playlist_next_track = playlist[song_i + 1] if song_i + 1 < len(playlist) else None
                 else: playlist_track = playlist_next_track = None
+                if playlist_track and not playlist_track.path.exists():
+                    song_i += 1
+                    max_iterator += 1
+                    return get_track()
                 if self.modman.active_modifier:
                     (track, next_track), extend = self.modman.active_modifier.play(song_i, playlist_track, playlist_next_track)
                     if track is None: song_i += 1
