@@ -120,6 +120,11 @@
                 <div class="bar-wrap"><div class="bar-fill" id="bar_agc_gain"></div></div>
                 <div class="card-desc">Automatic gain control · linear</div>
             </div>
+            <div class="card" style="--accent:#f472b6">
+                <div class="card-label">Message Counter</div>
+                <div class="card-value" id="counter">—</div>
+                <div class="card-desc" id="counter_desc">uint32 · missed: 0</div>
+            </div>
         </div>
 
         <div class="scope-wrap">
@@ -293,14 +298,27 @@
 
             function decode(b64) {
                 const bin = atob(b64);
-                const buf = new ArrayBuffer(bin.length);
-                const u8  = new Uint8Array(buf);
+                const u8  = new Uint8Array(bin.length);
                 for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-                const view = new DataView(buf);
-                return FIELDS.map((_, i) => view.getFloat32(i * 4, true));
+
+                // 0xff prefix + 5 floats + uint32 counter
+                if (u8.length < 1 + FIELDS.length * 4 + 4 || u8[0] !== 0xff) return null;
+
+                const view = new DataView(u8.buffer);
+                const values  = FIELDS.map((_, i) => view.getFloat32(1 + i * 4, true));
+                const counter = view.getUint32(u8.length - 4, true);
+                return { values, counter };
             }
 
             function updateUI(values) {
+                document.getElementById('counter').textContent = counter;
+                if (lastCounter !== null) {
+                    const gap = (counter - lastCounter - 1) >>> 0;   // handles uint32 wraparound
+                    if (gap < 1000000) missed += gap;                // ignore huge jumps (e.g. server restart)
+                }
+                lastCounter = counter;
+                document.getElementById('counter_desc').textContent = `uint32 · missed: ${missed}`;
+
                 values.forEach((v, i) => {
                     const key = FIELDS[i];
                     const cfg = FIELD_CFG[key];
