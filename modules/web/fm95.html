@@ -311,11 +311,11 @@
                 return { values, counter };
             }
 
-            function updateUI(values) {
+            function updateUI({ values, counter }) {
                 document.getElementById('counter').textContent = counter;
-                if (lastCounter !== null) {
-                    const gap = (counter - lastCounter - 1) >>> 0;   // handles uint32 wraparound
-                    if (gap < 1000000) missed += gap;                // ignore huge jumps (e.g. server restart)
+                if (lastCounter !== null && counter !== lastCounter) {
+                    const gap = (counter - lastCounter - 1) >>> 0;
+                    if (gap < 1000000) missed += gap;
                 }
                 lastCounter = counter;
                 document.getElementById('counter_desc').textContent = `uint32 · missed: ${missed}`;
