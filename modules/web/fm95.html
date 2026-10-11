@@ -154,6 +154,7 @@
         <div id="last-update">Waiting for data…</div>
 
         <script>
+            let lastCounter = null, missed = 0;
             const POLL_MSG = JSON.stringify({ action: "fm95", data: "/w==" });
             const FIELDS = ['mpx_power','bs412_gain','agc_gain','input_level','audio_level'];
             const FIELD_CFG = {
@@ -373,7 +374,10 @@
                 ws.addEventListener('message', e => {
                     try {
                         const msg = JSON.parse(e.data);
-                        if (msg.event === 'fm95' && msg.data) updateUI(decode(msg.data));
+                        if (msg.event === 'fm95' && msg.data) {
+                            const d = decode(msg.data);
+                            if (d) updateUI(d);
+                        }
                     } catch(err) { console.warn('Parse error', err); }
                 });
                 ws.addEventListener('close', () => {
