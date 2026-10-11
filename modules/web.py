@@ -222,14 +222,14 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                             data = await reader.read(256)
                             if not data:
                                 raise ConnectionResetError("fm95 socket closed")
+                        except Exception:
+                            pending = (qdata, ws)   # fm95 side failed → reconnect and retry
+                            raise
+
+                        try:
                             await ws.send(json.dumps({"event": "fm95", "data": base64.b64encode(data).decode()}))
-                        except Exception as e:
-                            try:
-                                await ws.send(json.dumps({"event": "error", "error": str(e)}))
-                            except Exception:
-                                pass
-                            pending = (qdata, ws)
-                            raise  # break to outer loop → reconnect
+                        except Exception:
+                            pass
 
                 except asyncio.CancelledError:
                     raise
