@@ -17,7 +17,7 @@ from modules import InterModuleCommunication
 
 from . import Track, PlayerModule, Path, BaseIMCModule
 
-MAIN_PATH_DIR = Path("/home/user/mixes")
+MAIN_PATH_DIR = Path("/mnt/mixes")
 
 # locks: dict[lock_id, websocket | None]  — managed inside the async runner's scope
 # passed into handlers via a shared dict reference

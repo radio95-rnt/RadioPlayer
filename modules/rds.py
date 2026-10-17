@@ -31,7 +31,7 @@ class RT_Set(uecp.commands.UECPCommand):
 
 DEBUG = False
 
-name_table_path = "/home/user/mixes/.playlist/name_table.txt"
+name_table_path = "/mnt/mixes/.playlist/name_table.txt"
 
 rds_base = "ON AIR: {} - {}"
 rds_default_artist = "radio95"

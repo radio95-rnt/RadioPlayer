@@ -2,7 +2,7 @@ from . import PlaylistModifierModule, Track, PlayerModule
 from pathlib import Path
 import datetime
 
-PLAYED_FILE = Path("/home/user/mixes/.playlist/played.txt")
+PLAYED_FILE = Path("/mnt/mixes/.playlist/played.txt")
 
 played_tracks: set[Path] = set()
 

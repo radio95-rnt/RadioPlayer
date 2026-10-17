@@ -19,7 +19,7 @@ def load_play_counts(file_path: Path) -> dict[str, int]:
 class PopularitySorterModule(PlaylistModifierModule):
     def __init__(self) -> None:
         self.logger = log95.log95("PopSort", output=_log_out)
-        self.play_counts_file = Path("/home/user/mixes/.playlist/count.txt")
+        self.play_counts_file = Path("/mnt/mixes/.playlist/count.txt")
 
     def modify(self, global_args: dict, playlist: list[Track]) -> list[Track]:
         self.logger.info("Applying popularity-based sorting to the playlist...")

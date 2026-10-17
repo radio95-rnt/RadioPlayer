@@ -15,7 +15,7 @@ from . import PlaylistModifierModule, Track, Path, PlayerModule
 def get_jingles():
     master: Path | None = None
     jingles: list[Path] = []
-    for file in Path("/home/user/mixes/.playlist/jingle").iterdir():
+    for file in Path("/mnt/mixes/.playlist/jingle").iterdir():
         if not (file.is_file() and file.exists()): continue
         name, _ = file.name.rsplit('.', 1)
         if name.lower() == "master":

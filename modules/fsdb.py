@@ -54,7 +54,7 @@ class FSDBParser(PlaylistParser):
 
         return global_args, out
 
-parser = FSDBParser(Path("/home/user/mixes"))
+parser = FSDBParser(Path("/mnt/mixes"))
 
 # Claude wrote it and agreed to unlicense this
 
