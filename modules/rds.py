@@ -1,35 +1,41 @@
 from modules import InterModuleCommunication
 
 from . import PlayerModule, log95, Track
-import socket
+import socket, struct
 
-# https://github.com/chrko/python-uecp
-import uecp.frame
-import uecp.commands
 import rds_codec
-
-@uecp.commands.UECPCommand.register_type
-class ASCII(uecp.commands.UECPCommand):
-    ELEMENT_CODE = 0x2D
-    @classmethod
-    def create_from(cls, data: bytes | list[int]): raise NotImplementedError()
-    def __init__(self, data: bytes) -> None: self.data = data
-    def encode(self) -> list[int]:
-        return [
-            self.ELEMENT_CODE,
-            2+len(self.data)] + list(b"95") + list(self.data)
-
-class RT_Set(uecp.commands.UECPCommand):
-    ELEMENT_CODE = 0x0A
-    @classmethod
-    def create_from(cls, data: bytes | list[int]): raise NotImplementedError()
-    def __init__(self, data: bytes) -> None: self.data = data
-    def encode(self) -> list[int]:
-        return [
-            self.ELEMENT_CODE, 0, 0,
-            1+len(self.data), (5 << 1) | 1] + list(self.data)
-
+UECP_ADDRESS = 0
 DEBUG = False
+
+def crc16_ccitt(data: bytes) -> int:
+    crc = 0xFFFF
+
+    for byte in data:
+        crc = ((crc >> 8) | (crc << 8)) & 0xFFFF
+        crc ^= byte
+        crc ^= (crc & 0xFF) >> 4
+        crc ^= (crc << 8) << 4 & 0xFFFF
+        crc ^= ((crc & 0xFF) << 4) << 1
+        crc &= 0xFFFF
+
+    return crc ^ 0xFFFF
+
+def encode_uecp(sequence: int, message: bytes, address: int = UECP_ADDRESS) -> bytes:
+    def stuff(x: bytes):
+        # Normally they do some for byte in bytes - if byte is fd append fd 0 else append byte, bullshit
+        # but this works just as well, is shorter and faster
+        return x.replace(b"\xfd", b"\xfd\x00").replace(b"\xfe", b"\xfd\x01").replace(b"\xff", b"\xfd\x02")
+    out = struct.pack(">H2B", address, sequence, len(message))
+    out += message[:255]
+    out += struct.pack(">H", crc16_ccitt(out)) # this crc is "up-to-this-point"
+    return b"\xfe" + stuff(out) + b"\xff"
+
+def encapsulate_ascii(data: str):
+    bdata = data.encode()
+    return b"\x2d" + bytes([len(bdata)+2]) + b"95" + bdata
+def set_rt(data: bytes):
+    return b"\x0a\0\0" + bytes([len(data)+1, (5 << 1) | 1]) + data
+
 
 name_table_path = "/mnt/mixes/.playlist/name_table.txt"
 
@@ -42,6 +48,8 @@ logger_level = log95.log95Levels.DEBUG if DEBUG else log95.log95Levels.CRITICAL_
 _log_out: log95.TextIO
 assert _log_out # pyright: ignore[reportUnboundVariable]
 logger = log95.log95("RDS", logger_level, output=_log_out)
+
+uecp_sequence = 1
 
 def load_dict_from_custom_format(file_path: str) -> dict[str, str]:
     try:
@@ -57,6 +65,7 @@ def load_dict_from_custom_format(file_path: str) -> dict[str, str]:
         return {}
 
 def update_rds(track_name: str):
+    global uecp_sequence
     name_table = load_dict_from_custom_format(name_table_path)
     try:
         name = name_table[track_name]
@@ -111,11 +120,12 @@ def update_rds(track_name: str):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as f:
             f.settimeout(1.0)
-            uecp_frame = uecp.frame.UECPFrame()
-            uecp_frame.add_command(RT_Set(prt))
-            uecp_frame.add_command(ASCII(f"RTP={rtp_str}".encode()))
+            uecp_message = set_rt(prt) + encapsulate_ascii(f"RTP={rtp_str}")
 
-            data = uecp_frame.encode()
+            data = encode_uecp(uecp_sequence, uecp_message)
+            uecp_sequence += 1
+            if uecp_sequence > 0xff: uecp_sequence = 1
+
             f.sendto(data, udp_host)
             logger.debug("Sending", str(data))
     except Exception as e: logger.error(f"Error updating RDS: {e}")

@@ -1,12 +1,19 @@
 import multiprocessing, os
 from queue import Empty
-import json
 import threading, uuid, time
-import asyncio
+import asyncio, json
 import websockets, base64
 from websockets import ServerConnection, Request, Response, Headers
 import mimetypes
 import shutil
+from . import Track, PlayerModule, Path, BaseIMCModule
+
+def runtime_dir() -> Path:
+    if os.name != "posix": return Path(os.environ.get("temp", "/tmp")) # /tmp also works on windows - it is the same as C:\tmp
+    xdg = os.environ.get("XDG_RUNTIME_DIR")
+    if xdg: return Path(xdg)
+    if os.geteuid() == 0: return Path("/run")
+    return Path(f"/run/user/{os.geteuid()}")
 
 def get_content_type(filename: str) -> str:
     mime_type, _ = mimetypes.guess_type(filename, False)
@@ -15,7 +22,6 @@ def get_content_type(filename: str) -> str:
 
 from modules import InterModuleCommunication
 
-from . import Track, PlayerModule, Path, BaseIMCModule
 
 MAIN_PATH_DIR = Path("/mnt/mixes")
 
@@ -197,7 +203,7 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
         async def get_socket_connection(retry_delay=2.0):
             while True:
                 try:
-                    reader, writer = await asyncio.open_unix_connection("/etc/fm95/ctl.socket") # pyright: ignore[reportAttributeAccessIssue]
+                    reader, writer = await asyncio.open_unix_connection(runtime_dir().joinpath("fm95.sock")) # pyright: ignore[reportAttributeAccessIssue]
                     return reader, writer
                 except Exception as e:
                     await asyncio.sleep(retry_delay)
