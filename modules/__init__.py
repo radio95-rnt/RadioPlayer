@@ -89,10 +89,10 @@ class PlaylistModifierModule:
         return playlist
     # No IMC, as we only run on new playlists
 class PlaylistAdvisor(BaseIMCModule):
-    """Only one of a playlist advisor can be loaded. This module picks the playlist file to play, this can be a scheduler or just a static file"""
+    """Only one of a playlist advisor can be loaded. This module picks the playlist file/folder to play, this can be a scheduler or just a static entry"""
     def advise(self, arguments: str | None) -> Path | None:
         """Arguments are the arguments passed to the program on startup"""
-        return Path("/path/to/playlist.txt")
+        return Path("/path/to/playlist")
     def new_playlist(self) -> bool:
         """Whether to play a new playlist, if this is True, then the player will refresh and fetch a new playlist, calling advise"""
         return False

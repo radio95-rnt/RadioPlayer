@@ -1,12 +1,12 @@
 import multiprocessing, os
 from queue import Empty
 import threading, uuid, time
-import asyncio, json
+import asyncio, json, re
 import websockets, base64
 from websockets import ServerConnection, Request, Response, Headers
 import mimetypes
 import shutil
-from . import Track, PlayerModule, Path, BaseIMCModule
+from . import Track, PlayerModule, Path, BaseIMCModule, InterModuleCommunication
 
 def runtime_dir() -> Path:
     if os.name != "posix": return Path(os.environ.get("temp", "/tmp")) # /tmp also works on windows - it is the same as C:\tmp
@@ -20,10 +20,20 @@ def get_content_type(filename: str) -> str:
     if mime_type: return mime_type
     return "application/octet-stream"
 
-from modules import InterModuleCommunication
-
-
 MAIN_PATH_DIR = Path("/mnt/mixes")
+PLAYLIST_ROOT = os.path.abspath(Path(MAIN_PATH_DIR, ".playlist"))
+
+MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+DATE_RE = re.compile(r"^(" + "|".join(MONTHS) + r")/(0[1-9]|[12]\d|3[01])$")
+
+def playlist_path(playlist: str, name: str | None = None) -> Path:
+    """Resolves a path under .playlist and refuses anything that escapes it."""
+    parts = [PLAYLIST_ROOT, playlist or ""]
+    if name: parts.append(name)
+    full = os.path.abspath(os.path.join(*parts))
+    if full != PLAYLIST_ROOT and not full.startswith(PLAYLIST_ROOT + os.sep):
+        raise Exception("invalid path")
+    return Path(full)
 
 # locks: dict[lock_id, websocket | None]  — managed inside the async runner's scope
 # passed into handlers via a shared dict reference
@@ -115,8 +125,8 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
             elif action == "fsdb_add":
                 name: str | None = msg.get("name")
                 try:
-                    if not name: raise Exception("name not defined")
-                    path = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""), name)
+                    path = playlist_path(msg.get("playlist", ""), name)
+                    path.parent.mkdir(parents=True, exist_ok=True)
                     path.touch(exist_ok=True)
                     await websocket.send(json.dumps({"event": "fsdb_add", "ok": True}))
                 except Exception as e: await websocket.send(json.dumps({"event": "fsdb_add", "error": str(e)}))
@@ -124,7 +134,7 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 name: str | None = msg.get("name")
                 try:
                     if not name: raise Exception("name not defined")
-                    path = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""), name)
+                    path = playlist_path(msg.get("playlist", ""), name)
                     path.mkdir(parents=True, exist_ok=True)
                     await websocket.send(json.dumps({"event": "fsdb_add_dir", "ok_dir": True}))
                 except Exception as e: await websocket.send(json.dumps({"event": "fsdb_add_dir", "error": str(e)}))
@@ -132,20 +142,33 @@ async def ws_handler(websocket: ServerConnection, shared_data: dict, imc_q: mult
                 name: str | None = msg.get("name")
                 try:
                     if not name: raise Exception("name not defined")
-                    path = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""), name)
+                    path = playlist_path(msg.get("playlist", ""), name)
                     if path.is_dir(): shutil.rmtree(path)
                     else: path.unlink(missing_ok=True)
                     await websocket.send(json.dumps({"event": "fsdb_remove", "ok": True}))
                 except Exception as e: await websocket.send(json.dumps({"event": "fsdb_remove", "error": str(e)}))
             elif action == "fsdb_list":
                 try:
-                    p = Path(MAIN_PATH_DIR, ".playlist", msg.get("playlist", ""))
-                    payload = {
-                        "files": [i.name for i in p.iterdir() if i.is_file()],
-                        "dirs": [i.name for i in p.iterdir() if i.is_dir()]
-                    }
+                    p = playlist_path(msg.get("playlist", ""))
+                    if p.is_dir():
+                        payload = {
+                            "files": [i.name for i in p.iterdir() if i.is_file()],
+                            "dirs": [i.name for i in p.iterdir() if i.is_dir()]
+                        }
+                    else:
+                        payload = {"files": [], "dirs": []}
                     await websocket.send(json.dumps({"event": "fsdb_list", "data": payload}))
                 except Exception as e: await websocket.send(json.dumps({"event": "fsdb_list", "data": {}, "error": str(e)}))
+            elif action == "fsdb_remove_date":
+                try:
+                    date = str(msg.get("date", "")).strip().lower()
+                    if not DATE_RE.fullmatch(date): raise Exception("invalid date")
+                    path = playlist_path(date)
+                    if path.is_dir(): shutil.rmtree(path)
+                    try: path.parent.rmdir()  # remove the month folder too, but only if it's now empty
+                    except OSError: pass
+                    await websocket.send(json.dumps({"event": "fsdb_remove_date", "ok": True, "date": date}))
+                except Exception as e: await websocket.send(json.dumps({"event": "fsdb_remove_date", "error": str(e)}))
             elif action == "fm95": await writer_q.put((base64.b64decode(msg.get("data", "")), websocket))
             elif action == "lock":
                 lid = msg.get("id")

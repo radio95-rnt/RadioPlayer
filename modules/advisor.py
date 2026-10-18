@@ -22,29 +22,38 @@ class Time:
         try: return os.path.getmtime(playlist_path)
         except OSError: return 0
 
+MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+def get_day_dir(now: datetime.datetime) -> tuple[Path, str]:
+    """
+    Returns (directory, label) for today.
+    Uses playlist_dir/mon/DD if that folder exists, otherwise playlist_dir/weekday.
+    """
+    # Fixed month names instead of strftime('%b'), so it doesn't depend on the system locale
+    special_label = f"{MONTHS[now.month - 1]}/{now.day:02d}"
+    special = Path(playlist_dir, MONTHS[now.month - 1], f"{now.day:02d}")
+    if special.is_dir(): return special.absolute(), special_label
+
+    weekday = now.strftime('%A').lower()
+    return Path(playlist_dir, weekday).absolute(), weekday
+
 def check_if_playlist_modifed(playlist_path: Path) -> bool:
-    current_day, current_hour = (time := datetime.datetime.now()).strftime('%A').lower(), time.hour
+    time = datetime.datetime.now()
+    current_hour = time.hour
+    day_dir, _ = get_day_dir(time)
 
     if DAY_START <= current_hour < DAY_END:
-        day_playlist_path = Path(playlist_dir, current_day, "day").absolute()
-        if playlist_path != day_playlist_path:
-            logger.info("Time changed to day hours, switching playlist...")
-            return True
+        name, label = "day", "day"
     elif MORNING_START <= current_hour < MORNING_END:
-        morning_playlist_path = Path(playlist_dir, current_day, "morning").absolute()
-        if playlist_path != morning_playlist_path:
-            logger.info("Time changed to morning hours, switching playlist...")
-            return True
+        name, label = "morning", "morning"
     elif LATE_NIGHT_START <= current_hour < LATE_NIGHT_END:
-        late_night_playlist_path = Path(playlist_dir, current_day, "late_night").absolute()
-        if playlist_path != late_night_playlist_path:
-            logger.info("Time changed to late night hours, switching playlist...")
-            return True
+        name, label = "late_night", "late night"
     else:
-        night_playlist_path = Path(playlist_dir, current_day, "night").absolute()
-        if playlist_path != night_playlist_path:
-            logger.info("Time changed to night hours, switching playlist...")
-            return True
+        name, label = "night", "night"
+
+    if playlist_path != Path(day_dir, name).absolute():
+        logger.info(f"Time changed to {label} hours, switching playlist...")
+        return True
     return False
 
 class Module(PlaylistAdvisor):
@@ -65,22 +74,18 @@ class Module(PlaylistAdvisor):
             return self.custom_playlist
         elif self.custom_playlist: self.custom_playlist = None
 
-        current_day, current_hour = (time := datetime.datetime.now()).strftime('%A').lower(), time.hour
+        time = datetime.datetime.now()
+        current_hour = time.hour
+        day_dir, current_day = get_day_dir(time)
 
-        morning_playlist = Path(playlist_dir, current_day, "morning").absolute()
-        day_playlist = Path(playlist_dir, current_day, "day").absolute()
-        night_playlist = Path(playlist_dir, current_day, "night").absolute()
-        late_night_playlist = Path(playlist_dir, current_day, "late_night").absolute()
+        morning_playlist = Path(day_dir, "morning").absolute()
+        day_playlist = Path(day_dir, "day").absolute()
+        night_playlist = Path(day_dir, "night").absolute()
+        late_night_playlist = Path(day_dir, "late_night").absolute()
 
-        morning_dir = morning_playlist.parent
-        day_dir = day_playlist.parent
-        night_dir = night_playlist.parent
-        late_night_dir = late_night_playlist.parent
-
-        for dir_path in [morning_dir, day_dir, night_dir, late_night_dir]:
-            if not dir_path.exists():
-                logger.info(f"Creating directory: {dir_path}")
-                dir_path.mkdir(exist_ok=True)
+        if not day_dir.exists():
+            logger.info(f"Creating directory: {day_dir}")
+            day_dir.mkdir(exist_ok=True)
 
         for playlist_path in [morning_playlist, day_playlist, night_playlist, late_night_playlist]:
             if not playlist_path.exists():
@@ -103,7 +108,7 @@ class Module(PlaylistAdvisor):
             logger.info(f"Playing {current_day} night playlist...")
             self.last_mod_time = Time.get_playlist_modification_time(night_playlist)
             self.last_playlist = night_playlist
-        if self._imc: self._imc.send(self, "web", {"playlist": str(self.last_playlist)})
+        if self._imc: self._imc.send(self, "web", {"playlist": str(self.last_playlist)}, False)
         return self.last_playlist
     def new_playlist(self) -> bool:
         if self.custom_playlist and self.custom_playlist_path.exists():

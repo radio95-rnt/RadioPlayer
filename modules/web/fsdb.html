@@ -39,6 +39,9 @@
                 gap: 3px;
             }
 
+            .btn-danger { border-color: #733; color: #f99; }
+            .btn-danger:hover { background: #3a1a1a; }
+
             .seg-btn {
                 font-size: 12px;
                 padding: 4px 9px;
@@ -59,6 +62,29 @@
                 border-color: #2a5a8c;
                 font-weight: 600;
             }
+
+            .date-input {
+                width: 72px;
+                font-size: 12px;
+                font-family: monospace;
+                padding: 4px 8px;
+                border-radius: 5px;
+                border: 1px solid #444;
+                background: #1e1e1e;
+                color: #eee;
+                outline: none;
+            }
+
+            .date-input:focus { border-color: #666; }
+
+            .date-input.active {
+                background: #1a3a5c;
+                color: #7ab8f5;
+                border-color: #2a5a8c;
+                font-weight: 600;
+            }
+
+            .date-input.invalid { border-color: #a33; }
 
             .playlist-display {
                 font-family: monospace;
@@ -129,6 +155,13 @@
                 <div class="seg-row" id="dayPicker"></div>
             </div>
             <div class="picker-group">
+                <span class="picker-label">Date</span>
+                <input type="text" id="dateInput" class="date-input" placeholder="oct/18"
+                    maxlength="8" autocomplete="off" spellcheck="false"
+                    title="mon/DD, e.g. oct/18 (also accepts 10/18 or oct 18)">
+                <button class="btn btn-danger" id="removeDateBtn" onclick="removeDate()" style="display:none">Remove date</button>
+            </div>
+            <div class="picker-group">
                 <span class="picker-label">Part</span>
                 <div class="seg-row" id="partPicker"></div>
             </div>
@@ -152,8 +185,30 @@
             const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
             const PARTS = ["day","morning","night","late_night"];
 
+            const MONTHS = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+            const MONTH_DAYS = [31,29,31,30,31,30,31,31,30,31,30,31];
+
             let selectedDay = "friday";
+            let selectedDate = null;   // e.g. "oct/18"; when set, it overrides the weekday
             let selectedPart = "day";
+
+            const dateInput = document.getElementById("dateInput");
+
+            // Accepts "oct/18", "oct 18", "oct-18", "10/18", "10.18", "oct/5" -> "oct/05"
+            function parseDate(str) {
+                const m = str.trim().toLowerCase().match(/^([a-z]{3}|\d{1,2})\s*[\/\-. ]\s*(\d{1,2})$/);
+                if (!m) return null;
+
+                let monthIdx;
+                if (/^\d+$/.test(m[1])) monthIdx = parseInt(m[1], 10) - 1;
+                else monthIdx = MONTHS.indexOf(m[1]);
+
+                const day = parseInt(m[2], 10);
+                if (monthIdx < 0 || monthIdx > 11) return null;
+                if (day < 1 || day > MONTH_DAYS[monthIdx]) return null;
+
+                return MONTHS[monthIdx] + "/" + String(day).padStart(2, "0");
+            }
 
             function buildPicker(containerId, items, getCurrent, setCurrent) {
                 const el = document.getElementById(containerId);
@@ -164,7 +219,7 @@
                     btn.textContent = val.replace("_", " ");
                     btn.onclick = () => {
                         setCurrent(val);
-                        buildPicker(containerId, items, getCurrent, setCurrent);
+                        buildPickers();
                         updateDisplay();
                         refreshPlaylist();
                     };
@@ -172,16 +227,67 @@
                 });
             }
 
-            function updateDisplay() {
-                document.getElementById("playlistVal").textContent = selectedDay + "/" + selectedPart;
+            function removeDate() {
+                if (!selectedDate) return;
+                if (!confirm("Delete " + selectedDate + " and ALL its playlists?\nThis day will fall back to the weekday playlists.")) return;
+                ws.send(JSON.stringify({ action: "fsdb_remove_date", date: selectedDate }));
+            }
+
+            function clearDate() {
+                selectedDate = null;
+                dateInput.value = "";
+                dateInput.classList.remove("active", "invalid");
+                buildPickers();
+                updateDisplay();
+                refreshPlaylist();
+            }
+
+            function buildPickers() {
+                buildPicker("dayPicker", DAYS,
+                    () => selectedDate ? null : selectedDay,
+                    v => {
+                        selectedDay = v;
+                        selectedDate = null;
+                        dateInput.value = "";
+                        dateInput.classList.remove("active", "invalid");
+                    });
+                buildPicker("partPicker", PARTS, () => selectedPart, v => { selectedPart = v; });
+                document.getElementById("removeDateBtn").style.display = selectedDate ? "" : "none";
             }
 
             function getPlaylistName() {
-                return selectedDay + "/" + selectedPart;
+                return (selectedDate || selectedDay) + "/" + selectedPart;
             }
 
-            buildPicker("dayPicker", DAYS, () => selectedDay, v => { selectedDay = v; });
-            buildPicker("partPicker", PARTS, () => selectedPart, v => { selectedPart = v; });
+            function updateDisplay() {
+                document.getElementById("playlistVal").textContent = getPlaylistName();
+            }
+
+            // "change" fires on Enter or when the field loses focus
+            dateInput.addEventListener("change", () => {
+                const raw = dateInput.value.trim();
+
+                if (raw === "") {
+                    selectedDate = null;
+                    dateInput.classList.remove("active", "invalid");
+                } else {
+                    const parsed = parseDate(raw);
+                    if (!parsed) {
+                        dateInput.classList.add("invalid");
+                        return; // keep the previous selection
+                    }
+                    selectedDate = parsed;
+                    dateInput.value = parsed; // normalize, e.g. "10/5" -> "oct/05"
+                    dateInput.classList.remove("invalid");
+                    dateInput.classList.add("active");
+                }
+
+                buildPickers();
+                updateDisplay();
+                refreshPlaylist();
+            });
+
+            buildPickers();
 
             const ws = new WebSocket("/ws");
 
@@ -194,6 +300,10 @@
                 const msg = JSON.parse(ev.data);
                 if (msg.event === "state") renderRef(msg.data.dirs);
                 if (msg.event === "fsdb_list") renderPlaylist(msg.data);
+                if (msg.event === "fsdb_remove_date") {
+                    if (msg.error) alert("Could not remove date: " + msg.error);
+                    else clearDate();
+                }
             };
 
             function sortNames(items) {
@@ -224,6 +334,10 @@
             }
 
             function renderPlaylist(data) {
+                data = data || {};
+                data.dirs = data.dirs || [];
+                data.files = data.files || [];
+
                 const el = document.getElementById("playlistView");
                 el.innerHTML = "";
 
