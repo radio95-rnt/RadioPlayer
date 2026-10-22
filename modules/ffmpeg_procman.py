@@ -13,7 +13,7 @@ class ProcessManager(ABC_ProcessManager):
         cmd = ['ffplay', '-nodisp', '-hide_banner', '-autoexit', '-loglevel', 'quiet']
 
         duration = self.tinytag.get(track.path.absolute(), tags=False).duration
-        if not duration: raise Exception("Failed to get file duration for", track.path)
+        if not duration: raise RejectedTrack
         if track.offset >= duration: track.offset = max(duration - 0.1, 0)
         if track.offset > 0: cmd.extend(['-ss', str(track.offset)])
 
