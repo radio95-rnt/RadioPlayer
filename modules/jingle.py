@@ -18,7 +18,7 @@ def get_jingles():
     for file in Path("/mnt/mixes/.playlist/jingle").iterdir():
         if not (file.is_file() and file.exists()): continue
         name, _ = file.name.rsplit('.', 1)
-        if name.lower() == "master":
+        if "master" in name.lower():
             master = file
             continue
         jingles.append(file)
@@ -36,7 +36,7 @@ class Module(PlaylistModifierModule):
         out: list[Track] = []
         last_jingiel = True
         for track in playlist:
-            if not last_jingiel and chance(3) and (track.args is None or int(track.args.get("no_jingle", 0)) == 0):
+            if not last_jingiel and chance(5) and (track.args is None or int(track.args.get("no_jingle", 0)) == 0):
                 out.append(Track(track.path, 0, track.fade_in, True, track.args))
                 jingle = primary
                 if secondary and chance(2): jingle = random.choice(secondary)
