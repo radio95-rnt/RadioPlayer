@@ -172,13 +172,33 @@
                 #keybinds {display: none;}
             }
 
-            #drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(960px, 100vw); z-index: 50;
-                    background: var(--panel); border-left: 1px solid rgba(255,255,255,0.08);
-                    display: flex; flex-direction: column; box-shadow: -8px 0 24px rgba(0,0,0,0.4); }
-            #drawer[hidden] { display: none; }
-            #drawer-bar { display: flex; justify-content: space-between; align-items: center;
-                        padding: 6px 10px; color: var(--muted); }
-            #drawer-frame { flex: 1; border: 0; width: 100%; background: #111; }
+            .win { position: fixed; display: flex; flex-direction: column; min-width: 320px; min-height: 200px;
+                background: var(--panel); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
+                box-shadow: 0 12px 32px rgba(0,0,0,0.5); overflow: hidden; }
+            .win.focused { border-color: rgba(255,255,255,0.28); }
+            .win.maximized { left: 0 !important; top: 0 !important; width: 100vw !important; height: 100vh !important;
+                            border-radius: 0; border: 0; }
+            .win-bar { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px; color: var(--muted);
+                    background: rgba(255,255,255,0.03); cursor: move; user-select: none; touch-action: none; }
+            .win.maximized .win-bar { cursor: default; }
+            .win-title { flex: 1; font-size: 14px; }
+            .win-bar button { padding: 2px 9px; }
+            .win-body { position: relative; flex: 1; }
+            .win-body iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #111; }
+            .win-shield { position: absolute; inset: 0; display: none; }
+            .win:not(.focused) .win-shield, body.dragging .win-shield { display: block; }
+            body.dragging { user-select: none; }
+
+            .rz { position: absolute; z-index: 2; touch-action: none; }
+            .win.maximized .rz { display: none; }
+            .rz[data-dir="n"]  { top: 0; left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+            .rz[data-dir="s"]  { bottom: 0; left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+            .rz[data-dir="w"]  { left: 0; top: 10px; bottom: 10px; width: 5px; cursor: ew-resize; }
+            .rz[data-dir="e"]  { right: 0; top: 10px; bottom: 10px; width: 5px; cursor: ew-resize; }
+            .rz[data-dir="nw"] { top: 0; left: 0; width: 10px; height: 10px; cursor: nwse-resize; }
+            .rz[data-dir="se"] { bottom: 0; right: 0; width: 10px; height: 10px; cursor: nwse-resize; }
+            .rz[data-dir="ne"] { top: 0; right: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+            .rz[data-dir="sw"] { bottom: 0; left: 0; width: 10px; height: 10px; cursor: nesw-resize; }
         </style>
     </head>
     <body>
@@ -276,13 +296,7 @@
             </div>
         </div>
 
-        <div id="drawer" hidden>
-            <div id="drawer-bar">
-                <span id="drawer-title"></span>
-                <button class="btn" id="drawer-close" style="padding:2px 10px">✕</button>
-            </div>
-            <iframe id="drawer-frame" src="about:blank"></iframe>
-        </div>
+        <div id="windows"></div>
         <script src="ws.js"></script>
         <script src="web.js"></script>
     </body>

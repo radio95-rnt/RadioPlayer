@@ -55,39 +55,161 @@ function clearListSelections(...ids) {
     }
 }
 
-const PANELS = { fsdb: "/fsdb.html?embed", fm95: "/fm95.html?embed" };
-const drawer = document.getElementById("drawer");
-const drawerFrame = document.getElementById("drawer-frame");
+const PANELS = {
+    fsdb: { title: "FSDB", url: "/fsdb.html?embed", w: 900, h: 600 },
+    fm95: { title: "FM95", url: "/fm95.html?embed", w: 760, h: 640 },
+};
+const MIN_W = 320, MIN_H = 200;
+const winRoot = document.getElementById("windows");
+const wins = new Map();            // name -> { el, g }
+let zTop = 50;
+let savedGeo = {};
+try { savedGeo = JSON.parse(localStorage.getItem("winGeo") || "{}"); } catch {}
 
-function openPanel(name) {
-    if (!PANELS[name]) return closePanel();
-    if (!drawerFrame.src.endsWith(PANELS[name])) drawerFrame.src = PANELS[name];
-    document.getElementById("drawer-title").textContent = name.toUpperCase();
-    drawer.hidden = false;
-    if (location.hash !== "#" + name) location.hash = name;
-    document.querySelectorAll("[data-panel]").forEach(b =>
-        b.classList.toggle("activated", b.dataset.panel === name));
+const saveGeo = () => localStorage.setItem("winGeo",
+    JSON.stringify(Object.fromEntries([...wins].map(([n, w]) => [n, w.g]))
+        .constructor === Object ? { ...savedGeo, ...Object.fromEntries([...wins].map(([n, w]) => [n, w.g])) } : savedGeo));
+
+function clampGeo(g) {
+    g.w = Math.min(Math.max(g.w, MIN_W), window.innerWidth);
+    g.h = Math.min(Math.max(g.h, MIN_H), window.innerHeight);
+    g.x = Math.min(Math.max(g.x, 80 - g.w), window.innerWidth - 80);   // keep part of the bar reachable
+    g.y = Math.min(Math.max(g.y, 0), window.innerHeight - 30);
 }
 
-function closePanel() {
-    drawerFrame.src = "about:blank";   // unloads the page, so the worker drops its subscriptions
-    drawer.hidden = true;
-    document.querySelectorAll("[data-panel]").forEach(b => b.classList.remove("activated"));
-    if (location.hash) history.replaceState(null, "", location.pathname);
+function applyGeo(w) {
+    const { el, g } = w;
+    clampGeo(g);
+    el.style.left = g.x + "px";
+    el.style.top = g.y + "px";
+    el.style.width = g.w + "px";
+    el.style.height = g.h + "px";
+    el.classList.toggle("maximized", !!g.max);
+    el.querySelector(".win-max").textContent = g.max ? "❐" : "□";
+}
+
+function focusWin(name) {
+    wins.forEach((w, n) => w.el.classList.toggle("focused", n === name));
+    const w = wins.get(name);
+    if (w) w.el.style.zIndex = ++zTop;
+}
+
+function syncButtons() {
+    document.querySelectorAll("[data-panel]").forEach(b =>
+        b.classList.toggle("activated", wins.has(b.dataset.panel)));
+}
+
+function openPanel(name) {
+    const p = PANELS[name];
+    if (!p) return;
+    if (wins.has(name)) return focusWin(name);
+
+    const n = wins.size;
+    const g = savedGeo[name] ? { ...savedGeo[name] } : {
+        w: p.w, h: p.h,
+        x: Math.round((window.innerWidth - p.w) / 2) + n * 30,
+        y: Math.round((window.innerHeight - p.h) / 2) + n * 30,
+    };
+    if (window.innerWidth <= 800) g.max = true;
+
+    const el = document.createElement("div");
+    el.className = "win";
+    el.innerHTML = `
+        <div class="win-bar">
+            <span class="win-title">${p.title}</span>
+            <button class="btn win-max" title="Maximize">□</button>
+            <button class="btn win-close" title="Close">✕</button>
+        </div>
+        <div class="win-body">
+            <iframe src="${p.url}"></iframe>
+            <div class="win-shield"></div>
+        </div>
+        ${["n","s","e","w","nw","ne","sw","se"].map(d => `<div class="rz" data-dir="${d}"></div>`).join("")}`;
+    winRoot.appendChild(el);
+
+    const w = { el, g };
+    wins.set(name, w);
+    applyGeo(w);
+    focusWin(name);
+    syncButtons();
+
+    el.addEventListener("pointerdown", () => focusWin(name), true);
+
+    // buttons
+    const toggleMax = () => { g.max = !g.max; applyGeo(w); persist(); };
+    el.querySelector(".win-max").addEventListener("click", toggleMax);
+    el.querySelector(".win-close").addEventListener("click", () => closePanel(name));
+
+    // drag by title bar
+    const bar = el.querySelector(".win-bar");
+    bar.addEventListener("dblclick", e => { if (e.target === bar || e.target.classList.contains("win-title")) toggleMax(); });
+    bar.addEventListener("pointerdown", e => {
+        if (e.target.closest("button") || g.max || e.button !== 0) return;
+        const sx = e.clientX, sy = e.clientY, ox = g.x, oy = g.y;
+        bar.setPointerCapture(e.pointerId);
+        document.body.classList.add("dragging");
+        const move = ev => { g.x = ox + ev.clientX - sx; g.y = oy + ev.clientY - sy; applyGeo(w); };
+        const up = () => {
+            document.body.classList.remove("dragging");
+            bar.removeEventListener("pointermove", move);
+            bar.removeEventListener("pointerup", up);
+            bar.removeEventListener("pointercancel", up);
+            persist();
+        };
+        bar.addEventListener("pointermove", move);
+        bar.addEventListener("pointerup", up);
+        bar.addEventListener("pointercancel", up);
+    });
+
+    // resize from edges and corners
+    el.querySelectorAll(".rz").forEach(h => h.addEventListener("pointerdown", e => {
+        if (e.button !== 0) return;
+        const dir = h.dataset.dir;
+        const sx = e.clientX, sy = e.clientY, o = { ...g };
+        h.setPointerCapture(e.pointerId);
+        document.body.classList.add("dragging");
+        const move = ev => {
+            const dx = ev.clientX - sx, dy = ev.clientY - sy;
+            if (dir.includes("e")) g.w = Math.max(MIN_W, o.w + dx);
+            if (dir.includes("s")) g.h = Math.max(MIN_H, o.h + dy);
+            if (dir.includes("w")) { g.w = Math.max(MIN_W, o.w - dx); g.x = o.x + (o.w - g.w); }
+            if (dir.includes("n")) { g.h = Math.max(MIN_H, o.h - dy); g.y = o.y + (o.h - g.h); }
+            applyGeo(w);
+        };
+        const up = () => {
+            document.body.classList.remove("dragging");
+            h.removeEventListener("pointermove", move);
+            h.removeEventListener("pointerup", up);
+            h.removeEventListener("pointercancel", up);
+            persist();
+        };
+        h.addEventListener("pointermove", move);
+        h.addEventListener("pointerup", up);
+        h.addEventListener("pointercancel", up);
+    }));
+}
+
+function persist() {
+    wins.forEach((w, n) => { savedGeo[n] = { ...w.g }; });
+    localStorage.setItem("winGeo", JSON.stringify(savedGeo));
+}
+
+function closePanel(name) {
+    const w = wins.get(name);
+    if (!w) return;
+    w.el.remove();                 // unloads the iframe → pagehide → worker drops its subscriptions
+    wins.delete(name);
+    syncButtons();
 }
 
 document.querySelectorAll("[data-panel]").forEach(b =>
     b.addEventListener("click", () =>
-        (!drawer.hidden && location.hash === "#" + b.dataset.panel) ? closePanel() : openPanel(b.dataset.panel)));
-document.getElementById("drawer-close").addEventListener("click", closePanel);
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !drawer.hidden) closePanel(); });
+        wins.has(b.dataset.panel) ? closePanel(b.dataset.panel) : openPanel(b.dataset.panel)));
 
-function routeFromHash() {
-    const name = location.hash.slice(1);
-    if (PANELS[name]) openPanel(name); else if (!drawer.hidden) closePanel();
-}
-addEventListener("hashchange", routeFromHash);
-routeFromHash();
+addEventListener("resize", () => wins.forEach(applyGeo));
+
+// deep links: /#fsdb or /#fsdb,fm95
+location.hash.slice(1).split(",").forEach(n => { if (PANELS[n]) openPanel(n); });
 
 function initLayout() {
     if (window.innerWidth <= 800) {
