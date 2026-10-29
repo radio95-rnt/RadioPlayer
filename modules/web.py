@@ -7,6 +7,7 @@ from websockets import ServerConnection, Request, Response, Headers
 import mimetypes
 import shutil
 from . import Track, PlayerModule, Path, BaseIMCModule, InterModuleCommunication
+from urllib.parse import urlsplit, unquote
 
 def runtime_dir() -> Path:
     if os.name != "posix": return Path(os.environ.get("temp", "/tmp")) # /tmp also works on windows - it is the same as C:\tmp
@@ -22,6 +23,7 @@ def get_content_type(filename: str) -> str:
 
 MAIN_PATH_DIR = Path("/mnt/mixes")
 PLAYLIST_ROOT = os.path.abspath(Path(MAIN_PATH_DIR, ".playlist"))
+WEB_ROOT = Path(__file__, "..", "web").resolve()
 
 MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
 DATE_RE = re.compile(r"^(" + "|".join(MONTHS) + r")/(0[1-9]|[12]\d|3[01])$")
@@ -281,8 +283,10 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                 await asyncio.get_event_loop().run_in_executor(None, ws_q.put, {"event": "users", "data": len(clients)})
 
         async def process_request(websocket: ServerConnection, request: Request):
-            if request.path == "/ws":
-                if not "upgrade" in request.headers.get("Connection", "").lower():
+            path = unquote(urlsplit(request.path).path)
+
+            if path == "/ws":
+                if "upgrade" not in request.headers.get("Connection", "").lower():
                     return Response(
                         426,
                         "Upgrade Required",
@@ -290,16 +294,20 @@ def websocket_server_process(shared_data: dict, imc_q: multiprocessing.Queue, ws
                         b"WebSocket upgrade required\n"
                     )
                 return None
-            else:
-                if request.path == "/" and (file := Path(__file__, "..", "web", "index.html").resolve()).exists():
-                    data = file.read_bytes()
-                    return Response(200, "OK", Headers([("Content-Type", "text/html; charset=utf-8"), ("Content-Length", f"{len(data)}")]), data)
-                elif (file := Path(__file__, "..", "web", request.path.removeprefix("/").strip()).resolve()).exists():
-                    data = file.read_bytes()
-                    return Response(200, "OK", Headers([("Content-Type", get_content_type(file.name)), ("Content-Length", f"{len(data)}")]), data)
-                else:
-                    data = b"Not Found\n"
-                    return Response(404, "Not Found", Headers([("Content-Length", f"{len(data)}")]), data)
+
+            rel = "index.html" if path == "/" else path.lstrip("/")
+            file = (WEB_ROOT / rel).resolve()
+
+            # refuse anything outside web/ (../ tricks) and anything that isn't a regular file
+            if not file.is_relative_to(WEB_ROOT) or not file.is_file():
+                data = b"Not Found\n"
+                return Response(404, "Not Found", Headers([("Content-Length", f"{len(data)}")]), data)
+
+            data = file.read_bytes()
+            ctype = get_content_type(file.name)
+            if ctype.startswith("text/") or ctype in ("application/javascript", "application/json"):
+                ctype += "; charset=utf-8"
+            return Response(200, "OK", Headers([("Content-Type", ctype), ("Content-Length", f"{len(data)}")]), data)
 
         server = await websockets.serve(handler_wrapper, "0.0.0.0", 3001, server_header="RadioPlayer ws plugin", process_request=process_request)
         broadcaster = asyncio.create_task(broadcast_worker(ws_q, clients))
