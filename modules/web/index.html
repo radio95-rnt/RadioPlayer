@@ -171,6 +171,14 @@
                 #section-playlist, #section-queue { flex: 1 1 auto; }
                 #keybinds {display: none;}
             }
+
+            #drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(960px, 100vw); z-index: 50;
+                    background: var(--panel); border-left: 1px solid rgba(255,255,255,0.08);
+                    display: flex; flex-direction: column; box-shadow: -8px 0 24px rgba(0,0,0,0.4); }
+            #drawer[hidden] { display: none; }
+            #drawer-bar { display: flex; justify-content: space-between; align-items: center;
+                        padding: 6px 10px; color: var(--muted); }
+            #drawer-frame { flex: 1; border: 0; width: 100%; background: #111; }
         </style>
     </head>
     <body>
@@ -255,7 +263,10 @@
 
         <div class="footer small">
             <div><i class="fa-solid fa-server" style="margin-right: 2px;"></i><span id="server-status">connecting...</span></div>
-            <div><a href="/fsdb.html">FSDB</a></div>
+            <div>
+                <button class="btn" data-panel="fsdb" style="padding:2px 8px">FSDB</button>
+                <button class="btn" data-panel="fm95" style="padding:2px 8px">FM95</button>
+            </div>
             <div><i class="fa-solid fa-user" style="margin-right: 2px;"></i><span id="user-count">-</span></div>
             <div class="small" id="keybinds">
                 <!-- <span><kbd>S</kbd> skip</span> -->
@@ -265,6 +276,13 @@
             </div>
         </div>
 
+        <div id="drawer" hidden>
+            <div id="drawer-bar">
+                <span id="drawer-title"></span>
+                <button class="btn" id="drawer-close" style="padding:2px 10px">✕</button>
+            </div>
+            <iframe id="drawer-frame" src="about:blank"></iframe>
+        </div>
         <script src="ws.js"></script>
         <script src="web.js"></script>
     </body>

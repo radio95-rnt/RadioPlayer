@@ -55,7 +55,39 @@ function clearListSelections(...ids) {
     }
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+const PANELS = { fsdb: "/fsdb.html?embed", fm95: "/fm95.html?embed" };
+const drawer = document.getElementById("drawer");
+const drawerFrame = document.getElementById("drawer-frame");
+
+function openPanel(name) {
+    if (!PANELS[name]) return closePanel();
+    if (!drawerFrame.src.endsWith(PANELS[name])) drawerFrame.src = PANELS[name];
+    document.getElementById("drawer-title").textContent = name.toUpperCase();
+    drawer.hidden = false;
+    if (location.hash !== "#" + name) location.hash = name;
+    document.querySelectorAll("[data-panel]").forEach(b =>
+        b.classList.toggle("activated", b.dataset.panel === name));
+}
+
+function closePanel() {
+    drawerFrame.src = "about:blank";   // unloads the page, so the worker drops its subscriptions
+    drawer.hidden = true;
+    document.querySelectorAll("[data-panel]").forEach(b => b.classList.remove("activated"));
+    if (location.hash) history.replaceState(null, "", location.pathname);
+}
+
+document.querySelectorAll("[data-panel]").forEach(b =>
+    b.addEventListener("click", () =>
+        (!drawer.hidden && location.hash === "#" + b.dataset.panel) ? closePanel() : openPanel(b.dataset.panel)));
+document.getElementById("drawer-close").addEventListener("click", closePanel);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !drawer.hidden) closePanel(); });
+
+function routeFromHash() {
+    const name = location.hash.slice(1);
+    if (PANELS[name]) openPanel(name); else if (!drawer.hidden) closePanel();
+}
+addEventListener("hashchange", routeFromHash);
+routeFromHash();
 
 function initLayout() {
     if (window.innerWidth <= 800) {
