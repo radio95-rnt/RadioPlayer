@@ -181,6 +181,7 @@
             </div>
         </div>
 
+        <script src="/ws.js"></script>
         <script>
             const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
             const PARTS = ["day","morning","night","late_night"];
@@ -230,8 +231,13 @@
             function removeDate() {
                 if (!selectedDate) return;
                 if (!confirm("Delete " + selectedDate + " and ALL its playlists?\nThis day will fall back to the weekday playlists.")) return;
-                ws.send(JSON.stringify({ action: "fsdb_remove_date", date: selectedDate }));
+                WS.send({ action: "fsdb_remove_date", date: selectedDate });
             }
+
+            WS.on("state", d => renderRef(d.dirs));
+            WS.on("fsdb_list", renderPlaylist);
+            WS.on("fsdb_remove_date", (_, m) => m.error ? alert("Could not remove date: " + m.error) : clearDate());
+            WS.on("_status", s => { if (s === "open") refreshPlaylist(); });
 
             function clearDate() {
                 selectedDate = null;
@@ -289,23 +295,6 @@
 
             buildPickers();
 
-            const ws = new WebSocket("/ws");
-
-            ws.onopen = () => {
-                console.log("WS connected");
-                refreshPlaylist();
-            };
-
-            ws.onmessage = (ev) => {
-                const msg = JSON.parse(ev.data);
-                if (msg.event === "state") renderRef(msg.data.dirs);
-                if (msg.event === "fsdb_list") renderPlaylist(msg.data);
-                if (msg.event === "fsdb_remove_date") {
-                    if (msg.error) alert("Could not remove date: " + msg.error);
-                    else clearDate();
-                }
-            };
-
             function sortNames(items) {
                 return [...items].sort((a, b) =>
                     a.localeCompare(b, undefined, { sensitivity: "base" })
@@ -359,27 +348,27 @@
             }
 
             function addFile(name) {
-                ws.send(JSON.stringify({ action: "fsdb_add", name, playlist: getPlaylistName() }));
+                WS.send({ action: "fsdb_add", name, playlist: getPlaylistName() });
                 setTimeout(refreshPlaylist, 100);
             }
 
             function addDir(name) {
-                ws.send(JSON.stringify({ action: "fsdb_add_dir", name, playlist: getPlaylistName() }));
+                WS.send({ action: "fsdb_add_dir", name, playlist: getPlaylistName() });
                 setTimeout(refreshPlaylist, 100);
             }
 
             function removeEntry(name) {
                 if (!confirm("Remove " + name + "?")) return;
-                ws.send(JSON.stringify({ action: "fsdb_remove", name, playlist: getPlaylistName() }));
+                WS.send({ action: "fsdb_remove", name, playlist: getPlaylistName() });
                 setTimeout(refreshPlaylist, 100);
             }
 
             function refreshPlaylist() {
-                ws.send(JSON.stringify({ action: "fsdb_list", playlist: getPlaylistName() }));
+                WS.send({ action: "fsdb_list", playlist: getPlaylistName() });
             }
 
             function reloadPlaylist() {
-                ws.send(JSON.stringify({ action: "fsdb_add", name: "reload" }));
+                WS.send({ action: "fsdb_add", name: "reload" });
             }
         </script>
     </body>

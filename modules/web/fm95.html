@@ -153,6 +153,7 @@
 
         <div id="last-update">Waiting for data…</div>
 
+        <script src="/ws.js"></script>
         <script>
             let lastCounter = null, missed = 0;
             const POLL_MSG = JSON.stringify({ action: "fm95", data: "/w==" });
@@ -360,34 +361,13 @@
                 document.getElementById('status-text').textContent = text;
             }
 
-            let ws, pollTimer;
-            function connect() {
-                const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-                ws = new WebSocket(`${proto}://${location.host}/ws`);
-                setStatus('connecting', 'Connecting…');
-
-                ws.addEventListener('open', () => {
-                    setStatus('connected', 'Connected');
-                    poll();
-                    pollTimer = setInterval(poll, 50 + (Math.random() * 25));
-                });
-                ws.addEventListener('message', e => {
-                    try {
-                        const msg = JSON.parse(e.data);
-                        if (msg.event === 'fm95' && msg.data) {
-                            const d = decode(msg.data);
-                            if (d) updateUI(d);
-                        }
-                    } catch(err) { console.warn('Parse error', err); }
-                });
-                ws.addEventListener('close', () => {
-                    clearInterval(pollTimer);
-                    setStatus('error', 'Disconnected — retrying in 3s…');
-                    setTimeout(connect, 3000);
-                });
-                ws.addEventListener('error', () => setStatus('error', 'WebSocket error'));
-            }
-            function poll() { if (ws && ws.readyState === WebSocket.OPEN) ws.send(POLL_MSG); }
+            WS.on("fm95", b64 => { const d = decode(b64); if (d) updateUI(d); });
+            WS.on("_status", s => {
+                setStatus(s === "open" ? "connected" : "error", s === "open" ? "Connected" : "Reconnecting…");
+            });
+            WS.send({ action: "fm95_sub" });
+            document.addEventListener("visibilitychange", () =>
+                WS.send({ action: document.hidden ? "fm95_unsub" : "fm95_sub" }));
 
             connect();
             drawScope();

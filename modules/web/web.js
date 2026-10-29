@@ -1,5 +1,3 @@
-let ws = null;
-let reconnectDelay = 1000;
 let playlist = [];
 let queue = [];
 let last_q_len = Infinity;
@@ -71,34 +69,27 @@ function connectWs() {
     const statusEl = document.getElementById("server-status");
     statusEl.textContent = "connecting...";
 
-    ws = new WebSocket("/ws");
-
-    ws.addEventListener("open", () => {
-        statusEl.textContent = "connected";
-        reconnectDelay = 1500;
-        wsSend({ action: "get_toplay" });
-        wsSend({ action: "skipc" });
-        wsSend({ action: "skipi" });
+    WS.on("_status", s => {
+        if (s === "open") {
+            statusEl.textContent = "connected";
+            // not every tab gets these from the replay cache, so ask again
+            wsSend({ action: "get_toplay" });
+            wsSend({ action: "skipc" });
+            wsSend({ action: "skipi" });
+        } else {
+            statusEl.textContent = "disconnected — reconnecting...";
+        }
     });
 
-    ws.addEventListener("close", () => {
-        statusEl.textContent = "disconnected — reconnecting...";
-        setTimeout(connectWs, reconnectDelay);
-        reconnectDelay = Math.min(10000, reconnectDelay + 1500);
-    });
-
-    ws.addEventListener("error", e => {
-        console.error("WS error", e);
-        statusEl.textContent = "error";
-    });
-
-    ws.addEventListener("message", evt => {
-        handleMessage(JSON.parse(evt.data));
+    // full message objects, same shape handleMessage already expects
+    WS.on("*", m => {
+        if (m.event?.startsWith("_")) return;   // skip worker-internal events
+        handleMessage(m);
     });
 }
 
 function wsSend(obj) {
-    ws.send(JSON.stringify(obj));
+    WS.send(obj);
 }
 function handleMessage(msg) {
     switch (msg.event) {
@@ -526,7 +517,7 @@ function animateProgress() {
 }
 
 initLayout();
-setTimeout(connectWs, 100);
+connectWs();
 requestAnimationFrame(animateProgress);
 setTimeout(() => {
     document.getElementById("prog-fill").classList.remove("init")
