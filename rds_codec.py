@@ -296,9 +296,11 @@ def _rds_encode(text: str, errors: str = 'strict') -> Tuple[bytes, int]:
                     f'U+{ord(ch):04X} ({ch!r}) has no RDS mapping'
                 )
             elif errors == 'replace':
-                rds2 = _UCS2_TO_RDS.get(ord(unidecode.unidecode(ch, "replace", " ")))
-                if rds2 is not None: out.append(rds2)
-                else: out.append(0x20)   # substitute with space
+                asciie = unidecode.unidecode(ch, "replace", " ")
+                for c in asciie:
+                    rds2 = _UCS2_TO_RDS.get(ord(c))
+                    if rds2 is not None: out.append(rds2)
+                    else: out.append(0x20)   # substitute with space
             elif errors == 'ignore':
                 pass
             else:
