@@ -110,7 +110,7 @@ class Module(ActiveModifier):
         else: self.last_track = track
         self.limit_tracks = self.can_limit_tracks
 
-        if self.limit_tracks:
+        if self.limit_tracks and self.last_track.path.exists():
             last_track_duration = self._imc.send(self, "procman", {"op": 1, "arg": self.last_track.path}) # Ask procman for the duration of this file
             assert isinstance(last_track_duration, dict)
             last_track_duration = last_track_duration.get("arg")

@@ -57,8 +57,10 @@ class ProcmanCommunicator(BaseIMCModule):
 
             if int(op) == 0: return {"op": 0, "arg": "pong"}
             elif int(op) == 1:
-                if arg := data.get("arg"): return {"op": 1, "arg": self.tinytag.get(arg, tags=False).duration}
-                else: return
+                try:
+                    if arg := data.get("arg"): return {"op": 1, "arg": self.tinytag.get(arg, tags=False).duration}
+                    else: return
+                except Exception: return {"op": 1}
             elif int(op) == 2:
                 self.procman.stop_all(data.get("timeout", None))
                 return {"op": 2}
